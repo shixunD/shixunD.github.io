@@ -80,7 +80,7 @@
                 </div>
 
                 <div class="input-calendar-layout">
-                    <!-- 录入区域 -->
+                    <!-- 左侧：录入区域 -->
                     <div class="input-section">
                         <div class="add-word-form">
                             <input type="text" id="word-input" placeholder="输入单词或词组..." autocomplete="off" />
@@ -92,25 +92,38 @@
                         </div>
                     </div>
 
-                    <!-- 日历视图 -->
-                    <div class="calendar-container">
-                        <div class="calendar-header">
-                            <button class="calendar-nav-btn" id="prev-month-btn">◀</button>
-                            <div class="calendar-title" id="calendar-title"></div>
-                            <button class="calendar-nav-btn" id="next-month-btn">▶</button>
+                    <!-- 右侧：日历和搜索框 -->
+                    <div class="calendar-search-wrapper">
+                        <!-- 日历视图 -->
+                        <div class="calendar-container">
+                            <div class="calendar-header">
+                                <button class="calendar-nav-btn" id="prev-month-btn">◀</button>
+                                <div class="calendar-title" id="calendar-title"></div>
+                                <button class="calendar-nav-btn" id="next-month-btn">▶</button>
+                            </div>
+                            <div class="calendar-weekdays">
+                                <div class="calendar-weekday">一</div>
+                                <div class="calendar-weekday">二</div>
+                                <div class="calendar-weekday">三</div>
+                                <div class="calendar-weekday">四</div>
+                                <div class="calendar-weekday">五</div>
+                                <div class="calendar-weekday">六</div>
+                                <div class="calendar-weekday">日</div>
+                                <div class="calendar-weekday week-header">周计</div>
+                            </div>
+                            <div class="calendar-grid" id="calendar-grid">
+                                <!-- 日历日期将动态生成 -->
+                            </div>
                         </div>
-                        <div class="calendar-weekdays">
-                            <div class="calendar-weekday">一</div>
-                            <div class="calendar-weekday">二</div>
-                            <div class="calendar-weekday">三</div>
-                            <div class="calendar-weekday">四</div>
-                            <div class="calendar-weekday">五</div>
-                            <div class="calendar-weekday">六</div>
-                            <div class="calendar-weekday">日</div>
-                            <div class="calendar-weekday week-header">周计</div>
-                        </div>
-                        <div class="calendar-grid" id="calendar-grid">
-                            <!-- 日历日期将动态生成 -->
+
+                        <!-- 搜索框 -->
+                        <div class="word-search-container">
+                            <div class="word-search-input-wrapper">
+                                <input type="text" id="word-search-input" placeholder="🔍 搜索单词..." autocomplete="off" />
+                            </div>
+                            <div class="word-search-results" id="word-search-results">
+                                <!-- 搜索结果将动态生成 -->
+                            </div>
                         </div>
                     </div>
                 </div>

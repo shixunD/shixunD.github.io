@@ -39,38 +39,38 @@ async function handleWebOAuthCallback() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
-    
+
     if (!code || !state) return; // 不是 OAuth 回调
-    
+
     console.log('检测到 OAuth 回调参数，处理中...');
-    
+
     try {
         // 获取保存的 PKCE 数据
         const pkceKey = TauriAPI._oneDriveConfig?.pkceKey || 'onedrive_pkce_web';
         const pkceData = localStorage.getItem(pkceKey);
-        
+
         if (!pkceData) {
             console.error('未找到 PKCE 数据');
             return;
         }
-        
+
         const { codeVerifier, state: savedState } = JSON.parse(pkceData);
-        
+
         if (state !== savedState) {
             console.error('State 不匹配');
             return;
         }
-        
+
         // 使用授权码换取 token
         await TauriAPI.waitForOAuthCallback(savedState);
         console.log('✅ OAuth 登录成功');
-        
+
         // 显示成功提示
         setTimeout(() => {
             if (typeof Toast !== 'undefined') {
                 Toast.success('OneDrive 登录成功！');
             }
-            
+
             // 刷新设置页面的 OneDrive 状态
             if (typeof SettingsPage !== 'undefined' && SettingsPage.checkOneDriveStatus) {
                 SettingsPage.checkOneDriveStatus();

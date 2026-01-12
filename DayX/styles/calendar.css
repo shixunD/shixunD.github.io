@@ -1,19 +1,16 @@
 /* 日历组件样式 */
 
 .calendar-container {
-    width: 460px;
-    max-width: 460px;
-    /* 最大宽度限制 */
-    flex: 0 1 460px;
-    /* 不增长、可缩小、基础宽度460px */
-    min-width: 150px;
-    /* 最小宽度，保证可用性 */
+    width: 100%;
+    max-width: 100%;
+    /* 自适应父容器宽度 */
     background: var(--card-bg);
     border-radius: 12px;
     padding: 0.8rem;
     box-shadow: var(--shadow);
     overflow: hidden;
     /* 防止内容溢出 */
+    box-sizing: border-box;
 }
 
 .calendar-header {
@@ -346,4 +343,104 @@
 
 .month-card.empty .month-count {
     color: var(--text-secondary);
+}
+
+/* 日历和搜索框包裹容器 */
+.calendar-search-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 50%;
+    /* 强制宽度为 50% */
+    box-sizing: border-box;
+    gap: 0.8rem;
+}
+
+/* 搜索框样式 */
+.word-search-container {
+    width: 100%;
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 0.8rem;
+    box-shadow: var(--shadow);
+}
+
+.word-search-input-wrapper {
+    position: relative;
+}
+
+.word-search-input-wrapper input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: var(--bg-color);
+    color: var(--text-primary);
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.word-search-input-wrapper input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.word-search-input-wrapper input::placeholder {
+    color: var(--text-secondary);
+}
+
+.word-search-results {
+    margin-top: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.word-search-results:empty {
+    display: none;
+}
+
+.search-result-item {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-word {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+}
+
+.search-result-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.search-date-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.search-date-btn:hover {
+    background: #357abd;
+    transform: scale(1.05);
+}
+
+.search-no-results {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 1rem 0;
 }

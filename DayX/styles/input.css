@@ -101,15 +101,17 @@
     align-items: flex-start;
     flex-wrap: nowrap;
     /* 强制不换行 */
-    overflow: hidden;
-    /* 防止溢出 */
+    overflow: visible;
+    /* 允许内容显示 */
     min-height: 0;
     /* 允许缩小 */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .input-section {
-    flex: 1 1 80%;
-    /* 可增长、可缩小，基础宽度50% */
+    flex: 1 1 50%;
+    /* 强制宽度为 50% */
     min-width: 0;
     /* 允许缩小到内容以下 */
     background: var(--card-bg);

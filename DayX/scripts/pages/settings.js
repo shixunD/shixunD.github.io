@@ -646,7 +646,7 @@ const SettingsPage = {
     async loadAutostartStatus() {
         const checkbox = document.getElementById('autostart-checkbox');
         const autostartSection = document.getElementById('settings-autostart');
-        
+
         // Web 版本隐藏开机自启功能
         if (TauriAPI.isWebBuild) {
             if (autostartSection) {
@@ -654,7 +654,7 @@ const SettingsPage = {
             }
             return;
         }
-        
+
         try {
             const isEnabled = await TauriAPI.isAutostartEnabled();
             checkbox.checked = isEnabled;
@@ -670,7 +670,7 @@ const SettingsPage = {
             Toast.warning('Web 版本不支持开机自启功能');
             return;
         }
-        
+
         const checkbox = document.getElementById('autostart-checkbox');
         const isEnabled = checkbox.checked;
 

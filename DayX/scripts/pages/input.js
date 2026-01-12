@@ -1,10 +1,13 @@
 // 录入页面逻辑
 const InputPage = {
+    searchTimeout: null,  // 搜索防抖定时器
+
     init() {
         const addButton = document.getElementById('add-word-btn');
         const wordInput = document.getElementById('word-input');
         const yearOverviewBtn = document.getElementById('year-overview-btn');
         const syncBtn = document.getElementById('sync-onedrive-btn');
+        const searchInput = document.getElementById('word-search-input');
 
         // 添加单词
         addButton.addEventListener('click', () => this.addWord());
@@ -24,6 +27,9 @@ const InputPage = {
 
         // 同步按钮
         syncBtn.addEventListener('click', () => this.syncToOneDrive());
+
+        // 搜索框事件
+        searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
 
         this.load();
     },
@@ -548,5 +554,93 @@ const InputPage = {
             syncBtn.classList.remove('syncing');
             syncBtn.disabled = false;
         }
+    },
+
+    // 处理搜索（带防抖）
+    handleSearch(query) {
+        // 清除之前的定时器
+        if (this.searchTimeout) {
+            clearTimeout(this.searchTimeout);
+        }
+
+        const resultsContainer = document.getElementById('word-search-results');
+
+        // 如果搜索框为空，清空结果
+        if (!query.trim()) {
+            resultsContainer.innerHTML = '';
+            return;
+        }
+
+        // 防抖：300ms 后执行搜索
+        this.searchTimeout = setTimeout(async () => {
+            await this.performSearch(query.trim());
+        }, 300);
+    },
+
+    // 执行搜索
+    async performSearch(query) {
+        const resultsContainer = document.getElementById('word-search-results');
+
+        try {
+            const results = await TauriAPI.searchWords(query);
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="search-no-results">未找到匹配的单词</div>';
+                return;
+            }
+
+            // 渲染搜索结果
+            resultsContainer.innerHTML = results.map(([word, dates]) => {
+                const dateButtons = dates.map(date => {
+                    // 格式化日期为 YY.MM.DD
+                    const formattedDate = this.formatDateShort(date);
+                    return `<button class="search-date-btn" data-date="${date}">${formattedDate}</button>`;
+                }).join('');
+
+                return `
+                    <div class="search-result-item">
+                        <div class="search-result-word">${this.escapeHtml(word)}</div>
+                        <div class="search-result-dates">${dateButtons}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // 绑定日期按钮点击事件
+            resultsContainer.querySelectorAll('.search-date-btn').forEach(btn => {
+                btn.addEventListener('click', () => this.jumpToDate(btn.dataset.date));
+            });
+
+        } catch (error) {
+            console.error('搜索失败:', error);
+            resultsContainer.innerHTML = '<div class="search-no-results">搜索出错</div>';
+        }
+    },
+
+    // 格式化日期为 YY.MM.DD
+    formatDateShort(dateStr) {
+        const [year, month, day] = dateStr.split('-');
+        return `${year.slice(2)}.${month}.${day}`;
+    },
+
+    // 跳转到指定日期
+    async jumpToDate(dateStr) {
+        // 更新当前日期
+        AppState.currentDate = dateStr;
+
+        // 解析日期更新日历视图
+        const [year, month] = dateStr.split('-').map(Number);
+        AppState.calendarYear = year;
+        AppState.calendarMonth = month - 1;  // JavaScript 月份从 0 开始
+
+        // 刷新日历和录入页面
+        await Calendar.render();
+        await this.load();
+    },
+
+    // HTML 转义（防止 XSS）
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 };
