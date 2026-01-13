@@ -704,7 +704,12 @@
     async toggleLockState() { return false; },
     async toggleDesktopPin() { return false; },
     async updateDesktopPinState(isPinned) { return false; },
-    async getSavedWindowState() { return {}; }
+    async getSavedWindowState() { return {}; },
+
+    // 打开外部链接（Web 版本）
+    async openExternalUrl(url) {
+      window.open(url, '_blank');
+    }
   };
 
   // export to global as TauriAPI so existing code works without changes
