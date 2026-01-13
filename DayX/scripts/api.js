@@ -395,10 +395,19 @@
     // OneDrive 配置
     _oneDriveConfig: {
       clientId: 'cf9e57d0-7dc3-4fd9-93f9-751d2abc1124', // 与 Tauri 版本相同
-      // 自动检测 redirect_uri：本地开发用 localhost，生产用 GitHub Pages
-      redirectUri: window.location.hostname === 'localhost'
-        ? 'http://localhost:8080'
-        : 'https://aaaableng.github.io/DayX/',
+      // 自动检测 redirect_uri：本地开发用 localhost，生产用当前域名
+      // ⚠️ 注意：需要在 Azure Portal 的应用注册中添加以下重定向 URI：
+      //   - http://localhost:8080 (本地开发)
+      //   - https://你的用户名.github.io/DayX/ (GitHub Pages)
+      //   类型选择：单页应用程序 (SPA)
+      get redirectUri() {
+        if (window.location.hostname === 'localhost') {
+          return 'http://localhost:8080';
+        } else {
+          // 自动使用当前部署的完整 URL（包含路径）
+          return window.location.origin + window.location.pathname;
+        }
+      },
       scopes: 'Files.ReadWrite.AppFolder offline_access',
       tokenKey: 'onedrive_token_web',
       pkceKey: 'onedrive_pkce_web'
