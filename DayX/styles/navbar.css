@@ -1,8 +1,5 @@
 /* 导航栏样式 */
 
-/* 导入 Google Fonts Caveat 字体 */
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap');
-
 .navbar {
     background: var(--card-bg);
     box-shadow: var(--shadow);
