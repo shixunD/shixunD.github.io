@@ -35,7 +35,7 @@
     border-radius: 50%;
     font-size: 0.9rem;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: background-color 0.2s ease, transform 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -92,7 +92,7 @@
     background: var(--bg-color);
     border: 1px solid transparent;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
     position: relative;
     font-size: 0.8rem;
     min-width: 0;
@@ -254,7 +254,7 @@
     border-radius: 50%;
     font-size: 1.2rem;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: background-color 0.2s ease, transform 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -277,7 +277,7 @@
     border-radius: 50%;
     font-size: 1.2rem;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -302,7 +302,7 @@
     border-radius: 12px;
     padding: 1.5rem 1rem;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
     text-align: center;
 }
 
@@ -430,7 +430,7 @@
     border-radius: 4px;
     font-size: 0.75rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .search-date-btn:hover {

@@ -29,7 +29,10 @@ body {
 /* 页面容器 */
 .page {
     display: none;
-    animation: fadeIn 0.3s ease-in;
+    /* 使用更轻量的淡入动画，只改变 opacity */
+    animation: fadeIn 0.2s ease-out;
+    /* 提示浏览器优化渲染 */
+    will-change: opacity;
 }
 
 .page.active {
@@ -39,12 +42,10 @@ body {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(10px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -147,4 +148,9 @@ h2 {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--primary-color);
+}
+
+/* 日历搜索包装器最大宽度限制 */
+.calendar-search-wrapper {
+    max-width: 400px;
 }
