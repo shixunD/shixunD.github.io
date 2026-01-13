@@ -194,6 +194,46 @@
     font-size: 0.95rem;
 }
 
+/* Web 版本数据持久化提示 */
+.web-only-notice {
+    border: 2px solid #2196f3;
+    background: #e3f2fd;
+}
+
+.web-only-notice h2 {
+    color: #1976d2;
+}
+
+.notice-content {
+    color: #333;
+}
+
+.notice-list {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    line-height: 1.8;
+}
+
+.notice-list li {
+    margin-bottom: 0.5rem;
+}
+
+.notice-list strong {
+    color: #1976d2;
+}
+
+.notice-tip {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #fff;
+    border-radius: 6px;
+    border-left: 4px solid #2196f3;
+}
+
+.notice-tip strong {
+    color: #1976d2;
+}
+
 /* 危险区域 */
 .danger-zone {
     border: 2px solid #ff6b6b;

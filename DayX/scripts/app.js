@@ -4,6 +4,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 0. 检查是否是 Web 版本的 OAuth 回调（仅 Web 版本）
     if (typeof TauriAPI !== 'undefined' && TauriAPI.isWebBuild) {
+        // 请求持久化存储权限（防止 IndexedDB 被清理）
+        if (TauriAPI.requestPersistentStorage) {
+            await TauriAPI.requestPersistentStorage();
+        }
         await handleWebOAuthCallback();
     }
 
@@ -105,8 +109,8 @@ function initWindowDrag() {
             return;
         }
 
-        // 只在点击 navbar 背景区域时触发拖动，不在按钮上
-        if (e.target.closest('.nav-btn')) {
+        // 只在点击 navbar 背景区域时触发拖动，不在按钮或品牌链接上
+        if (e.target.closest('.nav-btn') || e.target.closest('.nav-brand-container')) {
             return;
         }
 
@@ -136,6 +140,23 @@ function initWindowDrag() {
     navbar.style.userSelect = 'none';
     navbar.style.webkitUserSelect = 'none';
     navbar.style.webkitAppRegion = 'no-drag'; // 重要：防止默认拖动行为
+
+    // 为 nav-brand 和 nav-homepagedirector 添加点击事件，打开链接
+    const navBrand = document.querySelector('.nav-brand');
+    const navDirector = document.querySelector('.nav-homepagedirector');
+
+    if (navBrand) {
+        navBrand.addEventListener('click', () => {
+            openExternalLink('https://shixund.github.io/');
+        });
+    }
+
+    if (navDirector) {
+        navDirector.addEventListener('click', (e) => {
+            e.stopPropagation(); // 防止事件冒泡
+            openExternalLink('https://shixund.github.io/');
+        });
+    }
 }
 
 // 更新导航栏鼠标样式
@@ -316,4 +337,17 @@ function setupEventListeners() {
     });
 
     console.log('✅ 事件监听器已设置');
+}
+
+// 打开外部链接
+function openExternalLink(url) {
+    if (TauriAPI && TauriAPI.openExternalUrl) {
+        // 桌面版本使用 Tauri API
+        TauriAPI.openExternalUrl(url).catch(err => {
+            console.error('打开链接失败:', err);
+        });
+    } else {
+        // Web 版本使用原生 window.open
+        window.open(url, '_blank');
+    }
 }

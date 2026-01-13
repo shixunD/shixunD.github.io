@@ -1,6 +1,14 @@
 // 设置页面逻辑
 const SettingsPage = {
     init() {
+        // 显示 Web 版本数据持久化提示（仅 Web 版）
+        if (TauriAPI.isWebBuild) {
+            const webDataNotice = document.getElementById('web-data-notice');
+            if (webDataNotice) {
+                webDataNotice.style.display = 'block';
+            }
+        }
+
         const saveBtn = document.getElementById('save-settings-btn');
         const resetBtn = document.getElementById('reset-settings-btn');
         const deleteAllBtn = document.getElementById('delete-all-btn');

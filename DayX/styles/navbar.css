@@ -1,5 +1,8 @@
 /* 导航栏样式 */
 
+/* 导入 Google Fonts Caveat 字体 */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap');
+
 .navbar {
     background: var(--card-bg);
     box-shadow: var(--shadow);
@@ -22,6 +25,30 @@
     /* 品牌名称不压缩 */
     white-space: nowrap;
     /* 防止文字换行 */
+}
+
+.nav-brand-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.8rem;
+    flex-shrink: 0;
+}
+
+.nav-homepagedirector {
+    font-size: 0.7rem;
+    font-family: 'Caveat', 'Comic Sans MS', cursive;
+    color: var(--primary-color);
+    opacity: 0.75;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+    line-height: 1;
+    padding-bottom: 0.15rem;
+}
+
+.nav-homepagedirector:hover {
+    opacity: 1;
 }
 
 .nav-links {

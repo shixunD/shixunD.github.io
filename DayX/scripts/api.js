@@ -5,6 +5,22 @@
   const DB_NAME = 'dayx_web_db_v1';
   const STORE_NAME = 'days';
 
+  // 请求持久化存储权限，防止数据被浏览器自动清理
+  async function requestPersistentStorage() {
+    if (navigator.storage && navigator.storage.persist) {
+      const isPersisted = await navigator.storage.persisted();
+      if (!isPersisted) {
+        const granted = await navigator.storage.persist();
+        console.log(`持久化存储权限: ${granted ? '已授予' : '未授予'}`);
+        return granted;
+      }
+      console.log('数据已启用持久化存储');
+      return true;
+    }
+    console.warn('浏览器不支持持久化存储 API');
+    return false;
+  }
+
   function openDB() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, 1);
@@ -55,6 +71,10 @@
   const WebAPI = {
     // ============ 环境检测 ============
     isWebBuild: true, // 标记这是 Web 构建版本
+
+    // ============ 持久化存储 ============
+    // 请求持久化存储权限，防止 IndexedDB 被浏览器自动清理
+    requestPersistentStorage,
 
     // ============ 底层 API 方法（浏览器替代） ============
 

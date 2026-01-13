@@ -20,7 +20,10 @@
     <body>
         <!-- 导航栏 -->
         <nav class="navbar">
-            <div class="nav-brand">DayX 词汇复习</div>
+            <div class="nav-brand-container">
+                <div class="nav-brand">DayX 词汇复习</div>
+                <div class="nav-homepagedirector">by Shixun</div>
+            </div>
             <div class="nav-links">
                 <button class="nav-btn active" data-page="home">主页</button>
                 <button class="nav-btn" data-page="input">录入</button>
@@ -206,6 +209,25 @@
                                 <div class="onedrive-backups-list" id="onedrive-backups-list">
                                     <!-- 备份列表将动态生成 -->
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Web 版本数据持久化提示（仅 Web 版显示） -->
+                        <div class="settings-section web-only-notice" id="web-data-notice" style="display: none;">
+                            <h2>💡 数据存储提示</h2>
+                            <div class="notice-content">
+                                <p class="settings-desc">
+                                    <strong>Web 版本使用浏览器本地存储（IndexedDB）</strong>
+                                </p>
+                                <ul class="notice-list">
+                                    <li>✅ 清理浏览历史记录<strong>不会</strong>删除您的数据</li>
+                                    <li>⚠️ 清理"Cookie 和其他网站数据"<strong>会</strong>删除数据</li>
+                                    <li>💾 建议定期使用"导出数据"或"OneDrive 云备份"功能</li>
+                                    <li>🔒 应用已申请持久化存储权限，减少被自动清理的风险</li>
+                                </ul>
+                                <p class="settings-desc notice-tip">
+                                    💡 <strong>提示：</strong>清理浏览器数据时，请不要勾选"Cookie 和其他网站数据"选项，或在清理前先导出备份。
+                                </p>
                             </div>
                         </div>
 
