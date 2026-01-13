@@ -412,20 +412,20 @@ const SettingsPage = {
             if (TauriAPI.isWebBuild) {
                 // Web 版本：在新标签页打开授权页面
                 Toast.info('正在新标签页打开 Microsoft 登录页面...');
-                
+
                 // 在新标签页打开授权链接
                 TauriAPI.openAuthInNewTab(auth_url);
-                
+
                 // 显示等待提示
                 this.showAuthWaitingDialog();
-                
+
                 try {
                     // 监听授权完成消息
                     await TauriAPI.listenForAuthComplete();
-                    
+
                     // 关闭等待对话框
                     this.closeAuthWaitingDialog();
-                    
+
                     Toast.success('OneDrive 登录成功！');
                     await this.checkOneDriveStatus();
                 } catch (error) {
@@ -493,7 +493,7 @@ const SettingsPage = {
     showAuthWaitingDialog() {
         // 移除已存在的对话框
         this.closeAuthWaitingDialog();
-        
+
         const dialog = document.createElement('div');
         dialog.id = 'auth-waiting-dialog';
         dialog.className = 'auth-dialog-overlay';
@@ -666,7 +666,32 @@ const SettingsPage = {
                 return;
             }
 
-            listContainer.innerHTML = backups.map(backup => {
+            // 按日期从新到旧排序
+            const sortedBackups = backups.sort((a, b) => {
+                const dateA = new Date(a.createdDateTime || a.created_date_time);
+                const dateB = new Date(b.createdDateTime || b.created_date_time);
+                return dateB - dateA; // 降序：最新的在前
+            });
+
+            // 过滤：只显示近3条 + 近7天的内容
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+            const filteredBackups = sortedBackups.filter((backup, index) => {
+                // 前5条必须显示
+                if (index < 5) return true;
+
+                // 或者是近7天内的
+                const backupDate = new Date(backup.createdDateTime || backup.created_date_time);
+                return backupDate >= sevenDaysAgo;
+            });
+
+            if (filteredBackups.length === 0) {
+                listContainer.innerHTML = '<div class="empty-backups">暂无符合条件的备份</div>';
+                return;
+            }
+
+            listContainer.innerHTML = filteredBackups.map(backup => {
                 // Microsoft Graph API 返回 createdDateTime (camelCase)
                 const date = new Date(backup.createdDateTime || backup.created_date_time);
                 const dateStr = date.toLocaleString('zh-CN');
