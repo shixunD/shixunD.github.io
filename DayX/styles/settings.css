@@ -811,6 +811,42 @@
     color: #0945a5;
 }
 
+/* 等待授权对话框样式 */
+.auth-waiting-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem 0;
+}
+
+.auth-waiting-spinner .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(33, 150, 243, 0.2);
+    border-top-color: #2196F3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.auth-waiting-spinner span {
+    color: var(--text-secondary, #666);
+    font-size: 0.9rem;
+}
+
+.auth-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #888);
+    margin-top: 1rem;
+    opacity: 0.8;
+}
+
 @keyframes slideUp {
     from {
         opacity: 0;

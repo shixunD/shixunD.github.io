@@ -40,49 +40,110 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Web 版本 OAuth 回调处理
 async function handleWebOAuthCallback() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-
-    if (!code || !state) return; // 不是 OAuth 回调
-
-    console.log('检测到 OAuth 回调参数，处理中...');
+    // 使用新的回调检查方法
+    if (!TauriAPI.checkAndHandleOAuthCallback) {
+        console.warn('checkAndHandleOAuthCallback 方法不存在');
+        return;
+    }
 
     try {
-        // 获取保存的 PKCE 数据
-        const pkceKey = TauriAPI._oneDriveConfig?.pkceKey || 'onedrive_pkce_web';
-        const pkceData = localStorage.getItem(pkceKey);
-
-        if (!pkceData) {
-            console.error('未找到 PKCE 数据');
-            return;
+        const result = await TauriAPI.checkAndHandleOAuthCallback();
+        
+        if (!result.isCallback) {
+            return; // 不是 OAuth 回调页面
         }
 
-        const { codeVerifier, state: savedState } = JSON.parse(pkceData);
+        console.log('检测到 OAuth 回调，处理结果:', result);
 
-        if (state !== savedState) {
-            console.error('State 不匹配');
-            return;
+        if (result.success) {
+            // 授权成功 - 显示成功页面
+            showOAuthSuccessPage();
+        } else {
+            // 授权失败 - 显示错误信息
+            setTimeout(() => {
+                if (typeof Toast !== 'undefined') {
+                    Toast.error(`登录失败: ${result.error}`);
+                }
+            }, 500);
         }
-
-        // 使用授权码换取 token
-        await TauriAPI.waitForOAuthCallback(savedState);
-        console.log('✅ OAuth 登录成功');
-
-        // 显示成功提示
-        setTimeout(() => {
-            if (typeof Toast !== 'undefined') {
-                Toast.success('OneDrive 登录成功！');
-            }
-
-            // 刷新设置页面的 OneDrive 状态
-            if (typeof SettingsPage !== 'undefined' && SettingsPage.checkOneDriveStatus) {
-                SettingsPage.checkOneDriveStatus();
-            }
-        }, 500);
     } catch (error) {
         console.error('OAuth 回调处理失败:', error);
     }
+}
+
+// 显示 OAuth 授权成功页面（在回调标签页中）
+function showOAuthSuccessPage() {
+    // 创建成功提示覆盖层
+    const overlay = document.createElement('div');
+    overlay.className = 'oauth-success-overlay';
+    overlay.innerHTML = `
+        <div class="oauth-success-content">
+            <div class="oauth-success-icon">✅</div>
+            <h2>授权成功！</h2>
+            <p>OneDrive 登录已完成</p>
+            <p class="oauth-success-hint">您可以关闭此标签页，返回原页面继续使用</p>
+            <button class="oauth-close-btn" onclick="window.close()">关闭此标签页</button>
+        </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .oauth-success-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-color, #fff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .oauth-success-content {
+            text-align: center;
+            padding: 40px;
+        }
+        .oauth-success-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .oauth-success-content h2 {
+            color: var(--primary-color, #2196F3);
+            margin-bottom: 10px;
+        }
+        .oauth-success-content p {
+            color: var(--text-secondary, #666);
+            margin-bottom: 8px;
+        }
+        .oauth-success-hint {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        .oauth-close-btn {
+            margin-top: 24px;
+            padding: 12px 32px;
+            background: var(--primary-color, #2196F3);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .oauth-close-btn:hover {
+            background: var(--primary-hover, #1976D2);
+        }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+    
+    // 5秒后自动关闭标签页
+    setTimeout(() => {
+        window.close();
+    }, 5000);
 }
 
 // 窗口拖动状态
@@ -340,14 +401,18 @@ function setupEventListeners() {
 }
 
 // 打开外部链接
-function openExternalLink(url) {
-    if (TauriAPI && TauriAPI.openExternalUrl) {
-        // 桌面版本使用 Tauri API
-        TauriAPI.openExternalUrl(url).catch(err => {
-            console.error('打开链接失败:', err);
-        });
-    } else {
-        // Web 版本使用原生 window.open
+async function openExternalLink(url) {
+    try {
+        if (TauriAPI && TauriAPI.openExternalUrl) {
+            // 使用统一的 API（桌面版和 Web 版都支持）
+            await TauriAPI.openExternalUrl(url);
+        } else {
+            // 降级处理：直接使用 window.open
+            window.open(url, '_blank');
+        }
+    } catch (err) {
+        console.error('打开链接失败:', err);
+        // 如果 API 调用失败，降级使用 window.open
         window.open(url, '_blank');
     }
 }

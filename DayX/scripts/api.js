@@ -2,8 +2,9 @@
 // Provides the same method signatures as scripts/api.js but runs in the browser.
 
 (function (global) {
-  const DB_NAME = 'dayx_web_db_v1';
+  const DB_NAME = 'dayx_web_db_v2'; // 升级版本以添加 settings store
   const STORE_NAME = 'days';
+  const SETTINGS_STORE = 'settings'; // 新增：存储 OneDrive token 等设置
 
   // 请求持久化存储权限，防止数据被浏览器自动清理
   async function requestPersistentStorage() {
@@ -26,9 +27,14 @@
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
+        // 创建词汇数据 store
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: 'date' });
           store.createIndex('date_idx', 'date');
+        }
+        // 创建设置 store（存储 OneDrive token 等）
+        if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
+          db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -44,6 +50,51 @@
       Promise.resolve(fn(store)).then(r => {
         tx.oncomplete = () => { db.close(); resolve(r); };
       }).catch(err => { db.close(); reject(err); });
+    });
+  }
+
+  // 操作 settings store 的辅助函数
+  async function withSettingsDB(fn) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SETTINGS_STORE, 'readwrite');
+      const store = tx.objectStore(SETTINGS_STORE);
+      Promise.resolve(fn(store)).then(r => {
+        tx.oncomplete = () => { db.close(); resolve(r); };
+      }).catch(err => { db.close(); reject(err); });
+    });
+  }
+
+  // 保存设置到 IndexedDB
+  async function saveSetting(key, value) {
+    return withSettingsDB(store => {
+      return new Promise((resolve, reject) => {
+        const req = store.put({ key, value });
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+      });
+    });
+  }
+
+  // 从 IndexedDB 读取设置
+  async function getSetting(key) {
+    return withSettingsDB(store => {
+      return new Promise((resolve, reject) => {
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result?.value || null);
+        req.onerror = () => reject(req.error);
+      });
+    });
+  }
+
+  // 从 IndexedDB 删除设置
+  async function deleteSetting(key) {
+    return withSettingsDB(store => {
+      return new Promise((resolve, reject) => {
+        const req = store.delete(key);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+      });
     });
   }
 
@@ -441,7 +492,7 @@
       const { codeVerifier, codeChallenge } = await this._generatePKCE();
       const state = this._generateState();
 
-      // 保存 PKCE 参数到 localStorage
+      // 保存 PKCE 参数到 localStorage（供回调页面使用）
       localStorage.setItem(this._oneDriveConfig.pkceKey, JSON.stringify({
         codeVerifier,
         state,
@@ -461,85 +512,178 @@
       return { auth_url: authUrl, state };
     },
 
-    // 等待 OAuth 回调（浏览器版本直接检查 URL 参数）
-    async waitForOAuthCallback(expectedState) {
+    // 在新标签页中打开授权页面
+    openAuthInNewTab(authUrl) {
+      const authWindow = window.open(authUrl, '_blank', 'width=600,height=700');
+      return authWindow;
+    },
+
+    // 监听来自授权标签页的消息
+    listenForAuthComplete() {
+      return new Promise((resolve, reject) => {
+        // 使用 BroadcastChannel 进行标签页间通信
+        const channel = new BroadcastChannel('dayx_oauth_channel');
+        
+        // 设置 5 分钟超时
+        const timeout = setTimeout(() => {
+          channel.close();
+          reject(new Error('授权超时'));
+        }, 5 * 60 * 1000);
+
+        channel.onmessage = (event) => {
+          if (event.data.type === 'oauth_complete') {
+            clearTimeout(timeout);
+            channel.close();
+            if (event.data.success) {
+              resolve(event.data.token);
+            } else {
+              reject(new Error(event.data.error || '授权失败'));
+            }
+          }
+        };
+
+        // 同时轮询检查 localStorage（作为备用方案）
+        const pollInterval = setInterval(async () => {
+          const token = await this._getValidToken();
+          if (token) {
+            clearInterval(pollInterval);
+            clearTimeout(timeout);
+            channel.close();
+            resolve({ access_token: token });
+          }
+        }, 2000);
+
+        // 超时时也清理轮询
+        setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
+      });
+    },
+
+    // 通知原标签页授权完成
+    notifyAuthComplete(success, tokenOrError) {
+      const channel = new BroadcastChannel('dayx_oauth_channel');
+      channel.postMessage({
+        type: 'oauth_complete',
+        success,
+        token: success ? tokenOrError : null,
+        error: success ? null : tokenOrError
+      });
+      channel.close();
+    },
+
+    // 检查并处理 OAuth 回调（在页面加载时调用）
+    async checkAndHandleOAuthCallback() {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       const error = urlParams.get('error');
 
+      // 没有回调参数，不是回调页面
+      if (!code && !error) {
+        return { isCallback: false };
+      }
+
+      // 标记这是一个回调页面
       if (error) {
-        throw new Error(`OAuth 授权失败: ${error}`);
-      }
-
-      if (!code || !state) {
-        return null; // 没有回调参数
-      }
-
-      if (state !== expectedState) {
-        throw new Error('State 验证失败，可能存在安全风险');
+        // 通知原标签页授权失败
+        this.notifyAuthComplete(false, `OAuth 授权失败: ${error}`);
+        // 清除 URL 参数
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return { isCallback: true, success: false, error };
       }
 
       // 获取保存的 PKCE 参数
       const pkceData = localStorage.getItem(this._oneDriveConfig.pkceKey);
       if (!pkceData) {
-        throw new Error('未找到 PKCE 数据');
+        const errorMsg = '未找到 PKCE 数据，请重新登录';
+        this.notifyAuthComplete(false, errorMsg);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return { isCallback: true, success: false, error: errorMsg };
       }
 
-      const { codeVerifier } = JSON.parse(pkceData);
+      const { codeVerifier, state: expectedState } = JSON.parse(pkceData);
 
-      // 使用授权码换取 token
-      const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: this._oneDriveConfig.clientId,
-          scope: this._oneDriveConfig.scopes,
-          code: code,
-          redirect_uri: this._oneDriveConfig.redirectUri,
-          grant_type: 'authorization_code',
-          code_verifier: codeVerifier
-        })
-      });
-
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        throw new Error(`Token 交换失败: ${errorText}`);
+      // 验证 state
+      if (state !== expectedState) {
+        const errorMsg = 'State 验证失败，可能存在安全风险';
+        this.notifyAuthComplete(false, errorMsg);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return { isCallback: true, success: false, error: errorMsg };
       }
 
-      const tokenData = await tokenResponse.json();
+      try {
+        // 使用授权码换取 token
+        const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: this._oneDriveConfig.clientId,
+            scope: this._oneDriveConfig.scopes,
+            code: code,
+            redirect_uri: this._oneDriveConfig.redirectUri,
+            grant_type: 'authorization_code',
+            code_verifier: codeVerifier
+          })
+        });
 
-      // 保存 token
-      const token = {
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expires_in: tokenData.expires_in,
-        expires_at: Math.floor(Date.now() / 1000) + tokenData.expires_in,
-        token_type: tokenData.token_type
-      };
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          const errorMsg = `Token 交换失败: ${errorText}`;
+          this.notifyAuthComplete(false, errorMsg);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return { isCallback: true, success: false, error: errorMsg };
+        }
 
-      localStorage.setItem(this._oneDriveConfig.tokenKey, JSON.stringify(token));
-      localStorage.removeItem(this._oneDriveConfig.pkceKey);
+        const tokenData = await tokenResponse.json();
 
-      console.log('✅ Token 已保存到 localStorage:', {
-        tokenKey: this._oneDriveConfig.tokenKey,
-        hasRefreshToken: !!token.refresh_token,
-        expiresAt: new Date(token.expires_at * 1000).toLocaleString()
-      });
+        // 保存 token
+        const token = {
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          expires_in: tokenData.expires_in,
+          expires_at: Math.floor(Date.now() / 1000) + tokenData.expires_in,
+          token_type: tokenData.token_type
+        };
 
-      // 清除 URL 参数
-      window.history.replaceState({}, document.title, window.location.pathname);
+        localStorage.setItem(this._oneDriveConfig.tokenKey, JSON.stringify(token));
+        localStorage.removeItem(this._oneDriveConfig.pkceKey);
 
-      return token;
+        console.log('✅ Token 已保存到 localStorage:', {
+          tokenKey: this._oneDriveConfig.tokenKey,
+          hasRefreshToken: !!token.refresh_token,
+          expiresAt: new Date(token.expires_at * 1000).toLocaleString()
+        });
+
+        // 通知原标签页授权成功
+        this.notifyAuthComplete(true, token);
+
+        // 清除 URL 参数
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        return { isCallback: true, success: true, token };
+      } catch (e) {
+        const errorMsg = `授权处理失败: ${e.message}`;
+        this.notifyAuthComplete(false, errorMsg);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return { isCallback: true, success: false, error: errorMsg };
+      }
+    },
+
+    // 等待 OAuth 回调（已废弃，保留兼容性）
+    async waitForOAuthCallback(expectedState) {
+      // 这个方法在新的新标签页方案中不再直接使用
+      // 保留以兼容桌面版本
+      return null;
     },
 
     // 获取当前 token（自动刷新）
     async _getValidToken() {
       const tokenStr = localStorage.getItem(this._oneDriveConfig.tokenKey);
+      console.log('_getValidToken: tokenStr存在?', !!tokenStr);
       if (!tokenStr) return null;
 
       const token = JSON.parse(tokenStr);
       const now = Math.floor(Date.now() / 1000);
+      console.log('_getValidToken: token解析成功, expires_at:', token.expires_at, ', now:', now, ', 剩余秒数:', token.expires_at - now);
 
       // 如果 token 还有 5 分钟以上有效期，直接返回
       if (token.expires_at - now > 300) {
@@ -687,12 +831,11 @@
 
     // 检查是否已登录
     async isOneDriveLoggedIn() {
+      console.log('isOneDriveLoggedIn: 开始检查...');
+      console.log('isOneDriveLoggedIn: tokenKey =', this._oneDriveConfig.tokenKey);
+      console.log('isOneDriveLoggedIn: localStorage中的值 =', localStorage.getItem(this._oneDriveConfig.tokenKey));
       const token = await this._getValidToken();
-      console.log('检查 OneDrive 登录状态:', {
-        hasToken: !!token,
-        tokenKey: this._oneDriveConfig.tokenKey,
-        localStorageValue: localStorage.getItem(this._oneDriveConfig.tokenKey)
-      });
+      console.log('isOneDriveLoggedIn: _getValidToken返回:', !!token);
       return !!token;
     },
 
@@ -708,7 +851,7 @@
 
     // 打开外部链接（Web 版本）
     async openExternalUrl(url) {
-      window.open(url, '_blank');
+      return window.open(url, '_blank');
     }
   };
 

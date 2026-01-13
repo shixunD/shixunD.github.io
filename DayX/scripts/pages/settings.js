@@ -378,17 +378,22 @@ const SettingsPage = {
 
     // OneDrive 相关方法
     async checkOneDriveStatus() {
+        console.log('checkOneDriveStatus: 开始检查 OneDrive 状态...');
         try {
             const isLoggedIn = await TauriAPI.isOneDriveLoggedIn();
+            console.log('checkOneDriveStatus: isLoggedIn =', isLoggedIn);
             const loginSection = document.getElementById('onedrive-login-section');
             const loggedInSection = document.getElementById('onedrive-logged-in-section');
+            console.log('checkOneDriveStatus: loginSection存在?', !!loginSection, ', loggedInSection存在?', !!loggedInSection);
 
             if (isLoggedIn) {
+                console.log('checkOneDriveStatus: 用户已登录，显示已登录界面');
                 loginSection.style.display = 'none';
                 loggedInSection.style.display = 'block';
                 await this.loadOneDriveUser();
                 await this.refreshBackupsList();
             } else {
+                console.log('checkOneDriveStatus: 用户未登录，显示登录按钮');
                 loginSection.style.display = 'block';
                 loggedInSection.style.display = 'none';
             }
@@ -405,9 +410,28 @@ const SettingsPage = {
 
             // 检查是否是 Web 版本
             if (TauriAPI.isWebBuild) {
-                // Web 版本：直接重定向到授权页面
-                Toast.info('正在跳转到 Microsoft 登录页面...');
-                window.location.href = auth_url;
+                // Web 版本：在新标签页打开授权页面
+                Toast.info('正在新标签页打开 Microsoft 登录页面...');
+                
+                // 在新标签页打开授权链接
+                TauriAPI.openAuthInNewTab(auth_url);
+                
+                // 显示等待提示
+                this.showAuthWaitingDialog();
+                
+                try {
+                    // 监听授权完成消息
+                    await TauriAPI.listenForAuthComplete();
+                    
+                    // 关闭等待对话框
+                    this.closeAuthWaitingDialog();
+                    
+                    Toast.success('OneDrive 登录成功！');
+                    await this.checkOneDriveStatus();
+                } catch (error) {
+                    this.closeAuthWaitingDialog();
+                    throw error;
+                }
                 return;
             }
 
@@ -462,6 +486,52 @@ const SettingsPage = {
         } catch (error) {
             console.error('登录 OneDrive 失败:', error);
             Toast.error(`登录失败: ${error}`);
+        }
+    },
+
+    // 显示等待授权对话框
+    showAuthWaitingDialog() {
+        // 移除已存在的对话框
+        this.closeAuthWaitingDialog();
+        
+        const dialog = document.createElement('div');
+        dialog.id = 'auth-waiting-dialog';
+        dialog.className = 'auth-dialog-overlay';
+        dialog.innerHTML = `
+            <div class="auth-dialog">
+                <div class="auth-dialog-header">
+                    <h3>⏳ 等待授权</h3>
+                </div>
+                <div class="auth-dialog-body">
+                    <p>已在新标签页打开 Microsoft 登录页面</p>
+                    <p class="auth-tip">请在新标签页中完成登录授权</p>
+                    <div class="auth-waiting-spinner">
+                        <div class="spinner"></div>
+                        <span>正在等待授权完成...</span>
+                    </div>
+                    <p class="auth-hint">授权完成后，此对话框将自动关闭</p>
+                </div>
+                <div class="auth-dialog-footer">
+                    <button class="btn-cancel" id="auth-waiting-cancel-btn">取消</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // 绑定取消按钮事件
+        const cancelBtn = dialog.querySelector('#auth-waiting-cancel-btn');
+        cancelBtn.addEventListener('click', () => {
+            this.closeAuthWaitingDialog();
+            Toast.info('已取消登录');
+        });
+    },
+
+    // 关闭等待授权对话框
+    closeAuthWaitingDialog() {
+        const dialog = document.getElementById('auth-waiting-dialog');
+        if (dialog) {
+            dialog.remove();
         }
     },
 
