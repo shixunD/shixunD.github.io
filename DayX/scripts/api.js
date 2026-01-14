@@ -523,7 +523,7 @@
       return new Promise((resolve, reject) => {
         // 使用 BroadcastChannel 进行标签页间通信
         const channel = new BroadcastChannel('dayx_oauth_channel');
-        
+
         // 设置 5 分钟超时
         const timeout = setTimeout(() => {
           channel.close();
@@ -851,7 +851,8 @@
 
     // 打开外部链接（Web 版本）
     async openExternalUrl(url) {
-      return window.open(url, '_blank');
+      window.open(url, '_blank');
+      return true;
     }
   };
 

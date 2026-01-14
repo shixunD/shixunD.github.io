@@ -673,7 +673,7 @@ const SettingsPage = {
                 return dateB - dateA; // 降序：最新的在前
             });
 
-            // 过滤：只显示近3条 + 近7天的内容
+            // 过滤：只显示近5条 + 近7天的内容
             const now = new Date();
             const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
