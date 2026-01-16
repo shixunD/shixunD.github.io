@@ -48,7 +48,7 @@ async function handleWebOAuthCallback() {
 
     try {
         const result = await TauriAPI.checkAndHandleOAuthCallback();
-        
+
         if (!result.isCallback) {
             return; // 不是 OAuth 回调页面
         }
@@ -85,7 +85,7 @@ function showOAuthSuccessPage() {
             <button class="oauth-close-btn" onclick="window.close()">关闭此标签页</button>
         </div>
     `;
-    
+
     // 添加样式
     const style = document.createElement('style');
     style.textContent = `
@@ -136,10 +136,10 @@ function showOAuthSuccessPage() {
             background: var(--primary-hover, #1976D2);
         }
     `;
-    
+
     document.head.appendChild(style);
     document.body.appendChild(overlay);
-    
+
     // 5秒后自动关闭标签页
     setTimeout(() => {
         window.close();
@@ -158,11 +158,34 @@ function initWindowDrag() {
         return;
     }
 
+    // 为 navbar 添加用户选择禁用，避免拖动时选中文字
+    navbar.style.userSelect = 'none';
+    navbar.style.webkitUserSelect = 'none';
+
+    // 为 nav-brand 和 nav-homepagedirector 添加点击事件，打开链接
+    const navBrand = document.querySelector('.nav-brand');
+    const navDirector = document.querySelector('.nav-homepagedirector');
+
+    if (navBrand) {
+        navBrand.addEventListener('click', () => {
+            openExternalLink('https://shixund.github.io/');
+        });
+    }
+
+    if (navDirector) {
+        navDirector.addEventListener('click', (e) => {
+            e.stopPropagation(); // 防止事件冒泡
+            openExternalLink('https://shixund.github.io/');
+        });
+    }
+
     // Web 版本不支持窗口拖动
     if (TauriAPI.isWebBuild) {
         navbar.style.cursor = 'default';
         return;
     }
+
+    navbar.style.webkitAppRegion = 'no-drag'; // 重要：防止默认拖动行为
 
     navbar.addEventListener('mousedown', (e) => {
         // 如果窗口已锁定，不允许拖动
@@ -196,28 +219,6 @@ function initWindowDrag() {
 
     // 设置初始鼠标样式提示可拖动
     updateNavbarCursor();
-
-    // 为 navbar 添加用户选择禁用，避免拖动时选中文字
-    navbar.style.userSelect = 'none';
-    navbar.style.webkitUserSelect = 'none';
-    navbar.style.webkitAppRegion = 'no-drag'; // 重要：防止默认拖动行为
-
-    // 为 nav-brand 和 nav-homepagedirector 添加点击事件，打开链接
-    const navBrand = document.querySelector('.nav-brand');
-    const navDirector = document.querySelector('.nav-homepagedirector');
-
-    if (navBrand) {
-        navBrand.addEventListener('click', () => {
-            openExternalLink('https://shixund.github.io/');
-        });
-    }
-
-    if (navDirector) {
-        navDirector.addEventListener('click', (e) => {
-            e.stopPropagation(); // 防止事件冒泡
-            openExternalLink('https://shixund.github.io/');
-        });
-    }
 }
 
 // 更新导航栏鼠标样式
