@@ -801,14 +801,25 @@ const SettingsPage = {
     // 加载开启时同步复选框状态
     loadSyncOnStartupStatus() {
         const checkbox = document.getElementById('sync-on-startup-checkbox');
+        if (!checkbox) {
+            console.warn('sync-on-startup-checkbox 元素未找到');
+            return;
+        }
         const saved = localStorage.getItem('syncOnStartup');
+        console.log('loadSyncOnStartupStatus: saved =', saved);
         checkbox.checked = saved === 'true';
+        console.log('loadSyncOnStartupStatus: checkbox.checked =', checkbox.checked);
     },
 
     // 切换开启时同步最新数据
     toggleSyncOnStartup() {
         const checkbox = document.getElementById('sync-on-startup-checkbox');
+        if (!checkbox) {
+            console.warn('sync-on-startup-checkbox 元素未找到');
+            return;
+        }
         localStorage.setItem('syncOnStartup', checkbox.checked.toString());
+        console.log('toggleSyncOnStartup: saved', checkbox.checked, 'to localStorage');
         if (checkbox.checked) {
             Toast.success('已开启启动时自动同步');
         } else {
