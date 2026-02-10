@@ -452,13 +452,33 @@ async function checkAndPerformStartupSync() {
     // 显示冻结遮罩
     const overlay = document.getElementById('sync-freeze-overlay');
     const subtextEl = overlay ? overlay.querySelector('.sync-freeze-subtext') : null;
+    const cancelBtn = document.getElementById('sync-cancel-btn');
     if (overlay) overlay.style.display = 'flex';
+
+    // 用于标记是否取消同步
+    let syncCancelled = false;
+
+    // 绑定取消按钮事件
+    const cancelHandler = () => {
+        syncCancelled = true;
+        if (overlay) overlay.style.display = 'none';
+        Toast.info('已取消同步，使用本地数据');
+    };
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelHandler);
+    }
 
     const MAX_RETRIES = 3;
     let success = false;
     let hasData = false;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        // 检查是否已取消
+        if (syncCancelled) {
+            if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+            return;
+        }
+
         try {
             if (subtextEl) subtextEl.textContent = `正在获取备份列表...（第 ${attempt} 次尝试）`;
 
@@ -505,6 +525,11 @@ async function checkAndPerformStartupSync() {
                 await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
             }
         }
+    }
+
+    // 移除取消按钮事件监听器
+    if (cancelBtn) {
+        cancelBtn.removeEventListener('click', cancelHandler);
     }
 
     // 隐藏冻结遮罩

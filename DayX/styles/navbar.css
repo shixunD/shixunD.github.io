@@ -12,6 +12,8 @@
     z-index: 1000;
     flex-wrap: nowrap;
     /* 防止换行 */
+    touch-action: manipulation;
+    /* 禁用移动端双击缩放，确保双击事件能触发 */
 }
 
 .nav-brand {
