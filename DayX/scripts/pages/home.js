@@ -80,11 +80,13 @@ const HomePage = {
                     minusBtn.addEventListener('click', async () => {
                         const newCount = Math.max(0, (dayData.review_count || 0) - 1);
                         await this.updateReviewCount(dayData.day_number, newCount);
+                        dayData.review_count = newCount;
                     });
 
                     plusBtn.addEventListener('click', async () => {
                         const newCount = (dayData.review_count || 0) + 1;
                         await this.updateReviewCount(dayData.day_number, newCount);
+                        dayData.review_count = newCount;
                     });
 
                     // 创建卡片体部

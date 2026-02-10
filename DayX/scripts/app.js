@@ -485,6 +485,12 @@ async function checkAndPerformStartupSync() {
             // 1. 获取备份列表
             const backups = await TauriAPI.listOneDriveBackups();
 
+            // 检查是否在获取列表后取消
+            if (syncCancelled) {
+                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+                return;
+            }
+
             if (!backups || backups.length === 0) {
                 success = true; // 无备份不算失败
                 break;
@@ -500,14 +506,32 @@ async function checkAndPerformStartupSync() {
             const latest = sorted[0];
             if (subtextEl) subtextEl.textContent = `正在下载: ${latest.name}`;
 
+            // 检查是否在下载前取消
+            if (syncCancelled) {
+                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+                return;
+            }
+
             // 3. 下载最新备份
             const jsonData = await TauriAPI.downloadBackupFromOneDrive(latest.id);
             const data = JSON.parse(jsonData);
+
+            // 检查是否在下载后取消
+            if (syncCancelled) {
+                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+                return;
+            }
 
             if (subtextEl) subtextEl.textContent = '正在导入数据...';
 
             // 4. 导入数据
             await TauriAPI.importData(data);
+
+            // 检查是否在导入后取消
+            if (syncCancelled) {
+                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+                return;
+            }
 
             // 5. 刷新所有页面
             if (subtextEl) subtextEl.textContent = '正在刷新页面...';
@@ -520,6 +544,13 @@ async function checkAndPerformStartupSync() {
             break;
         } catch (error) {
             console.error(`启动同步第 ${attempt} 次尝试失败:`, error);
+            
+            // 检查是否在错误处理时取消
+            if (syncCancelled) {
+                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+                return;
+            }
+            
             if (attempt < MAX_RETRIES) {
                 if (subtextEl) subtextEl.textContent = `同步失败，正在重试...（${attempt}/${MAX_RETRIES}）`;
                 await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
