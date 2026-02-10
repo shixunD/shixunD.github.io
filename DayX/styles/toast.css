@@ -35,6 +35,11 @@
     transform: translateY(0);
 }
 
+/* 错误 Toast 样式（红色） */
+.toast-error {
+    background-color: var(--danger-color, #e74c3c);
+}
+
 /* 响应式调整 */
 @media (max-width: 567px) {
     #toast-container {

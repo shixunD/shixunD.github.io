@@ -1,7 +1,7 @@
 // Toast 通知组件
 const Toast = {
     // 显示 Toast 通知
-    show(message, duration = 3000) {
+    show(message, duration = 3000, extraClass = '') {
         // 创建或获取 Toast 容器
         let container = document.getElementById('toast-container');
         if (!container) {
@@ -12,7 +12,7 @@ const Toast = {
 
         // 创建 Toast 元素
         const toast = document.createElement('div');
-        toast.className = 'toast';
+        toast.className = `toast${extraClass ? ' ' + extraClass : ''}`;
         toast.textContent = message;
 
         // 添加到容器
@@ -48,9 +48,9 @@ const Toast = {
         this.show(`⚠ ${message}`, duration);
     },
 
-    // 错误提示（带图标）
-    error(message, duration = 3000) {
-        this.show(`✕ ${message}`, duration);
+    // 错误提示（带图标，红色背景，默认5秒）
+    error(message, duration = 5000) {
+        this.show(`✕ ${message}`, duration, 'toast-error');
     }
 };
 

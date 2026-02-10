@@ -194,6 +194,15 @@
                             <h2>☁️ OneDrive 云备份</h2>
                             <p class="settings-desc">将数据自动备份到 OneDrive 云端（保存到应用专属文件夹）</p>
 
+                            <!-- 开启时同步最新数据设置 -->
+                            <div class="setting-item sync-on-startup-setting">
+                                <label class="checkbox-label-inline">
+                                    <input type="checkbox" id="sync-on-startup-checkbox" />
+                                    <span>开启时同步最新数据</span>
+                                </label>
+                                <div class="setting-help">启用后，每次打开应用会自动从 OneDrive 获取最新备份并恢复</div>
+                            </div>
+
                             <!-- 未登录状态 -->
                             <div id="onedrive-login-section" style="display: none;">
                                 <button id="onedrive-login-btn" class="btn-primary">🔑 登录 OneDrive</button>
@@ -343,6 +352,15 @@
                     <button id="confirm-delete-btn" class="btn-danger" disabled>⚠️ 立即删除（不可撤销）</button>
                     <button id="cancel-delete-btn" class="btn-secondary">取消</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- 启动同步冻结遮罩 -->
+        <div class="sync-freeze-overlay" id="sync-freeze-overlay" style="display: none;">
+            <div class="sync-freeze-content">
+                <div class="sync-freeze-spinner"></div>
+                <div class="sync-freeze-text">正在同步最新数据...</div>
+                <div class="sync-freeze-subtext">正在连接 OneDrive...</div>
             </div>
         </div>
 

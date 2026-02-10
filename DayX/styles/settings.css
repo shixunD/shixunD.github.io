@@ -126,6 +126,19 @@
     color: var(--text-primary);
 }
 
+/* 开启时同步最新数据复选框 */
+.sync-on-startup-setting {
+    margin-bottom: 1.5rem;
+    padding: 0.8rem 1rem;
+    background: var(--bg-color);
+    border-radius: 8px;
+}
+
+.sync-on-startup-setting .setting-help {
+    margin-top: 0.4rem;
+    margin-left: 1.6rem;
+}
+
 .setting-preview {
     background: var(--bg-color);
     padding: 0.8rem;

@@ -49,6 +49,55 @@ body {
     }
 }
 
+/* 启动同步冻结遮罩 */
+.sync-freeze-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.88);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.sync-freeze-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.sync-freeze-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(74, 144, 226, 0.2);
+    border-top-color: var(--primary-color, #4a90e2);
+    border-radius: 50%;
+    animation: syncSpin 1s linear infinite;
+}
+
+@keyframes syncSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.sync-freeze-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary, #2c3e50);
+}
+
+.sync-freeze-subtext {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #7f8c8d);
+}
+
 .container {
     margin: 1rem auto;
     padding: 0 1rem;

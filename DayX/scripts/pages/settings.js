@@ -70,6 +70,10 @@ const SettingsPage = {
         const autostartCheckbox = document.getElementById('autostart-checkbox');
         autostartCheckbox.addEventListener('change', () => this.toggleAutostart());
 
+        // 开启时同步最新数据事件监听
+        const syncOnStartupCheckbox = document.getElementById('sync-on-startup-checkbox');
+        syncOnStartupCheckbox.addEventListener('change', () => this.toggleSyncOnStartup());
+
         // 退出登录弹窗事件监听
         const logoutModal = document.getElementById('logout-onedrive-modal');
         const closeLogoutModal = document.getElementById('close-logout-modal');
@@ -126,6 +130,7 @@ const SettingsPage = {
         this.loadStats();
         await this.checkOneDriveStatus();
         await this.loadAutostartStatus();
+        this.loadSyncOnStartupStatus();
     },
 
     updatePreview() {
@@ -790,6 +795,24 @@ const SettingsPage = {
             Toast.error(`设置失败: ${error}`);
             // 恢复复选框状态
             checkbox.checked = !isEnabled;
+        }
+    },
+
+    // 加载开启时同步复选框状态
+    loadSyncOnStartupStatus() {
+        const checkbox = document.getElementById('sync-on-startup-checkbox');
+        const saved = localStorage.getItem('syncOnStartup');
+        checkbox.checked = saved === 'true';
+    },
+
+    // 切换开启时同步最新数据
+    toggleSyncOnStartup() {
+        const checkbox = document.getElementById('sync-on-startup-checkbox');
+        localStorage.setItem('syncOnStartup', checkbox.checked.toString());
+        if (checkbox.checked) {
+            Toast.success('已开启启动时自动同步');
+        } else {
+            Toast.info('已关闭启动时自动同步');
         }
     }
 };

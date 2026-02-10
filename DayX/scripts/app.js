@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 7. 监听后端状态变化事件
     setupEventListeners();
 
+    // 8. 启动时自动同步 OneDrive 最新数据
+    await checkAndPerformStartupSync();
+
     console.log('DayX 应用初始化完成！');
 });
 
@@ -415,5 +418,90 @@ async function openExternalLink(url) {
         console.error('打开链接失败:', err);
         // 如果 API 调用失败，降级使用 window.open
         window.open(url, '_blank');
+    }
+}
+
+// 启动时自动同步 OneDrive 最新数据
+async function checkAndPerformStartupSync() {
+    // 检查是否启用了开启时同步
+    const syncEnabled = localStorage.getItem('syncOnStartup') === 'true';
+    if (!syncEnabled) return;
+
+    // 检查是否已登录 OneDrive
+    let isLoggedIn = false;
+    try {
+        isLoggedIn = await TauriAPI.isOneDriveLoggedIn();
+    } catch (e) {
+        console.warn('检查 OneDrive 登录状态失败:', e);
+        return;
+    }
+    if (!isLoggedIn) return;
+
+    // 显示冻结遮罩
+    const overlay = document.getElementById('sync-freeze-overlay');
+    const subtextEl = overlay ? overlay.querySelector('.sync-freeze-subtext') : null;
+    if (overlay) overlay.style.display = 'flex';
+
+    const MAX_RETRIES = 3;
+    let success = false;
+    let hasData = false;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            if (subtextEl) subtextEl.textContent = `正在获取备份列表...（第 ${attempt} 次尝试）`;
+
+            // 1. 获取备份列表
+            const backups = await TauriAPI.listOneDriveBackups();
+
+            if (!backups || backups.length === 0) {
+                success = true; // 无备份不算失败
+                break;
+            }
+
+            // 2. 按时间排序，获取最新的备份
+            const sorted = backups.sort((a, b) => {
+                const dateA = new Date(a.createdDateTime || a.created_date_time);
+                const dateB = new Date(b.createdDateTime || b.created_date_time);
+                return dateB - dateA; // 降序：最新的在前
+            });
+
+            const latest = sorted[0];
+            if (subtextEl) subtextEl.textContent = `正在下载: ${latest.name}`;
+
+            // 3. 下载最新备份
+            const jsonData = await TauriAPI.downloadBackupFromOneDrive(latest.id);
+            const data = JSON.parse(jsonData);
+
+            if (subtextEl) subtextEl.textContent = '正在导入数据...';
+
+            // 4. 导入数据
+            await TauriAPI.importData(data);
+
+            // 5. 刷新所有页面
+            if (subtextEl) subtextEl.textContent = '正在刷新页面...';
+            await HomePage.load();
+            await InputPage.load();
+            await Calendar.render();
+
+            success = true;
+            hasData = true;
+            break;
+        } catch (error) {
+            console.error(`启动同步第 ${attempt} 次尝试失败:`, error);
+            if (attempt < MAX_RETRIES) {
+                if (subtextEl) subtextEl.textContent = `同步失败，正在重试...（${attempt}/${MAX_RETRIES}）`;
+                await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
+            }
+        }
+    }
+
+    // 隐藏冻结遮罩
+    if (overlay) overlay.style.display = 'none';
+
+    if (!success) {
+        // 三次失败：红色 toast 提示，5秒后消失
+        Toast.error('网络连接错误，请重试...');
+    } else if (hasData) {
+        Toast.success('已同步最新云端数据');
     }
 }
