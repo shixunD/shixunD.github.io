@@ -1,3 +1,7 @@
+// 用于标记页面初始化是否完成，同步刷新时需要等待
+let _resolveInitReady;
+const initReadyPromise = new Promise(resolve => { _resolveInitReady = resolve; });
+
 // 主应用入口
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DayX 应用初始化...');
@@ -14,29 +18,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. 加载设置
     AppState.loadSettings();
 
-    // 2. 初始化导航
+    // 2. 尽早启动同步检查（不 await，让它和本地加载并行）
+    const syncPromise = checkAndPerformStartupSync();
+
+    // 3. 初始化导航
     Navigation.init();
 
-    // 3. 初始化各个页面
+    // 4. 初始化各个页面（本地数据加载，与同步并行）
     await HomePage.init();
     InputPage.init();
     SettingsPage.init();
 
-    // 4. 初始化组件
+    // 5. 初始化组件
     Calendar.init();
     YearOverview.init();
 
-    // 5. 初始化窗口拖动功能
+    // 6. 初始化窗口拖动功能
     initWindowDrag();
 
-    // 6. 初始化导航栏右键菜单
+    // 7. 初始化导航栏右键菜单
     await initNavbarContextMenu();
 
-    // 7. 监听后端状态变化事件
+    // 8. 监听后端状态变化事件
     setupEventListeners();
 
-    // 8. 启动时自动同步 OneDrive 最新数据
-    await checkAndPerformStartupSync();
+    // 标记页面初始化完成，同步刷新可以安全执行了
+    _resolveInitReady();
+
+    // 9. 等待同步完成（如果还在进行中的话）
+    await syncPromise;
 
     console.log('DayX 应用初始化完成！');
 });
@@ -533,8 +543,9 @@ async function checkAndPerformStartupSync() {
                 return;
             }
 
-            // 5. 刷新所有页面
+            // 5. 等待页面初始化完成后再刷新，避免竞态条件
             if (subtextEl) subtextEl.textContent = '正在刷新页面...';
+            await initReadyPromise;
             await HomePage.load();
             await InputPage.load();
             await Calendar.render();
