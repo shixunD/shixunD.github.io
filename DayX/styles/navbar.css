@@ -22,6 +22,7 @@
     /* 品牌名称不压缩 */
     white-space: nowrap;
     /* 防止文字换行 */
+    cursor: pointer;
 }
 
 .nav-brand-container {

@@ -182,6 +182,18 @@ function initWindowDrag() {
         });
     }
 
+    // 双击 navbar 空白区域触发 OneDrive 备份（PC 和 Web 都支持）
+    navbar.addEventListener('dblclick', (e) => {
+        // 排除已有按钮和品牌链接区域
+        if (e.target.closest('.nav-btn') || e.target.closest('.nav-brand-container') || e.target.closest('.nav-links')) {
+            return;
+        }
+        // 调用 InputPage 的 syncToOneDrive 方法
+        if (typeof InputPage !== 'undefined' && InputPage.syncToOneDrive) {
+            InputPage.syncToOneDrive();
+        }
+    });
+
     // Web 版本不支持窗口拖动
     if (TauriAPI.isWebBuild) {
         navbar.style.cursor = 'default';
