@@ -8,9 +8,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 0. 检查是否是 Web 版本的 OAuth 回调（仅 Web 版本）
     if (typeof TauriAPI !== 'undefined' && TauriAPI.isWebBuild) {
-        // 请求持久化存储权限（防止 IndexedDB 被清理）
+        // 🔒 主动申请持久化存储权限（防止 IndexedDB 和 localStorage 被清理）
+        // 这对于 OneDrive token 的保存至关重要
         if (TauriAPI.requestPersistentStorage) {
-            await TauriAPI.requestPersistentStorage();
+            console.log('🔐 应用启动 - 主动申请持久化存储权限...');
+            const storageStatus = await TauriAPI.requestPersistentStorage();
+            if (storageStatus && storageStatus.persisted) {
+                console.log('✅ 持久化存储已启用，数据将受到保护');
+            } else if (storageStatus && !storageStatus.persisted) {
+                console.warn('⚠️ 未获得持久化存储权限，数据可能在浏览器清理时丢失');
+                console.warn('建议：定期使用 OneDrive 云备份或"导出数据"功能');
+            }
         }
         await handleWebOAuthCallback();
     }

@@ -131,6 +131,11 @@ const SettingsPage = {
         await this.checkOneDriveStatus();
         await this.loadAutostartStatus();
         this.loadSyncOnStartupStatus();
+        
+        // Web 版本：显示存储状态
+        if (TauriAPI.isWebBuild) {
+            await this.checkStorageStatus();
+        }
     },
 
     updatePreview() {
@@ -811,7 +816,7 @@ const SettingsPage = {
         console.log('loadSyncOnStartupStatus: checkbox.checked =', checkbox.checked);
     },
 
-    // 切换开启时同步最新数据
+    // 切换开启时自动同步最新数据
     toggleSyncOnStartup() {
         const checkbox = document.getElementById('sync-on-startup-checkbox');
         if (!checkbox) {
@@ -824,6 +829,57 @@ const SettingsPage = {
             Toast.success('已开启启动时自动同步');
         } else {
             Toast.info('已关闭启动时自动同步');
+        }
+    },
+
+    // 检查并显示存储状态（仅 Web 版）
+    async checkStorageStatus() {
+        const statusBody = document.getElementById('storage-status-body');
+        if (!statusBody) return;
+
+        try {
+            // 调用 TauriAPI 的持久化检查方法
+            const storageStatus = await TauriAPI.requestPersistentStorage();
+            
+            if (!storageStatus || !storageStatus.supported) {
+                // 不支持持久化存储 API
+                statusBody.innerHTML = `
+                    <div class="storage-status-unsupported">
+                        浏览器不支持持久化存储 API
+                        <div class="storage-status-details">
+                            您的浏览器可能不支持持久化存储功能，数据可能在清理时丢失。<br>
+                            建议使用最新版 Chrome、Edge 或 Firefox。
+                        </div>
+                    </div>
+                `;
+            } else if (storageStatus.persisted) {
+                // 已获得持久化保护
+                statusBody.innerHTML = `
+                    <div class="storage-status-protected">
+                        持久化存储已启用，数据受到保护
+                        <div class="storage-status-details">
+                            您的数据（包括 OneDrive 登录状态）已申请持久化保护，<br>
+                            不会在常规浏览器清理中被删除。
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 未获得持久化保护
+                statusBody.innerHTML = `
+                    <div class="storage-status-unprotected">
+                        未获得持久化存储权限
+                        <div class="storage-status-details">
+                            浏览器可能会在存储空间不足时自动清理数据。<br>
+                            建议定期使用"导出数据"或"OneDrive 云备份"功能。
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('检查存储状态失败:', error);
+            statusBody.innerHTML = `
+                <div class="storage-status-loading">检查失败: ${error.message}</div>
+            `;
         }
     }
 };

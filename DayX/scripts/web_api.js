@@ -7,19 +7,21 @@
   const SETTINGS_STORE = 'settings'; // 新增：存储 OneDrive token 等设置
 
   // 请求持久化存储权限，防止数据被浏览器自动清理
+  // 返回对象包含 granted（是否授予）和 persisted（最终是否持久化）
   async function requestPersistentStorage() {
     if (navigator.storage && navigator.storage.persist) {
       const isPersisted = await navigator.storage.persisted();
       if (!isPersisted) {
         const granted = await navigator.storage.persist();
-        console.log(`持久化存储权限: ${granted ? '已授予' : '未授予'}`);
-        return granted;
+        console.log(`🔒 持久化存储权限请求结果: ${granted ? '✅ 已授予' : '❌ 未授予'}`);
+        const finalPersisted = await navigator.storage.persisted();
+        return { granted, persisted: finalPersisted, supported: true };
       }
-      console.log('数据已启用持久化存储');
-      return true;
+      console.log('✅ 数据已启用持久化存储');
+      return { granted: true, persisted: true, supported: true };
     }
-    console.warn('浏览器不支持持久化存储 API');
-    return false;
+    console.warn('⚠️ 浏览器不支持持久化存储 API');
+    return { granted: false, persisted: false, supported: false };
   }
 
   function openDB() {
@@ -489,6 +491,16 @@
 
     // 开始 OAuth 授权
     async startOneDriveAuth() {
+      // 在授权前主动申请持久化存储权限，确保 token 不会丢失
+      console.log('🔐 OneDrive 授权前检查持久化存储权限...');
+      const storageStatus = await requestPersistentStorage();
+      if (!storageStatus.persisted) {
+        console.warn('⚠️ 未获得持久化存储权限，OneDrive token 可能会丢失！');
+        console.warn('建议用户定期重新登录或使用导出数据功能备份。');
+      } else {
+        console.log('✅ 持久化存储已启用，OneDrive token 将受到保护');
+      }
+
       const { codeVerifier, codeChallenge } = await this._generatePKCE();
       const state = this._generateState();
 
@@ -647,10 +659,13 @@
         localStorage.setItem(this._oneDriveConfig.tokenKey, JSON.stringify(token));
         localStorage.removeItem(this._oneDriveConfig.pkceKey);
 
+        // 再次确认持久化状态
+        const persistStatus = await requestPersistentStorage();
         console.log('✅ Token 已保存到 localStorage:', {
           tokenKey: this._oneDriveConfig.tokenKey,
           hasRefreshToken: !!token.refresh_token,
-          expiresAt: new Date(token.expires_at * 1000).toLocaleString()
+          expiresAt: new Date(token.expires_at * 1000).toLocaleString(),
+          persistentStorage: persistStatus.persisted ? '✅ 已保护' : '⚠️ 未保护'
         });
 
         // 通知原标签页授权成功

@@ -230,9 +230,21 @@
                         <!-- Web 版本数据持久化提示（仅 Web 版显示） -->
                         <div class="settings-section web-only-notice" id="web-data-notice" style="display: none;">
                             <h2>💡 数据存储提示</h2>
+                            
+                            <!-- 存储状态实时显示 -->
+                            <div class="storage-status-card" id="storage-status-card">
+                                <div class="storage-status-header">
+                                    <span class="storage-status-icon">🔒</span>
+                                    <span class="storage-status-text">存储状态</span>
+                                </div>
+                                <div class="storage-status-body" id="storage-status-body">
+                                    <div class="storage-status-loading">检查中...</div>
+                                </div>
+                            </div>
+
                             <div class="notice-content">
                                 <p class="settings-desc">
-                                    <strong>Web 版本使用浏览器本地存储（IndexedDB）</strong>
+                                    <strong>Web 版本使用浏览器本地存储（IndexedDB + localStorage）</strong>
                                 </p>
                                 <ul class="notice-list">
                                     <li>✅ 清理浏览历史记录<strong>不会</strong>删除您的数据</li>
