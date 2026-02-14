@@ -496,13 +496,17 @@ async function performStartupSync() {
     } catch (e) {
         console.warn('检查 OneDrive 登录状态失败:', e);
         if (overlay) overlay.style.display = 'none';
-        Toast.info('OneDrive 未登录，使用本地数据');
+        if (typeof Toast !== 'undefined') {
+            Toast.info('OneDrive 未登录，使用本地数据');
+        }
         return;
     }
     
     if (!isLoggedIn) {
         if (overlay) overlay.style.display = 'none';
-        Toast.info('OneDrive 未登录，使用本地数据');
+        if (typeof Toast !== 'undefined') {
+            Toast.info('OneDrive 未登录，使用本地数据');
+        }
         return;
     }
 
@@ -513,7 +517,9 @@ async function performStartupSync() {
     const cancelHandler = () => {
         syncCancelled = true;
         if (overlay) overlay.style.display = 'none';
-        Toast.info('已取消同步，使用本地数据');
+        if (typeof Toast !== 'undefined') {
+            Toast.info('已取消同步，使用本地数据');
+        }
     };
     if (cancelBtn) {
         cancelBtn.addEventListener('click', cancelHandler);
@@ -620,48 +626,12 @@ async function performStartupSync() {
 
     if (!success) {
         // 三次失败：红色 toast 提示，5秒后消失
-        Toast.error('网络连接错误，请重试...');
-    } else if (hasData) {
-        Toast.success('已同步最新云端数据');
-    }
-}
-            if (subtextEl) subtextEl.textContent = '正在刷新页面...';
-            await initReadyPromise;
-            await HomePage.load();
-            await InputPage.load();
-            await Calendar.render();
-
-            success = true;
-            hasData = true;
-            break;
-        } catch (error) {
-            console.error(`启动同步第 ${attempt} 次尝试失败:`, error);
-
-            // 检查是否在错误处理时取消
-            if (syncCancelled) {
-                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
-                return;
-            }
-
-            if (attempt < MAX_RETRIES) {
-                if (subtextEl) subtextEl.textContent = `同步失败，正在重试...（${attempt}/${MAX_RETRIES}）`;
-                await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
-            }
+        if (typeof Toast !== 'undefined') {
+            Toast.error('网络连接错误，请重试...');
         }
-    }
-
-    // 移除取消按钮事件监听器
-    if (cancelBtn) {
-        cancelBtn.removeEventListener('click', cancelHandler);
-    }
-
-    // 隐藏冻结遮罩
-    if (overlay) overlay.style.display = 'none';
-
-    if (!success) {
-        // 三次失败：红色 toast 提示，5秒后消失
-        Toast.error('网络连接错误，请重试...');
     } else if (hasData) {
-        Toast.success('已同步最新云端数据');
+        if (typeof Toast !== 'undefined') {
+            Toast.success('已同步最新云端数据');
+        }
     }
 }
