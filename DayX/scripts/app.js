@@ -20,18 +20,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.warn('建议：定期使用 OneDrive 云备份或"导出数据"功能');
             }
         }
-        
+
         // 📱 注册 Service Worker（PWA 支持）
         if ('serviceWorker' in navigator) {
             try {
                 const registration = await navigator.serviceWorker.register('/service-worker.js');
                 console.log('✅ Service Worker 注册成功:', registration.scope);
-                
+
                 // 监听 Service Worker 更新
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
                     console.log('🔄 发现新的 Service Worker');
-                    
+
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             // 新版本已安装，提示用户刷新
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.warn('⚠️ Service Worker 注册失败:', error);
             }
         }
-        
+
         await handleWebOAuthCallback();
     }
 
@@ -591,13 +591,13 @@ async function checkAndPerformStartupSync() {
             break;
         } catch (error) {
             console.error(`启动同步第 ${attempt} 次尝试失败:`, error);
-            
+
             // 检查是否在错误处理时取消
             if (syncCancelled) {
                 if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
                 return;
             }
-            
+
             if (attempt < MAX_RETRIES) {
                 if (subtextEl) subtextEl.textContent = `同步失败，正在重试...（${attempt}/${MAX_RETRIES}）`;
                 await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试

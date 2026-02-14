@@ -131,7 +131,7 @@ const SettingsPage = {
         await this.checkOneDriveStatus();
         await this.loadAutostartStatus();
         this.loadSyncOnStartupStatus();
-        
+
         // Web 版本：显示存储状态
         if (TauriAPI.isWebBuild) {
             await this.checkStorageStatus();
@@ -840,7 +840,7 @@ const SettingsPage = {
         try {
             // 调用 TauriAPI 的持久化检查方法
             const storageStatus = await TauriAPI.requestPersistentStorage();
-            
+
             if (!storageStatus || !storageStatus.supported) {
                 // 不支持持久化存储 API
                 statusBody.innerHTML = `
@@ -867,7 +867,7 @@ const SettingsPage = {
                 // 未获得持久化保护 - 区分 Chrome 和其他浏览器
                 const isChrome = storageStatus.isChrome;
                 const isFirefox = storageStatus.isFirefox;
-                
+
                 let browserHelp = '';
                 if (isChrome) {
                     browserHelp = `
@@ -891,7 +891,7 @@ const SettingsPage = {
                         </div>
                     `;
                 }
-                
+
                 statusBody.innerHTML = `
                     <div class="storage-status-unprotected">
                         未获得持久化存储权限

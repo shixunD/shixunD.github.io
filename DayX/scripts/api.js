@@ -15,11 +15,11 @@
         const granted = await navigator.storage.persist();
         console.log(`🔒 持久化存储权限请求结果: ${granted ? '✅ 已授予' : '❌ 未授予'}`);
         const finalPersisted = await navigator.storage.persisted();
-        
+
         // 检测浏览器类型
         const isChrome = /Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent);
         const isFirefox = /Firefox/.test(navigator.userAgent);
-        
+
         // Chrome 需要额外条件（PWA、通知权限、高参与度）
         if (granted && !finalPersisted) {
           if (isChrome) {
@@ -30,10 +30,10 @@
             console.warn('💡 建议：定期使用 OneDrive 云备份或导出数据功能');
           }
         }
-        
-        return { 
-          granted, 
-          persisted: finalPersisted, 
+
+        return {
+          granted,
+          persisted: finalPersisted,
           supported: true,
           isChrome,
           isFirefox
