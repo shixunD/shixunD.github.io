@@ -1,6 +1,6 @@
 // DayX Service Worker - PWA 支持
 // 版本号用于缓存管理（更新版本号以强制刷新缓存）
-const CACHE_NAME = 'dayx-cache-v1.3.15';
+const CACHE_NAME = 'dayx-cache-v1.3.16';
 
 // 需要缓存的关键资源
 const URLS_TO_CACHE = [

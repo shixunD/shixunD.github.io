@@ -8,44 +8,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 0. 检查是否是 Web 版本的 OAuth 回调（仅 Web 版本）
     if (typeof TauriAPI !== 'undefined' && TauriAPI.isWebBuild) {
-        // 🔒 主动申请持久化存储权限（防止 IndexedDB 和 localStorage 被清理）
-        // 这对于 OneDrive token 的保存至关重要
+        // 🔒 主动申请持久化存储权限（fire-and-forget，不阻塞启动）
         if (TauriAPI.requestPersistentStorage) {
-            console.log('🔐 应用启动 - 主动申请持久化存储权限...');
-            const storageStatus = await TauriAPI.requestPersistentStorage();
-            if (storageStatus && storageStatus.persisted) {
-                console.log('✅ 持久化存储已启用，数据将受到保护');
-            } else if (storageStatus && !storageStatus.persisted) {
-                console.warn('⚠️ 未获得持久化存储权限，数据可能在浏览器清理时丢失');
-                console.warn('建议：定期使用 OneDrive 云备份或"导出数据"功能');
-            }
+            TauriAPI.requestPersistentStorage().then(status => {
+                if (status && status.persisted) {
+                    console.log('✅ 持久化存储已启用，数据将受到保护');
+                } else if (status && !status.persisted) {
+                    console.warn('⚠️ 未获得持久化存储权限，数据可能在浏览器清理时丢失');
+                }
+            }).catch(err => console.warn('⚠️ 持久化存储检查失败:', err));
         }
 
-        // 📱 注册 Service Worker（PWA 支持）
+        // 📱 注册 Service Worker（fire-and-forget，不阻塞启动）
         if ('serviceWorker' in navigator) {
-            try {
-                const registration = await navigator.serviceWorker.register('/service-worker.js');
+            navigator.serviceWorker.register('./service-worker.js').then(registration => {
                 console.log('✅ Service Worker 注册成功:', registration.scope);
-
-                // 监听 Service Worker 更新
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    console.log('🔄 发现新的 Service Worker');
-
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // 新版本已安装，提示用户刷新
-                            console.log('💡 新版本已准备就绪，刷新页面即可更新');
-                            // 可以显示一个 Toast 提示用户刷新
                             if (typeof Toast !== 'undefined') {
                                 Toast.info('新版本已准备就绪，刷新页面即可更新');
                             }
                         }
                     });
                 });
-            } catch (error) {
-                console.warn('⚠️ Service Worker 注册失败:', error);
-            }
+            }).catch(err => console.warn('⚠️ Service Worker 注册失败:', err));
         }
 
         await handleWebOAuthCallback();
@@ -54,35 +42,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. 加载设置
     AppState.loadSettings();
 
-    // 2. 尽早启动同步检查（不 await，让它和本地加载并行）
-    const syncPromise = checkAndPerformStartupSync();
+    // 2. 立即检查是否需要启动时同步，如果需要则立即显示遮罩
+    const syncEnabled = localStorage.getItem('syncOnStartup') === 'true';
+    let syncPromise = null;
+    if (syncEnabled) {
+        // 立即显示遮罩（不等待任何异步操作）
+        const overlay = document.getElementById('sync-freeze-overlay');
+        if (overlay) overlay.style.display = 'flex';
+        
+        // 启动同步流程（完全并行，不阻塞）
+        syncPromise = performStartupSync();
+    }
 
     // 3. 初始化导航
     Navigation.init();
 
-    // 4. 初始化各个页面（本地数据加载，与同步并行）
-    await HomePage.init();
-    InputPage.init();
-    SettingsPage.init();
+    // 4. 并行初始化所有页面和组件（不 await，让数据库加载和同步完全并行）
+    const initPromises = [
+        HomePage.init(),
+        // InputPage 和 SettingsPage 是同步的，可以直接调用
+        Promise.resolve(InputPage.init()),
+        Promise.resolve(SettingsPage.init()),
+        Promise.resolve(Calendar.init()),
+        Promise.resolve(YearOverview.init())
+    ];
 
-    // 5. 初始化组件
-    Calendar.init();
-    YearOverview.init();
-
-    // 6. 初始化窗口拖动功能
+    // 5. 初始化窗口拖动功能（同步操作）
     initWindowDrag();
 
-    // 7. 初始化导航栏右键菜单
-    await initNavbarContextMenu();
+    // 6. 初始化导航栏右键菜单
+    const contextMenuPromise = initNavbarContextMenu();
 
-    // 8. 监听后端状态变化事件
+    // 7. 监听后端状态变化事件
     setupEventListeners();
+
+    // 8. 等待所有初始化完成
+    await Promise.all([...initPromises, contextMenuPromise]);
 
     // 标记页面初始化完成，同步刷新可以安全执行了
     _resolveInitReady();
 
     // 9. 等待同步完成（如果还在进行中的话）
-    await syncPromise;
+    if (syncPromise) {
+        await syncPromise;
+    }
 
     console.log('DayX 应用初始化完成！');
 });
@@ -480,10 +483,11 @@ async function openExternalLink(url) {
 }
 
 // 启动时自动同步 OneDrive 最新数据
-async function checkAndPerformStartupSync() {
-    // 检查是否启用了开启时同步
-    const syncEnabled = localStorage.getItem('syncOnStartup') === 'true';
-    if (!syncEnabled) return;
+// 启动时同步数据（假设已经显示了遮罩）
+async function performStartupSync() {
+    const overlay = document.getElementById('sync-freeze-overlay');
+    const subtextEl = overlay ? overlay.querySelector('.sync-freeze-subtext') : null;
+    const cancelBtn = document.getElementById('sync-cancel-btn');
 
     // 检查是否已登录 OneDrive
     let isLoggedIn = false;
@@ -491,15 +495,16 @@ async function checkAndPerformStartupSync() {
         isLoggedIn = await TauriAPI.isOneDriveLoggedIn();
     } catch (e) {
         console.warn('检查 OneDrive 登录状态失败:', e);
+        if (overlay) overlay.style.display = 'none';
+        Toast.info('OneDrive 未登录，使用本地数据');
         return;
     }
-    if (!isLoggedIn) return;
-
-    // 显示冻结遮罩
-    const overlay = document.getElementById('sync-freeze-overlay');
-    const subtextEl = overlay ? overlay.querySelector('.sync-freeze-subtext') : null;
-    const cancelBtn = document.getElementById('sync-cancel-btn');
-    if (overlay) overlay.style.display = 'flex';
+    
+    if (!isLoggedIn) {
+        if (overlay) overlay.style.display = 'none';
+        Toast.info('OneDrive 未登录，使用本地数据');
+        return;
+    }
 
     // 用于标记是否取消同步
     let syncCancelled = false;
@@ -580,6 +585,46 @@ async function checkAndPerformStartupSync() {
             }
 
             // 5. 等待页面初始化完成后再刷新，避免竞态条件
+            if (subtextEl) subtextEl.textContent = '正在刷新页面...';
+            await initReadyPromise;
+            await HomePage.load();
+            await InputPage.load();
+            await Calendar.render();
+
+            success = true;
+            hasData = true;
+            break;
+        } catch (error) {
+            console.error(`启动同步第 ${attempt} 次尝试失败:`, error);
+
+            // 检查是否在错误处理时取消
+            if (syncCancelled) {
+                if (cancelBtn) cancelBtn.removeEventListener('click', cancelHandler);
+                return;
+            }
+
+            if (attempt < MAX_RETRIES) {
+                if (subtextEl) subtextEl.textContent = `同步失败，正在重试...（${attempt}/${MAX_RETRIES}）`;
+                await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
+            }
+        }
+    }
+
+    // 移除取消按钮事件监听器
+    if (cancelBtn) {
+        cancelBtn.removeEventListener('click', cancelHandler);
+    }
+
+    // 隐藏冻结遮罩
+    if (overlay) overlay.style.display = 'none';
+
+    if (!success) {
+        // 三次失败：红色 toast 提示，5秒后消失
+        Toast.error('网络连接错误，请重试...');
+    } else if (hasData) {
+        Toast.success('已同步最新云端数据');
+    }
+}
             if (subtextEl) subtextEl.textContent = '正在刷新页面...';
             await initReadyPromise;
             await HomePage.load();

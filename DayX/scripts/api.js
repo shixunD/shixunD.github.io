@@ -46,7 +46,11 @@
     return { granted: false, persisted: false, supported: false };
   }
 
+  // 连接池：复用单个 IndexedDB 连接，避免每次调用都重新打开
+  let _cachedDB = null;
+
   function openDB() {
+    if (_cachedDB) return Promise.resolve(_cachedDB);
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = (e) => {
@@ -61,7 +65,13 @@
           db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        _cachedDB = req.result;
+        // 连接意外关闭时清除缓存
+        _cachedDB.onclose = () => { _cachedDB = null; };
+        _cachedDB.onversionchange = () => { _cachedDB.close(); _cachedDB = null; };
+        resolve(_cachedDB);
+      };
       req.onerror = () => reject(req.error);
     });
   }
@@ -72,8 +82,8 @@
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       Promise.resolve(fn(store)).then(r => {
-        tx.oncomplete = () => { db.close(); resolve(r); };
-      }).catch(err => { db.close(); reject(err); });
+        tx.oncomplete = () => { resolve(r); };
+      }).catch(err => { reject(err); });
     });
   }
 
@@ -84,8 +94,8 @@
       const tx = db.transaction(SETTINGS_STORE, 'readwrite');
       const store = tx.objectStore(SETTINGS_STORE);
       Promise.resolve(fn(store)).then(r => {
-        tx.oncomplete = () => { db.close(); resolve(r); };
-      }).catch(err => { db.close(); reject(err); });
+        tx.oncomplete = () => { resolve(r); };
+      }).catch(err => { reject(err); });
     });
   }
 
@@ -122,9 +132,23 @@
     });
   }
 
+  // 内存缓存：避免启动时多次全表扫描
+  let _cachedAllDays = null;
+  let _cacheValid = false;
+
+  function _invalidateCache() {
+    _cachedAllDays = null;
+    _cacheValid = false;
+  }
+
   // Utility to get all days sorted by date asc
   async function _getAllDaysSorted() {
-    return withDB(store => {
+    // 返回缓存副本（深拷贝以防止外部修改）
+    if (_cacheValid && _cachedAllDays) {
+      return JSON.parse(JSON.stringify(_cachedAllDays));
+    }
+
+    const result = await withDB(store => {
       return new Promise((resolve, reject) => {
         const items = [];
         const req = store.openCursor();
@@ -141,6 +165,11 @@
         req.onerror = () => reject(req.error);
       });
     });
+
+    // 存入缓存
+    _cachedAllDays = result;
+    _cacheValid = true;
+    return JSON.parse(JSON.stringify(result));
   }
 
   const WebAPI = {
@@ -235,7 +264,7 @@
     },
 
     async addWordToDate(date, weekday, word) {
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const getReq = store.get(date);
           getReq.onsuccess = () => {
@@ -248,6 +277,8 @@
           getReq.onerror = () => reject(getReq.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async findWord(word) {
@@ -294,7 +325,7 @@
       const day = all.find(d => d.day_number === dayNumber);
       if (!day) throw new Error('Day not found');
       const date = day.date;
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const req = store.get(date);
           req.onsuccess = () => {
@@ -316,6 +347,8 @@
           req.onerror = () => reject(req.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async updateWordsOrder(dayNumber, words) {
@@ -323,7 +356,7 @@
       const day = all.find(d => d.day_number === dayNumber);
       if (!day) throw new Error('Day not found');
       const date = day.date;
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const req = store.get(date);
           req.onsuccess = () => {
@@ -336,6 +369,8 @@
           req.onerror = () => reject(req.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async updateWordColor(dayNumber, wordIndex, color) {
@@ -343,7 +378,7 @@
       const day = all.find(d => d.day_number === dayNumber);
       if (!day) throw new Error('Day not found');
       const date = day.date;
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const req = store.get(date);
           req.onsuccess = () => {
@@ -356,6 +391,8 @@
           req.onerror = () => reject(req.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async updateWordText(dayNumber, wordIndex, newText) {
@@ -363,7 +400,7 @@
       const day = all.find(d => d.day_number === dayNumber);
       if (!day) throw new Error('Day not found');
       const date = day.date;
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const req = store.get(date);
           req.onsuccess = () => {
@@ -376,6 +413,8 @@
           req.onerror = () => reject(req.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async updateReviewCount(dayNumber, reviewCount) {
@@ -383,7 +422,7 @@
       const day = all.find(d => d.day_number === dayNumber);
       if (!day) throw new Error('Day not found');
       const date = day.date;
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const req = store.get(date);
           req.onsuccess = () => {
@@ -396,16 +435,20 @@
           req.onerror = () => reject(req.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async deleteAllData() {
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const req = store.clear();
           req.onsuccess = () => resolve(true);
           req.onerror = () => reject(req.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async exportData() {
@@ -432,7 +475,7 @@
 
     async importData(records) {
       // records should be array of day objects
-      return withDB(store => {
+      const result = await withDB(store => {
         return new Promise((resolve, reject) => {
           const clearReq = store.clear();
           clearReq.onsuccess = () => {
@@ -447,6 +490,8 @@
           clearReq.onerror = () => reject(clearReq.error);
         });
       });
+      _invalidateCache();
+      return result;
     },
 
     async getDesktopPath() {
@@ -515,12 +560,16 @@
     async startOneDriveAuth() {
       // 在授权前主动申请持久化存储权限，确保 token 不会丢失
       console.log('🔐 OneDrive 授权前检查持久化存储权限...');
-      const storageStatus = await requestPersistentStorage();
-      if (!storageStatus.persisted) {
-        console.warn('⚠️ 未获得持久化存储权限，OneDrive token 可能会丢失！');
-        console.warn('建议用户定期重新登录或使用导出数据功能备份。');
-      } else {
-        console.log('✅ 持久化存储已启用，OneDrive token 将受到保护');
+      try {
+        const storageStatus = await this.requestPersistentStorage();
+        if (storageStatus && !storageStatus.persisted) {
+          console.warn('⚠️ 未获得持久化存储权限，OneDrive token 可能会丢失！');
+          console.warn('建议用户定期重新登录或使用导出数据功能备份。');
+        } else if (storageStatus && storageStatus.persisted) {
+          console.log('✅ 持久化存储已启用，OneDrive token 将受到保护');
+        }
+      } catch (error) {
+        console.warn('⚠️ 持久化存储检查失败，继续授权流程:', error);
       }
 
       const { codeVerifier, codeChallenge } = await this._generatePKCE();
@@ -682,13 +731,22 @@
         localStorage.removeItem(this._oneDriveConfig.pkceKey);
 
         // 再次确认持久化状态
-        const persistStatus = await requestPersistentStorage();
-        console.log('✅ Token 已保存到 localStorage:', {
-          tokenKey: this._oneDriveConfig.tokenKey,
-          hasRefreshToken: !!token.refresh_token,
-          expiresAt: new Date(token.expires_at * 1000).toLocaleString(),
-          persistentStorage: persistStatus.persisted ? '✅ 已保护' : '⚠️ 未保护'
-        });
+        try {
+          const persistStatus = await this.requestPersistentStorage();
+          console.log('✅ Token 已保存到 localStorage:', {
+            tokenKey: this._oneDriveConfig.tokenKey,
+            hasRefreshToken: !!token.refresh_token,
+            expiresAt: new Date(token.expires_at * 1000).toLocaleString(),
+            persistentStorage: (persistStatus && persistStatus.persisted) ? '✅ 已保护' : '⚠️ 未保护'
+          });
+        } catch (error) {
+          console.warn('⚠️ 持久化状态确认失败:', error);
+          console.log('✅ Token 已保存到 localStorage:', {
+            tokenKey: this._oneDriveConfig.tokenKey,
+            hasRefreshToken: !!token.refresh_token,
+            expiresAt: new Date(token.expires_at * 1000).toLocaleString()
+          });
+        }
 
         // 通知原标签页授权成功
         this.notifyAuthComplete(true, token);
