@@ -864,7 +864,34 @@ const SettingsPage = {
                     </div>
                 `;
             } else {
-                // 未获得持久化保护
+                // 未获得持久化保护 - 区分 Chrome 和其他浏览器
+                const isChrome = storageStatus.isChrome;
+                const isFirefox = storageStatus.isFirefox;
+                
+                let browserHelp = '';
+                if (isChrome) {
+                    browserHelp = `
+                        <div class="storage-status-browser-help chrome-help">
+                            <strong>💡 Chrome 用户专属提示：</strong><br>
+                            Chrome 需要满足以下条件之一才能授予持久化保护：<br>
+                            <ul style="margin: 0.5rem 0; padding-left: 1.5rem; line-height: 1.8;">
+                                <li>点击地址栏右侧的<strong>安装按钮</strong>（⊕ 或 <svg style="display: inline; width: 16px; height: 16px; vertical-align: middle;">📥</svg>），将网站安装为应用</li>
+                                <li>授予网站<strong>通知权限</strong>（地址栏锁图标 → 网站设置 → 通知 → 允许）</li>
+                                <li>经常访问该网站，让 Chrome 认为您信任此网站</li>
+                            </ul>
+                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(255,152,0,0.1); border-radius: 4px;">
+                                🎯 <strong>推荐操作</strong>：点击地址栏的安装按钮，将 DayX 安装为桌面应用
+                            </div>
+                        </div>
+                    `;
+                } else if (isFirefox) {
+                    browserHelp = `
+                        <div class="storage-status-browser-help firefox-help">
+                            💡 Firefox 通常会自动授予持久化权限。如果未获得，请检查浏览器隐私设置。
+                        </div>
+                    `;
+                }
+                
                 statusBody.innerHTML = `
                     <div class="storage-status-unprotected">
                         未获得持久化存储权限
@@ -872,6 +899,7 @@ const SettingsPage = {
                             浏览器可能会在存储空间不足时自动清理数据。<br>
                             建议定期使用"导出数据"或"OneDrive 云备份"功能。
                         </div>
+                        ${browserHelp}
                     </div>
                 `;
             }

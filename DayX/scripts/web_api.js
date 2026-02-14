@@ -15,7 +15,29 @@
         const granted = await navigator.storage.persist();
         console.log(`🔒 持久化存储权限请求结果: ${granted ? '✅ 已授予' : '❌ 未授予'}`);
         const finalPersisted = await navigator.storage.persisted();
-        return { granted, persisted: finalPersisted, supported: true };
+        
+        // 检测浏览器类型
+        const isChrome = /Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent);
+        const isFirefox = /Firefox/.test(navigator.userAgent);
+        
+        // Chrome 需要额外条件（PWA、通知权限、高参与度）
+        if (granted && !finalPersisted) {
+          if (isChrome) {
+            console.warn('⚠️ Chrome 浏览器需要满足以下条件之一才能获得持久化保护：');
+            console.warn('  1️⃣ 将网站安装为 PWA（点击地址栏右侧的安装按钮）');
+            console.warn('  2️⃣ 授予网站通知权限（地址栏 → 设置 → 通知 → 允许）');
+            console.warn('  3️⃣ 经常访问该网站以提升参与度');
+            console.warn('💡 建议：定期使用 OneDrive 云备份或导出数据功能');
+          }
+        }
+        
+        return { 
+          granted, 
+          persisted: finalPersisted, 
+          supported: true,
+          isChrome,
+          isFirefox
+        };
       }
       console.log('✅ 数据已启用持久化存储');
       return { granted: true, persisted: true, supported: true };

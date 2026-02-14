@@ -292,6 +292,45 @@
     line-height: 1.6;
 }
 
+/* 浏览器特定帮助信息 */
+.storage-status-browser-help {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.storage-status-browser-help strong {
+    color: #e65100;
+}
+
+.chrome-help ul {
+    list-style-type: none;
+    margin: 0.5rem 0;
+    padding-left: 0;
+}
+
+.chrome-help ul li {
+    padding-left: 1.5rem;
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
+.chrome-help ul li::before {
+    content: "▸";
+    position: absolute;
+    left: 0.5rem;
+    color: #ff9800;
+    font-weight: bold;
+}
+
+.firefox-help {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 0.75rem;
+}
+
 .notice-content {
     color: #333;
 }
