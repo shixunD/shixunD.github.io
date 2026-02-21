@@ -6,6 +6,67 @@
   const STORE_NAME = 'days';
   const SETTINGS_STORE = 'settings'; // 新增：存储 OneDrive token 等设置
 
+  // ============ MSAL 静默刷新初始化 ============
+  // MSAL.js v2 由 build-web.js 构建时从 CDN 注入，提供 window.msal 全局对象。
+  // 相比手动 refresh_token，MSAL 能通过 SSO 会话 cookie 静默续签，绕过微软对 SPA 24 小时限制。
+  const MSAL_CLIENT_ID = 'cf9e57d0-7dc3-4fd9-93f9-751d2abc1124';
+  const MSAL_SCOPES = ['Files.ReadWrite.AppFolder'];
+
+  let _msalInstance = null;
+  let _msalInitPromise = null;
+
+  // 构建 MSAL 配置（redirectUri 运行时自动检测）
+  function _buildMSALConfig() {
+    const redirectUri = window.location.hostname === 'localhost'
+      ? 'http://localhost:8080'
+      : (window.location.origin + window.location.pathname).replace(/\/$/, '/').replace(/\/[^/]*$/, '/');
+    return {
+      auth: {
+        clientId: MSAL_CLIENT_ID,
+        authority: 'https://login.microsoftonline.com/common',
+        redirectUri,
+        navigateToLoginRequestUrl: false,
+      },
+      cache: {
+        // localStorage 确保页面刷新后 token 不丢失
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: false,
+      },
+      system: {
+        loggerOptions: {
+          logLevel: 3, // Warning
+          loggerCallback: (level, message, containsPii) => {
+            if (!containsPii) console.log('[MSAL]', message);
+          }
+        }
+      }
+    };
+  }
+
+  // MSAL v2 不需要 initialize()，但需要尽早调用 handleRedirectPromise()
+  // 以便在 popup 重定向回本页时正确处理 auth code（popup 窗口内会自动关闭）
+  if (typeof msal !== 'undefined') {
+    _msalInitPromise = (async () => {
+      try {
+        const instance = new msal.PublicClientApplication(_buildMSALConfig());
+        // 必须在页面加载早期调用，处理 popup redirect response
+        await instance.handleRedirectPromise();
+        _msalInstance = instance;
+        console.log('[MSAL] ✅ 初始化完成，账户数:', instance.getAllAccounts().length);
+        return instance;
+      } catch (e) {
+        console.warn('[MSAL] ⚠️ 初始化失败:', e.message);
+        return null;
+      }
+    })();
+  }
+
+  // 获取 MSAL 实例（等待初始化完成）
+  async function getMSAL() {
+    if (_msalInitPromise) return await _msalInitPromise;
+    return null;
+  }
+
   // 请求持久化存储权限，防止数据被浏览器自动清理
   // 返回对象包含 granted（是否授予）和 persisted（最终是否持久化）
   async function requestPersistentStorage() {
@@ -512,14 +573,16 @@
 
     // ============ OneDrive OAuth 功能（浏览器版本）============
 
+    // 标记：本构建支持 MSAL 静默刷新（桌面版为 false，由 api.js 负责）
+    useMSAL: true,
+
     // OneDrive 配置
     _oneDriveConfig: {
-      clientId: 'cf9e57d0-7dc3-4fd9-93f9-751d2abc1124', // 与 Tauri 版本相同
+      clientId: MSAL_CLIENT_ID, // 与 Tauri 版本相同，复用顶部常量
       // 自动检测 redirect_uri：本地开发用 localhost，生产用当前域名
-      // ⚠️ 注意：需要在 Azure Portal 的应用注册中添加以下重定向 URI：
+      // ⚠️ 注意：需要在 Azure Portal 的应用注册中添加以下重定向 URI（类型：单页应用程序 SPA）：
       //   - http://localhost:8080 (本地开发)
       //   - https://shixund.github.io/DayX/ (GitHub Pages)
-      //   类型选择：单页应用程序 (SPA)
       get redirectUri() {
         if (window.location.hostname === 'localhost') {
           return 'http://localhost:8080';
@@ -529,7 +592,7 @@
         }
       },
       scopes: 'Files.ReadWrite.AppFolder offline_access',
-      tokenKey: 'onedrive_token_web',
+      tokenKey: 'onedrive_token_web',      // 旧版 token 键（用于迁移兼容）
       pkceKey: 'onedrive_pkce_web'
     },
 
@@ -595,10 +658,38 @@
       return { auth_url: authUrl, state };
     },
 
-    // 在新标签页中打开授权页面
+    // 在新标签页中打开授权页面（旧方案，已由 MSAL popup 替代，保留供兼容）
     openAuthInNewTab(authUrl) {
       const authWindow = window.open(authUrl, '_blank', 'width=600,height=700');
       return authWindow;
+    },
+
+    /**
+     * 使用 MSAL popup 完成 OneDrive 登录（Web 版推荐方式）。
+     * 相比旧的"新标签页 + BroadcastChannel"方案，优势：
+     *  1. MSAL 管理 token 生命周期，通过 SSO 会话 cookie 静默续签，不受 24h SPA 限制
+     *  2. popup 由 MSAL 自动处理 auth code 交换，无需手动 BroadcastChannel
+     *  3. 用户体验更佳（小弹窗，不跳转主页面）
+     */
+    async loginOneDriveViaPopup() {
+      const msalInst = await getMSAL();
+      if (!msalInst) {
+        throw new Error('MSAL 未加载。请确保网络正常后刷新页面，或使用桌面客户端。');
+      }
+
+      try {
+        const response = await msalInst.loginPopup({
+          scopes: MSAL_SCOPES,
+          prompt: 'select_account',   // 让用户选择账号
+        });
+        console.log('[MSAL] ✅ popup 登录成功，账户:', response.account.username);
+        return response;
+      } catch (err) {
+        if (err.errorCode === 'user_cancelled' || err.message?.includes('user_cancelled')) {
+          throw new Error('user_cancelled');
+        }
+        throw err;
+      }
     },
 
     // 监听来自授权标签页的消息
@@ -770,22 +861,46 @@
       return null;
     },
 
-    // 获取当前 token（自动刷新）
+    // 获取当前有效 token（优先 MSAL 静默续签，降级到旧版 refresh_token 兼容路径）
     async _getValidToken() {
+      // ── 路径 A：MSAL 静默获取（推荐，Web 版主路径）──────────────────────────
+      const msalInst = await getMSAL();
+      if (msalInst) {
+        const accounts = msalInst.getAllAccounts();
+        if (accounts.length > 0) {
+          try {
+            // acquireTokenSilent 先查缓存；若 access_token 过期，通过 SSO 会话 cookie
+            // 在隐藏 iframe 中静默换新 token，无需用户交互
+            const response = await msalInst.acquireTokenSilent({
+              scopes: MSAL_SCOPES,
+              account: accounts[0],
+            });
+            console.log('[MSAL] 静默获取 token 成功，过期时间:', new Date(response.expiresOn).toLocaleString());
+            return response.accessToken;
+          } catch (silentErr) {
+            // InteractionRequiredAuthError 意味着 SSO 会话也已过期，需要用户重新登录
+            console.warn('[MSAL] ⚠️ 静默续签失败（需要用户交互）:', silentErr.message);
+            return null;
+          }
+        }
+        // MSAL 无账号：说明用户未通过 MSAL 登录，继续尝试旧版 token
+      }
+
+      // ── 路径 B：旧版 refresh_token（迁移兼容，适用于升级前已登录的用户）───────
       const tokenStr = localStorage.getItem(this._oneDriveConfig.tokenKey);
-      console.log('_getValidToken: tokenStr存在?', !!tokenStr);
+      console.log('[legacy] tokenStr 存在?', !!tokenStr);
       if (!tokenStr) return null;
 
       const token = JSON.parse(tokenStr);
       const now = Math.floor(Date.now() / 1000);
-      console.log('_getValidToken: token解析成功, expires_at:', token.expires_at, ', now:', now, ', 剩余秒数:', token.expires_at - now);
+      console.log('[legacy] expires_at:', token.expires_at, ', now:', now, ', 剩余秒数:', token.expires_at - now);
 
-      // 如果 token 还有 5 分钟以上有效期，直接返回
+      // 若旧 token 仍在有效期内（5 分钟余量）直接返回
       if (token.expires_at - now > 300) {
         return token.access_token;
       }
 
-      // 需要刷新 token
+      // 旧版 refresh_token 续签（SPA 限制 24h，建议用户重新通过 MSAL 登录）
       if (!token.refresh_token) {
         localStorage.removeItem(this._oneDriveConfig.tokenKey);
         return null;
@@ -804,6 +919,7 @@
         });
 
         if (!refreshResponse.ok) {
+          console.warn('[legacy] refresh_token 已过期，需要重新登录');
           localStorage.removeItem(this._oneDriveConfig.tokenKey);
           return null;
         }
@@ -917,20 +1033,33 @@
       return await response.text();
     },
 
-    // 退出 OneDrive 登录
+    // 退出 OneDrive 登录（清除 MSAL 缓存 + 旧版 token）
     async logoutOneDrive() {
+      // 清除 MSAL 缓存（本地注销，不弹出微软退出页面）
+      const msalInst = await getMSAL();
+      if (msalInst) {
+        // 清除 localStorage 中所有 MSAL 缓存键（格式：msal.{clientId}.xxx）
+        const msalPrefix = `msal.${MSAL_CLIENT_ID}`;
+        const keysToRemove = Object.keys(localStorage).filter(k =>
+          k.startsWith(msalPrefix) || k.startsWith('msal.') || k === 'msal.cache.keys'
+        );
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        // 重置实例，确保下次 getMSAL() 重新初始化
+        _msalInstance = null;
+        _msalInitPromise = null;
+        console.log('[MSAL] 已清除本地缓存');
+      }
+      // 清除旧版 token
       localStorage.removeItem(this._oneDriveConfig.tokenKey);
       localStorage.removeItem(this._oneDriveConfig.pkceKey);
       return true;
     },
 
-    // 检查是否已登录
+    // 检查是否已登录（MSAL 优先，兼容旧版 token）
     async isOneDriveLoggedIn() {
       console.log('isOneDriveLoggedIn: 开始检查...');
-      console.log('isOneDriveLoggedIn: tokenKey =', this._oneDriveConfig.tokenKey);
-      console.log('isOneDriveLoggedIn: localStorage中的值 =', localStorage.getItem(this._oneDriveConfig.tokenKey));
       const token = await this._getValidToken();
-      console.log('isOneDriveLoggedIn: _getValidToken返回:', !!token);
+      console.log('isOneDriveLoggedIn: 结果:', !!token);
       return !!token;
     },
 

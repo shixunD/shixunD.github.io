@@ -249,9 +249,11 @@ const SettingsPage = {
             if (deleteSettings) {
                 localStorage.removeItem('displayOffsets');
                 localStorage.removeItem('columnsPerRow');
+                localStorage.removeItem('syncOnStartup');
                 // 恢复默认设置
                 AppState.displayOffsets = [0, 1, 2, 5, 7, 14, 30];
                 AppState.columnsPerRow = 7;
+                AppState.syncOnStartup = false;
                 deletedItems.push('用户设置');
             }
 
@@ -414,38 +416,30 @@ const SettingsPage = {
 
     async loginOneDrive() {
         try {
-            // 1. 生成授权 URL
-            const authResponse = await TauriAPI.startOneDriveAuth();
-            const { auth_url, state } = authResponse;
-
-            // 检查是否是 Web 版本
+            // ── Web 版本：MSAL popup 登录（静默续签，彻底告别 24h SPA 过期问题）────
             if (TauriAPI.isWebBuild) {
-                // Web 版本：在新标签页打开授权页面
-                Toast.info('正在新标签页打开 Microsoft 登录页面...');
-
-                // 在新标签页打开授权链接
-                TauriAPI.openAuthInNewTab(auth_url);
-
-                // 显示等待提示
-                this.showAuthWaitingDialog();
-
+                Toast.info('正在打开 Microsoft 登录弹窗...');
                 try {
-                    // 监听授权完成消息
-                    await TauriAPI.listenForAuthComplete();
-
-                    // 关闭等待对话框
-                    this.closeAuthWaitingDialog();
-
+                    await TauriAPI.loginOneDriveViaPopup();
                     Toast.success('OneDrive 登录成功！');
                     await this.checkOneDriveStatus();
-                } catch (error) {
-                    this.closeAuthWaitingDialog();
-                    throw error;
+                } catch (err) {
+                    if (err.message === 'user_cancelled') {
+                        Toast.info('已取消 Microsoft 登录');
+                    } else {
+                        // MSAL 可能抛出含具体 errorCode 的错误
+                        console.error('MSAL 登录失败:', err);
+                        Toast.error(`登录失败: ${err.message || err}`);
+                    }
                 }
                 return;
             }
 
-            // Tauri 桌面版本：显示选择对话框
+            // ── Tauri 桌面版本：生成授权 URL → 外部浏览器打开 ─────────────────────
+            // 1. 生成授权 URL
+            const authResponse = await TauriAPI.startOneDriveAuth();
+            const { auth_url, state } = authResponse;
+
             // 2. 显示选择对话框
             const userChoice = await this.showAuthDialog(auth_url);
 
@@ -810,9 +804,7 @@ const SettingsPage = {
             console.warn('sync-on-startup-checkbox 元素未找到');
             return;
         }
-        const saved = localStorage.getItem('syncOnStartup');
-        console.log('loadSyncOnStartupStatus: saved =', saved);
-        checkbox.checked = saved === 'true';
+        checkbox.checked = AppState.syncOnStartup;
         console.log('loadSyncOnStartupStatus: checkbox.checked =', checkbox.checked);
     },
 
@@ -823,8 +815,9 @@ const SettingsPage = {
             console.warn('sync-on-startup-checkbox 元素未找到');
             return;
         }
-        localStorage.setItem('syncOnStartup', checkbox.checked.toString());
-        console.log('toggleSyncOnStartup: saved', checkbox.checked, 'to localStorage');
+        AppState.syncOnStartup = checkbox.checked;
+        AppState.saveSettings();
+        console.log('toggleSyncOnStartup: saved', checkbox.checked, 'via AppState');
         if (checkbox.checked) {
             Toast.success('已开启启动时自动同步');
         } else {

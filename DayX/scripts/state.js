@@ -4,6 +4,7 @@ const AppState = {
     currentDate: new Date().toISOString().split('T')[0],
     displayOffsets: [0, 1, 2, 5, 7, 14, 30], // 默认显示配置
     columnsPerRow: 7, // 默认每行显示7列
+    syncOnStartup: false, // 开启时同步最新数据
     calendarYear: new Date().getFullYear(),
     calendarMonth: new Date().getMonth(), // 0-11
     datesWithWordCounts: new Map(), // 存储有单词记录的日期及其词条数量 {date: count}
@@ -33,11 +34,17 @@ const AppState = {
                 console.error('加载列数设置失败:', error);
             }
         }
+
+        const savedSyncOnStartup = localStorage.getItem('syncOnStartup');
+        if (savedSyncOnStartup !== null) {
+            this.syncOnStartup = savedSyncOnStartup === 'true';
+        }
     },
 
     // 保存设置
     saveSettings() {
         localStorage.setItem('displayOffsets', JSON.stringify(this.displayOffsets));
         localStorage.setItem('columnsPerRow', this.columnsPerRow.toString());
+        localStorage.setItem('syncOnStartup', this.syncOnStartup.toString());
     }
 };

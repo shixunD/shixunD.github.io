@@ -43,13 +43,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.loadSettings();
 
     // 2. 立即检查是否需要启动时同步，如果需要则立即显示遮罩
-    const syncEnabled = localStorage.getItem('syncOnStartup') === 'true';
+    const syncEnabled = AppState.syncOnStartup;
     let syncPromise = null;
     if (syncEnabled) {
         // 立即显示遮罩（不等待任何异步操作）
         const overlay = document.getElementById('sync-freeze-overlay');
         if (overlay) overlay.style.display = 'flex';
-        
+
         // 启动同步流程（完全并行，不阻塞）
         syncPromise = performStartupSync();
     }
@@ -92,6 +92,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Web 版本 OAuth 回调处理
 async function handleWebOAuthCallback() {
+    // MSAL 接管：若 web_api.js 已启用 MSAL（useMSAL: true），
+    // MSAL 的 handleRedirectPromise() 在 web_api.js 初始化时已自动处理 popup 回调并关闭窗口，
+    // 无需旧版手动 code exchange 流程，跳过即可。
+    if (TauriAPI.useMSAL) {
+        return;
+    }
+
     // 使用新的回调检查方法
     if (!TauriAPI.checkAndHandleOAuthCallback) {
         console.warn('checkAndHandleOAuthCallback 方法不存在');
@@ -501,7 +508,7 @@ async function performStartupSync() {
         }
         return;
     }
-    
+
     if (!isLoggedIn) {
         if (overlay) overlay.style.display = 'none';
         if (typeof Toast !== 'undefined') {
