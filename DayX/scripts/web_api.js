@@ -43,17 +43,36 @@
     };
   }
 
-  // 动态加载 MSAL CDN（开发环境未预注入时的降级方案）
-  function _loadMSALScript() {
+  // 动态加载 MSAL CDN（多源容灾：微软官方 → jsDelivr → unpkg）
+  const MSAL_CDN_URLS = [
+    'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
+    'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
+    'https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
+  ];
+
+  function _tryLoadScript(url) {
     return new Promise((resolve, reject) => {
-      if (typeof msal !== 'undefined') { resolve(); return; }
       const s = document.createElement('script');
-      s.src = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+      s.src = url;
       s.crossOrigin = 'anonymous';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('无法从 CDN 加载 MSAL.js，请检查网络连接'));
+      s.onload = () => resolve(url);
+      s.onerror = () => { s.remove(); reject(url); };
       document.head.appendChild(s);
     });
+  }
+
+  async function _loadMSALScript() {
+    if (typeof msal !== 'undefined') return; // 已由 build-web.js 预注入
+    for (const url of MSAL_CDN_URLS) {
+      try {
+        const loaded = await _tryLoadScript(url);
+        console.log('[MSAL] CDN 加载成功:', loaded);
+        return;
+      } catch (failedUrl) {
+        console.warn('[MSAL] CDN 加载失败:', failedUrl);
+      }
+    }
+    throw new Error('所有 MSAL CDN 均不可用，请检查网络或使用桌面客户端');
   }
 
   // 始终启动 MSAL 初始化（不受 msal 全局变量是否存在影响）
