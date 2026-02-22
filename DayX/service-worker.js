@@ -1,8 +1,8 @@
 // DayX Service Worker - PWA 支持
-// 版本号用于缓存管理（更新版本号以强制刷新缓存）
-const CACHE_NAME = 'dayx-cache-v1.3.17';
+// 版本号用于缓存管理 - 构建脚本会自动替换为构建时间戳
+const CACHE_NAME = 'dayx-cache-20260222064054';
 
-// 需要缓存的关键资源
+// 需要缓存的关键资源（离线时使用）
 const URLS_TO_CACHE = [
     './',
     './index.html',
@@ -28,30 +28,28 @@ const URLS_TO_CACHE = [
     './scripts/components/yearOverview.js'
 ];
 
-// 安装事件 - 缓存资源
+// 安装事件 - 预缓存资源
 self.addEventListener('install', (event) => {
     console.log('[Service Worker] 安装中...', CACHE_NAME);
 
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('[Service Worker] 缓存应用资源');
-                // 使用 addAll 批量缓存，失败时继续
+                console.log('[Service Worker] 预缓存应用资源');
                 return cache.addAll(URLS_TO_CACHE).catch(err => {
-                    console.warn('[Service Worker] 部分资源缓存失败:', err);
-                    // 即使部分失败也继续安装
+                    console.warn('[Service Worker] 部分资源预缓存失败:', err);
                     return Promise.resolve();
                 });
             })
             .then(() => {
-                console.log('[Service Worker] 安装完成');
+                console.log('[Service Worker] 安装完成，立即激活');
                 // 强制激活，不等待旧 Service Worker
                 return self.skipWaiting();
             })
     );
 });
 
-// 激活事件 - 清理旧缓存
+// 激活事件 - 清理旧缓存并立即接管页面
 self.addEventListener('activate', (event) => {
     console.log('[Service Worker] 激活中...');
 
@@ -60,7 +58,6 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames.map((cacheName) => {
-                        // 删除旧版本缓存
                         if (cacheName !== CACHE_NAME) {
                             console.log('[Service Worker] 删除旧缓存:', cacheName);
                             return caches.delete(cacheName);
@@ -69,56 +66,46 @@ self.addEventListener('activate', (event) => {
                 );
             })
             .then(() => {
-                console.log('[Service Worker] 激活完成');
-                // 立即控制所有页面
+                console.log('[Service Worker] 激活完成，接管所有页面');
                 return self.clients.claim();
             })
     );
 });
 
-// 拦截网络请求 - 缓存优先策略（Cache First）
+// 拦截网络请求 - Network First 策略（网络优先，离线回退缓存）
+// 确保在线时始终获取最新内容，解决 GitHub Pages 更新后浏览器显示旧版本的问题
 self.addEventListener('fetch', (event) => {
     // 只处理 GET 请求
     if (event.request.method !== 'GET') {
         return;
     }
 
-    // 跳过外部请求（如 Google Fonts、Microsoft OAuth）
+    // 跳过外部请求（如 Google Fonts、Microsoft OAuth、CDN）
     const url = new URL(event.request.url);
     if (url.origin !== location.origin) {
         return;
     }
 
     event.respondWith(
-        caches.match(event.request)
+        fetch(event.request)
             .then((response) => {
-                // 缓存命中，返回缓存
-                if (response) {
-                    // console.log('[Service Worker] 从缓存返回:', event.request.url);
-                    return response;
-                }
-
-                // 缓存未命中，发起网络请求
-                // console.log('[Service Worker] 网络请求:', event.request.url);
-                return fetch(event.request).then((response) => {
-                    // 检查响应有效性
-                    if (!response || response.status !== 200 || response.type !== 'basic') {
-                        return response;
-                    }
-
-                    // 克隆响应（因为响应流只能读一次）
+                // 网络请求成功 - 更新缓存并返回最新内容
+                if (response && response.status === 200) {
                     const responseToCache = response.clone();
-
-                    // 将新资源添加到缓存
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(event.request, responseToCache);
                     });
-
-                    return response;
-                }).catch((error) => {
-                    console.warn('[Service Worker] 网络请求失败:', event.request.url, error);
-                    // 可以返回一个离线页面
-                    return new Response('Network error', {
+                }
+                return response;
+            })
+            .catch(() => {
+                // 网络不可用 - 回退到缓存（离线模式）
+                return caches.match(event.request).then((cachedResponse) => {
+                    if (cachedResponse) {
+                        console.log('[Service Worker] 离线模式，从缓存返回:', event.request.url);
+                        return cachedResponse;
+                    }
+                    return new Response('Network error - offline', {
                         status: 408,
                         headers: { 'Content-Type': 'text/plain' },
                     });

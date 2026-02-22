@@ -19,21 +19,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             }).catch(err => console.warn('⚠️ 持久化存储检查失败:', err));
         }
 
-        // 📱 注册 Service Worker（fire-and-forget，不阻塞启动）
+        // 📱 注册 Service Worker 并自动检测更新
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./service-worker.js').then(registration => {
                 console.log('✅ Service Worker 注册成功:', registration.scope);
+
+                // 每次页面加载时主动检查 SW 更新
+                registration.update().catch(() => {});
+
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
+                    console.log('[SW Update] 检测到新版本，正在安装...');
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            if (typeof Toast !== 'undefined') {
-                                Toast.info('新版本已准备就绪，刷新页面即可更新');
-                            }
+                            console.log('[SW Update] 新版本已安装，通知激活...');
+                            // 通知新 SW 立即激活（skipWaiting）
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
                         }
                     });
                 });
             }).catch(err => console.warn('⚠️ Service Worker 注册失败:', err));
+
+            // 监听 SW 控制权切换 - 新 SW 激活后自动刷新页面
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                console.log('[SW Update] 新版本已激活，自动刷新页面...');
+                window.location.reload();
+            });
         }
 
         await handleWebOAuthCallback();
