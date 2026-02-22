@@ -11,6 +11,10 @@
   // 相比手动 refresh_token，MSAL 能通过 SSO 会话 cookie 静默续签，绕过微软对 SPA 24 小时限制。
   const MSAL_CLIENT_ID = 'cf9e57d0-7dc3-4fd9-93f9-751d2abc1124';
   const MSAL_SCOPES = ['Files.ReadWrite.AppFolder'];
+  const MSAL_CDN_URLS = [
+    'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
+    'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
+  ];
 
   let _msalInstance = null;
   let _msalInitPromise = null;
@@ -43,13 +47,59 @@
     };
   }
 
-  // MSAL v2 不需要 initialize()，但需要尽早调用 handleRedirectPromise()
-  // 以便在 popup 重定向回本页时正确处理 auth code（popup 窗口内会自动关闭）
-  if (typeof msal !== 'undefined') {
+  async function _loadMSALScriptIfNeeded() {
+    if (typeof msal !== 'undefined' || typeof window.msal !== 'undefined') {
+      return true;
+    }
+
+    const loadBySrc = (src) => new Promise((resolve) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        if (typeof msal !== 'undefined' || typeof window.msal !== 'undefined') {
+          resolve(true);
+          return;
+        }
+      }
+
+      const script = existing || document.createElement('script');
+      if (!existing) {
+        script.src = src;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        document.head.appendChild(script);
+      }
+
+      const onReady = () => resolve(typeof msal !== 'undefined' || typeof window.msal !== 'undefined');
+      script.addEventListener('load', onReady, { once: true });
+      script.addEventListener('error', () => resolve(false), { once: true });
+    });
+
+    for (const url of MSAL_CDN_URLS) {
+      const ok = await loadBySrc(url);
+      if (ok) {
+        console.log('[MSAL] ✅ 运行时脚本加载成功:', url);
+        return true;
+      }
+      console.warn('[MSAL] ⚠️ 脚本加载失败，尝试下一个 CDN:', url);
+    }
+
+    return false;
+  }
+
+  // 懒初始化：先确保脚本可用，再创建实例。
+  // 这样即使 build-web 注入失败，也可运行时兜底加载。
+  function _ensureMSALInitialized() {
+    if (_msalInitPromise) return _msalInitPromise;
+
     _msalInitPromise = (async () => {
       try {
-        const instance = new msal.PublicClientApplication(_buildMSALConfig());
-        // 必须在页面加载早期调用，处理 popup redirect response
+        const loaded = await _loadMSALScriptIfNeeded();
+        if (!loaded || typeof window.msal === 'undefined') {
+          console.warn('[MSAL] ⚠️ 未能加载 msal-browser 脚本');
+          return null;
+        }
+
+        const instance = new window.msal.PublicClientApplication(_buildMSALConfig());
         await instance.handleRedirectPromise();
         _msalInstance = instance;
         console.log('[MSAL] ✅ 初始化完成，账户数:', instance.getAllAccounts().length);
@@ -59,12 +109,16 @@
         return null;
       }
     })();
+
+    return _msalInitPromise;
   }
+
+  // 尽早初始化（不阻塞页面），并保留懒加载兜底
+  _ensureMSALInitialized();
 
   // 获取 MSAL 实例（等待初始化完成）
   async function getMSAL() {
-    if (_msalInitPromise) return await _msalInitPromise;
-    return null;
+    return await _ensureMSALInitialized();
   }
 
   // 请求持久化存储权限，防止数据被浏览器自动清理
@@ -674,7 +728,7 @@
     async loginOneDriveViaPopup() {
       const msalInst = await getMSAL();
       if (!msalInst) {
-        throw new Error('MSAL 未加载。请确保网络正常后刷新页面，或使用桌面客户端。');
+        throw new Error('MSAL 未加载。可能是 CDN 被拦截或网络不可达，请检查网络/代理后重试。');
       }
 
       try {

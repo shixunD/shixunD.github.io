@@ -851,7 +851,7 @@ const SettingsPage = {
                     <div class="storage-status-protected">
                         持久化存储已启用，数据受到保护
                         <div class="storage-status-details">
-                            您的数据（包括 OneDrive 登录状态）已申请持久化保护，<br>
+                            您的词汇数据已申请持久化保护，<br>
                             不会在常规浏览器清理中被删除。
                         </div>
                     </div>
