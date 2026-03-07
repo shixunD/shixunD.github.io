@@ -196,7 +196,6 @@
 
 .month-summary .dup-count:hover {
     opacity: 1;
-    text-decoration: underline;
 }
 
 .search-dup-header {
