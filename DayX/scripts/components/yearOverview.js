@@ -42,8 +42,6 @@ const YearOverview = {
         const yearTitle = document.getElementById('year-title');
         const monthsGrid = document.getElementById('months-grid');
 
-        yearTitle.textContent = `${AppState.yearOverviewYear}年`;
-
         // 获取所有有记录的日期及词条数量
         try {
             const allDays = await TauriAPI.getAllDays();
@@ -57,9 +55,24 @@ const YearOverview = {
                 const currentCount = AppState.monthlyWordCounts.get(yearMonth) || 0;
                 AppState.monthlyWordCounts.set(yearMonth, currentCount + day.words.length);
             });
+
+            // 计算重复词条
+            AppState.computeMonthlyDuplicates(allDays);
         } catch (error) {
             console.error('获取日期数据失败:', error);
         }
+
+        // 计算当年总词条和总重复
+        let yearTotal = 0;
+        let yearDuplicates = 0;
+        for (let month = 0; month < 12; month++) {
+            const ym = `${AppState.yearOverviewYear}-${String(month + 1).padStart(2, '0')}`;
+            yearTotal += AppState.monthlyWordCounts.get(ym) || 0;
+            yearDuplicates += AppState.monthlyDuplicateCounts.get(ym) || 0;
+        }
+
+        const dupHtml = yearDuplicates > 0 ? `<span class="year-dup-count">(${yearDuplicates}重复)</span>` : '';
+        yearTitle.innerHTML = `${AppState.yearOverviewYear}年 <span class="year-total-count">${yearTotal}词条${dupHtml}</span>`;
 
         // 月份名称
         const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月',
@@ -85,10 +98,13 @@ const YearOverview = {
                 monthCard.classList.add('current-month');
             }
 
+            const dupCount = AppState.monthlyDuplicateCounts.get(yearMonth) || 0;
+            const monthDupHtml = dupCount > 0 ? `<div class="month-dup">(${dupCount}重复)</div>` : '';
+
             monthCard.innerHTML = `
                 <div class="month-name">${monthNames[month]}</div>
                 <div class="month-count">${count}</div>
-                <div class="month-label">个词条</div>
+                <div class="month-label">个词条${monthDupHtml}</div>
             `;
 
             // 点击月份卡片切换到该月

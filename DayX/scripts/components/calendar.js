@@ -47,6 +47,10 @@ const Calendar = {
             dateWordCounts.forEach(([date, count]) => {
                 AppState.datesWithWordCounts.set(date, count);
             });
+
+            // 获取所有日期数据用于计算重复词条
+            const allDays = await TauriAPI.getAllDays();
+            AppState.computeMonthlyDuplicates(allDays);
         } catch (error) {
             console.error('获取日期记录失败:', error);
             AppState.datesWithWordCounts.clear();
@@ -138,7 +142,9 @@ const Calendar = {
         }
 
         // 在日历标题下方添加月总数显示
-        this.updateMonthSummary(monthTotal);
+        const yearMonth = `${AppState.calendarYear}-${String(AppState.calendarMonth + 1).padStart(2, '0')}`;
+        const monthDuplicates = AppState.monthlyDuplicateCounts.get(yearMonth) || 0;
+        this.updateMonthSummary(monthTotal, monthDuplicates);
     },
 
     createCalendarDay(day, dateStr, isOtherMonth) {
@@ -204,7 +210,7 @@ const Calendar = {
         return summaryElement;
     },
 
-    updateMonthSummary(total) {
+    updateMonthSummary(total, duplicates) {
         let monthSummary = document.getElementById('month-summary');
         if (!monthSummary) {
             monthSummary = document.createElement('div');
@@ -215,7 +221,8 @@ const Calendar = {
             calendarHeader.parentNode.insertBefore(monthSummary, calendarHeader.nextSibling);
         }
 
-        monthSummary.innerHTML = `本月总计: <strong>${total}</strong> 个词条`;
+        const dupHtml = duplicates > 0 ? `<span class="dup-count">(${duplicates}重复)</span>` : '';
+        monthSummary.innerHTML = `本月总计: <strong>${total}</strong> 个词条${dupHtml}`;
     },
 
     formatDate(year, month, day) {

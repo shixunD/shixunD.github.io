@@ -10,7 +10,33 @@ const AppState = {
     datesWithWordCounts: new Map(), // 存储有单词记录的日期及其词条数量 {date: count}
     yearOverviewYear: new Date().getFullYear(), // 年度总览的年份
     monthlyWordCounts: new Map(), // 存储每个月的词条数量 {YYYY-MM: count}
+    monthlyDuplicateCounts: new Map(), // 存储每个月的重复词条数量 {YYYY-MM: count}
     homePageNeedsRefresh: false, // 标记主页是否需要刷新
+
+    // 计算每月重复词条数（非首次添加的词条）
+    computeMonthlyDuplicates(allDays) {
+        const sorted = [...allDays].sort((a, b) => a.date.localeCompare(b.date));
+        const seen = new Set();
+        this.monthlyDuplicateCounts.clear();
+
+        for (const day of sorted) {
+            const yearMonth = day.date.substring(0, 7);
+            let dayDuplicates = 0;
+
+            for (const word of day.words) {
+                const text = (typeof word === 'string' ? word : word.text).toLowerCase().trim();
+                if (seen.has(text)) {
+                    dayDuplicates++;
+                } else {
+                    seen.add(text);
+                }
+            }
+
+            if (dayDuplicates > 0) {
+                this.monthlyDuplicateCounts.set(yearMonth, (this.monthlyDuplicateCounts.get(yearMonth) || 0) + dayDuplicates);
+            }
+        }
+    },
 
     // 加载保存的设置
     loadSettings() {
