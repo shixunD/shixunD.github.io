@@ -221,8 +221,48 @@ const Calendar = {
             calendarHeader.parentNode.insertBefore(monthSummary, calendarHeader.nextSibling);
         }
 
+        const yearMonth = `${AppState.calendarYear}-${String(AppState.calendarMonth + 1).padStart(2, '0')}`;
         const dupHtml = duplicates > 0 ? `<span class="dup-count">(${duplicates}重复)</span>` : '';
         monthSummary.innerHTML = `本月总计: <strong>${total}</strong> 个词条${dupHtml}`;
+
+        // 绑定重复数点击事件
+        const dupEl = monthSummary.querySelector('.dup-count');
+        if (dupEl) {
+            dupEl.addEventListener('click', () => {
+                this.showDuplicateWords(yearMonth);
+            });
+        }
+    },
+
+    // 点击重复数显示重复词条到搜索结果区域
+    showDuplicateWords(yearMonth) {
+        const dupMap = AppState.monthlyDuplicateWords.get(yearMonth);
+        if (!dupMap || dupMap.size === 0) return;
+
+        const resultsContainer = document.getElementById('word-search-results');
+        const searchInput = document.getElementById('word-search-input');
+        if (searchInput) searchInput.value = '';
+
+        const items = [];
+        dupMap.forEach((dates, word) => {
+            const dateButtons = dates.map(date => {
+                const [y, m, d] = date.split('-');
+                const short = `${y.slice(2)}.${m}.${d}`;
+                return `<button class="search-date-btn" data-date="${date}">${short}</button>`;
+            }).join('');
+            items.push(`
+                <div class="search-result-item">
+                    <div class="search-result-word">${word}</div>
+                    <div class="search-result-dates">${dateButtons}</div>
+                </div>
+            `);
+        });
+
+        resultsContainer.innerHTML = `<div class="search-dup-header">本月重复词条 (${dupMap.size}个词)</div>` + items.join('');
+
+        resultsContainer.querySelectorAll('.search-date-btn').forEach(btn => {
+            btn.addEventListener('click', () => InputPage.jumpToDate(btn.dataset.date));
+        });
     },
 
     formatDate(year, month, day) {

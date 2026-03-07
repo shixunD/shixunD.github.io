@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('✅ Service Worker 注册成功:', registration.scope);
 
                 // 每次页面加载时主动检查 SW 更新
-                registration.update().catch(() => {});
+                registration.update().catch(() => { });
 
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;

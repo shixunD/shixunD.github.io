@@ -190,6 +190,22 @@
     font-size: 0.78rem;
     opacity: 0.85;
     margin-left: 0.3rem;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.month-summary .dup-count:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.search-dup-header {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.3rem;
 }
 
 /* 年度总览弹窗 */

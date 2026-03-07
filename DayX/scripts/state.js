@@ -11,13 +11,15 @@ const AppState = {
     yearOverviewYear: new Date().getFullYear(), // 年度总览的年份
     monthlyWordCounts: new Map(), // 存储每个月的词条数量 {YYYY-MM: count}
     monthlyDuplicateCounts: new Map(), // 存储每个月的重复词条数量 {YYYY-MM: count}
+    monthlyDuplicateWords: new Map(), // 存储每个月的重复词详情 {YYYY-MM: Map<word, [dates]>}
     homePageNeedsRefresh: false, // 标记主页是否需要刷新
 
     // 计算每月重复词条数（非首次添加的词条）
     computeMonthlyDuplicates(allDays) {
         const sorted = [...allDays].sort((a, b) => a.date.localeCompare(b.date));
-        const seen = new Set();
+        const seen = new Map(); // word -> first date
         this.monthlyDuplicateCounts.clear();
+        this.monthlyDuplicateWords.clear();
 
         for (const day of sorted) {
             const yearMonth = day.date.substring(0, 7);
@@ -27,8 +29,19 @@ const AppState = {
                 const text = (typeof word === 'string' ? word : word.text).toLowerCase().trim();
                 if (seen.has(text)) {
                     dayDuplicates++;
+                    // 记录重复词详情
+                    if (!this.monthlyDuplicateWords.has(yearMonth)) {
+                        this.monthlyDuplicateWords.set(yearMonth, new Map());
+                    }
+                    const monthMap = this.monthlyDuplicateWords.get(yearMonth);
+                    if (!monthMap.has(text)) {
+                        monthMap.set(text, [seen.get(text)]); // 首次出现的日期
+                    }
+                    if (!monthMap.get(text).includes(day.date)) {
+                        monthMap.get(text).push(day.date);
+                    }
                 } else {
-                    seen.add(text);
+                    seen.set(text, day.date);
                 }
             }
 
