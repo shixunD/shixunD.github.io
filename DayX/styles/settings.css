@@ -985,3 +985,28 @@
         transform: translateY(0);
     }
 }
+
+/* 版本号展示 */
+.app-version-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color, #e0e6ed);
+}
+
+.app-version-badge {
+    background: var(--primary-color, #4a90e2);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+}
+
+.app-version-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #7f8c8d);
+}
