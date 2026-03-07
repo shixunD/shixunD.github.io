@@ -254,6 +254,7 @@ const SettingsPage = {
                 AppState.displayOffsets = [0, 1, 2, 5, 7, 14, 30];
                 AppState.columnsPerRow = 7;
                 AppState.syncOnStartup = false;
+                await AppState.saveSyncOnStartupToBackend();
                 deletedItems.push('用户设置');
             }
 
@@ -809,7 +810,7 @@ const SettingsPage = {
     },
 
     // 切换开启时自动同步最新数据
-    toggleSyncOnStartup() {
+    async toggleSyncOnStartup() {
         const checkbox = document.getElementById('sync-on-startup-checkbox');
         if (!checkbox) {
             console.warn('sync-on-startup-checkbox 元素未找到');
@@ -817,7 +818,8 @@ const SettingsPage = {
         }
         AppState.syncOnStartup = checkbox.checked;
         AppState.saveSettings();
-        console.log('toggleSyncOnStartup: saved', checkbox.checked, 'via AppState');
+        await AppState.saveSyncOnStartupToBackend();
+        console.log('toggleSyncOnStartup: saved', checkbox.checked);
         if (checkbox.checked) {
             Toast.success('已开启启动时自动同步');
         } else {

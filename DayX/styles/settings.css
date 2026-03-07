@@ -986,27 +986,54 @@
     }
 }
 
-/* 版本号展示 */
-.app-version-footer {
+/* 版本信息卡片 */
+.version-info-row {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 0.6rem;
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color, #e0e6ed);
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border-color, #e0e6ed);
 }
 
-.app-version-badge {
-    background: var(--primary-color, #4a90e2);
-    color: white;
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 0.2rem 0.65rem;
-    border-radius: 999px;
-    letter-spacing: 0.04em;
+.version-info-row:last-of-type {
+    border-bottom: none;
+    margin-bottom: 1rem;
 }
 
-.app-version-label {
-    font-size: 0.78rem;
+.version-info-label {
+    font-size: 0.82rem;
     color: var(--text-secondary, #7f8c8d);
+}
+
+.version-info-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary-color, #4a90e2);
+    letter-spacing: 0.03em;
+}
+
+.version-info-date {
+    font-size: 0.82rem;
+    color: var(--text-secondary, #7f8c8d);
+}
+
+.btn-docs {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 0.5rem;
+    margin-top: 0.25rem;
+    background: transparent;
+    color: var(--primary-color, #4a90e2);
+    border: 1px solid var(--primary-color, #4a90e2);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: background-color 0.15s, color 0.15s;
+    cursor: pointer;
+}
+
+.btn-docs:hover {
+    background: var(--primary-color, #4a90e2);
+    color: #fff;
 }

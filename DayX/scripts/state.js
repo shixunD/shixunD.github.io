@@ -74,9 +74,24 @@ const AppState = {
             }
         }
 
-        const savedSyncOnStartup = localStorage.getItem('syncOnStartup');
-        if (savedSyncOnStartup !== null) {
-            this.syncOnStartup = savedSyncOnStartup === 'true';
+        // syncOnStartup: 桌面版从 Rust 后端加载（通过 loadSyncOnStartupFromBackend）
+        // Web 版从 localStorage 加载
+        if (typeof TauriAPI !== 'undefined' && TauriAPI.isWebBuild) {
+            const savedSyncOnStartup = localStorage.getItem('syncOnStartup');
+            if (savedSyncOnStartup !== null) {
+                this.syncOnStartup = savedSyncOnStartup === 'true';
+            }
+        }
+    },
+
+    // 从后端加载 syncOnStartup（桌面版专用，异步）
+    async loadSyncOnStartupFromBackend() {
+        if (typeof TauriAPI !== 'undefined' && !TauriAPI.isWebBuild && TauriAPI.getSyncOnStartup) {
+            try {
+                this.syncOnStartup = await TauriAPI.getSyncOnStartup();
+            } catch (e) {
+                console.warn('从后端加载 syncOnStartup 失败:', e);
+            }
         }
     },
 
@@ -84,6 +99,20 @@ const AppState = {
     saveSettings() {
         localStorage.setItem('displayOffsets', JSON.stringify(this.displayOffsets));
         localStorage.setItem('columnsPerRow', this.columnsPerRow.toString());
-        localStorage.setItem('syncOnStartup', this.syncOnStartup.toString());
+        // syncOnStartup: Web 版存 localStorage，桌面版存后端
+        if (typeof TauriAPI !== 'undefined' && TauriAPI.isWebBuild) {
+            localStorage.setItem('syncOnStartup', this.syncOnStartup.toString());
+        }
+    },
+
+    // 保存 syncOnStartup 到后端（桌面版专用，异步）
+    async saveSyncOnStartupToBackend() {
+        if (typeof TauriAPI !== 'undefined' && !TauriAPI.isWebBuild && TauriAPI.setSyncOnStartup) {
+            try {
+                await TauriAPI.setSyncOnStartup(this.syncOnStartup);
+            } catch (e) {
+                console.warn('保存 syncOnStartup 到后端失败:', e);
+            }
+        }
     }
 };

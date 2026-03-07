@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. 加载设置
     AppState.loadSettings();
 
+    // 1.5 桌面版：从后端加载 syncOnStartup（文件持久化，不依赖 localStorage）
+    await AppState.loadSyncOnStartupFromBackend();
+
     // 2. 立即检查是否需要启动时同步，如果需要则立即显示遮罩
     const syncEnabled = AppState.syncOnStartup;
     let syncPromise = null;
