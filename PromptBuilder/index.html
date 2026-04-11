@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompt Builder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== SIDEBAR ===== -->
+<aside id="sidebar">
+  <div id="sidebar-header">
+    <span class="app-logo">Prompt Builder</span>
+    <div class="sidebar-icons">
+      <button id="theme-toggle" class="icon-btn" title="切换主题">🌙</button>
+      <button id="btn-new-canvas" class="icon-btn" title="新建 Canvas" style="font-size:18px;font-weight:300;">+</button>
+    </div>
+  </div>
+  <ul id="canvas-list"></ul>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main id="main">
+
+  <!-- Canvas Header -->
+  <div id="canvas-header" class="no-canvas">
+    <div id="canvas-title-area">
+      <h1 id="canvas-name" class="placeholder">未选择 Canvas</h1>
+      <span id="canvas-desc"></span>
+    </div>
+    <div id="canvas-actions">
+      <button class="btn" id="btn-data-tools">数据</button>
+      <span id="storage-badge" class="storage-badge unknown" title="正在检查浏览器存储持久化状态">存储: 检查中</span>
+      <button class="btn needs-canvas" id="btn-rename-canvas">重命名</button>
+      <button class="btn needs-canvas" id="btn-duplicate-canvas">复制</button>
+      <button class="btn danger needs-canvas" id="btn-delete-canvas">删除</button>
+      <button class="btn primary needs-canvas" id="btn-add-block">+ 添加块</button>
+    </div>
+  </div>
+
+  <!-- Three-column Work Area -->
+  <div id="work-area">
+
+    <!-- LEFT: free-form canvas -->
+    <div id="canvas-panel">
+      <div id="canvas-stage">
+        <div id="canvas-hint">
+          <div class="hint-icon">🗂️</div>
+          <p>右键空白处 · 新建块<br>双击块 · 编辑内容<br>点击 → · 加入流水线</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="resizer-left" class="col-resizer" role="separator" aria-label="调整主画布与流水线宽度"></div>
+
+    <!-- MIDDLE: pipeline -->
+    <div id="pipeline-panel">
+      <div class="panel-hd">
+        <span class="panel-hd-title">流水线</span>
+        <button class="btn" id="btn-clear-pipeline" style="font-size:11px;padding:3px 8px;">清空</button>
+      </div>
+      <ul id="pipeline-list">
+        <div id="pipeline-empty">
+          <p>点击块上的 <strong>→</strong><br>将块加入流水线</p>
+        </div>
+      </ul>
+      <div id="pipeline-drop-zone">将块拖入此处</div>
+    </div>
+
+    <div id="resizer-right" class="col-resizer" role="separator" aria-label="调整流水线与结果区宽度"></div>
+
+    <!-- RIGHT: live result -->
+    <div id="result-panel">
+      <div class="panel-hd">
+        <span class="panel-hd-title">生成结果</span>
+        <div class="result-font-control">
+          <label for="result-font-slider">字号</label>
+          <input id="result-font-slider" type="range" min="30" max="150" step="1" value="100">
+          <span id="result-font-value">100%</span>
+        </div>
+      </div>
+      <div id="result-content" contenteditable="true" spellcheck="false">
+        <span class="result-empty">流水线为空</span>
+      </div>
+      <div id="result-footer">
+        <span class="result-hint">可临时编辑，流水线变化后重置</span>
+        <button class="btn" id="btn-copy-plain">纯文本</button>
+        <button class="btn primary" id="btn-copy-rich">复制结果</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Canvas right-click menu (empty area) -->
+<ul id="canvas-ctx-menu" class="ctx-menu hidden">
+  <li data-action="new-block">新建块</li>
+</ul>
+
+<!-- Block right-click menu -->
+<ul id="block-ctx-menu" class="ctx-menu hidden">
+  <li data-action="add-pipeline">加入流水线</li>
+  <li data-action="dup-block">复制块</li>
+  <li data-action="send-to-canvas">发送到其他 Canvas</li>
+  <li class="sep"></li>
+  <li data-action="del-block" class="danger">删除块</li>
+</ul>
+
+<ul id="data-ctx-menu" class="ctx-menu hidden">
+  <li data-action="export-data">导出全部数据</li>
+  <li data-action="import-data">导入并覆盖数据</li>
+  <li data-action="configure-onedrive-oauth">配置 OneDrive OAuth（高级）</li>
+  <li data-action="backup-onedrive">OneDrive 备份</li>
+  <li class="sep"></li>
+  <li id="data-storage-status" class="muted" data-action="noop">存储持久化: 检查中</li>
+</ul>
+
+<!-- Dialog: new canvas / rename -->
+<div id="dialog-overlay" class="hidden">
+  <div id="dialog-box">
+    <div id="dialog-title">新建 Canvas</div>
+    <div class="dialog-field">
+      <label>名称 *</label>
+      <input id="dlg-name" type="text" maxlength="80" placeholder="Canvas 名称">
+    </div>
+    <div class="dialog-field">
+      <label>描述（可选）</label>
+      <input id="dlg-desc" type="text" maxlength="200" placeholder="简短描述">
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:4px;">
+      <button class="btn" id="btn-dlg-cancel">取消</button>
+      <button class="btn primary" id="btn-dlg-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog: send block to canvas -->
+<div id="send-overlay" class="hidden">
+  <div id="send-box">
+    <div id="send-title">发送块到其他 Canvas</div>
+    <div class="dialog-field">
+      <label>目标 Canvas</label>
+      <select id="send-target-canvas"></select>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:4px;">
+      <button class="btn" id="btn-send-cancel">取消</button>
+      <button class="btn primary" id="btn-send-ok">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<input id="input-import-data" type="file" accept="application/json,.json" hidden>
+
+<script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+<script src="js/01-core.js"></script>
+<script src="js/02-blocks.js"></script>
+<script src="js/03-pipeline.js"></script>
+<script src="js/04-render-menus.js"></script>
+<script src="js/05-actions-init.js"></script>
+</body>
+</html>
+
+
