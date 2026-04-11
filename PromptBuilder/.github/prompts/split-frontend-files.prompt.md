@@ -79,6 +79,7 @@
 	- `uploadOneDriveBackupFromDialog`（1360）
 	- `refreshOneDriveHistory`（1291）
 	- `downloadOneDriveHistoryItem`（1312）
+	- `logoutOneDriveAccount`（1300）
 	- `initPipelineDropZone`（219）
 	- `bindEvents`（341）
 	- `init`（449）
@@ -159,6 +160,7 @@
 	- `btn-od-close click` -> `Actions.closeOneDriveBackupDialog`
 	- `btn-od-upload click` -> `Actions.uploadOneDriveBackupFromDialog`
 	- `btn-od-refresh click` -> `Actions.refreshOneDriveHistory`
+	- `btn-od-logout click` -> `Actions.logoutOneDriveAccount`
 	- `btn-od-prev click` -> `Actions.prevOneDriveHistoryPage`
 	- `btn-od-next click` -> `Actions.nextOneDriveHistoryPage`
 	- `od-backup-name keydown` -> `Enter 上传`、`Escape 关闭`
@@ -221,7 +223,7 @@
 
 - `Data 菜单: backup-onedrive`
 	- 处理：`Actions.backupToOneDrive -> Actions.openOneDriveBackupDialog`
-	- 副作用：打开 OneDrive 备份页面（上传 + 历史分页下载）
+	- 副作用：打开 OneDrive 备份页面（上传 + 历史分页下载 + 退出登录）
 
 ###### 16.2 对话框按钮
 - `#btn-dlg-ok` -> `Actions.confirmDialog`
@@ -230,6 +232,7 @@
 - `#btn-send-cancel` -> `hideSendDialog`
 - `#btn-od-upload` -> `Actions.uploadOneDriveBackupFromDialog`
 - `#btn-od-refresh` -> `Actions.refreshOneDriveHistory`
+- `#btn-od-logout` -> `Actions.logoutOneDriveAccount`
 - `#btn-od-prev` -> `Actions.prevOneDriveHistoryPage`
 - `#btn-od-next` -> `Actions.nextOneDriveHistoryPage`
 - `#btn-od-close` -> `Actions.closeOneDriveBackupDialog`
@@ -292,6 +295,8 @@
 	- 处理：历史区显示失败提示并 toast 报错，可点击“刷新历史”重试
 - OneDrive 普通上传失败（网络/权限等）
 	- 处理：弹出“是否改为本地下载备份文件”确认，保证数据可落地
+- OneDrive 退出登录失败
+	- 处理：toast 显示退出失败原因，保留当前控制页面可继续操作
 - 高级 OAuth 配置入口移除
 	- 处理：Data 菜单仅保留导出、导入、OneDrive 备份，默认使用内置 OAuth 配置
 
