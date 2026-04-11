@@ -268,11 +268,11 @@ const OneDriveOAuth = {
     return app;
   },
 
-  async acquireAccessToken(interactive = true) {
+  async acquireAccessToken(interactive = true, forceSelectAccount = false) {
     const config = await OneDriveOAuth.ensureConfigured(interactive);
     const app = await OneDriveOAuth._getMsalApp(config);
 
-    let account = app.getAllAccounts()[0] || null;
+    let account = forceSelectAccount ? null : (app.getAllAccounts()[0] || null);
     if (!account) {
       if (!interactive) {
         throw new Error('OneDrive 未登录，请先完成 OAuth 登录');
@@ -281,7 +281,7 @@ const OneDriveOAuth = {
         scopes: ONEDRIVE_OAUTH_SCOPES,
         prompt: 'select_account',
       });
-      account = loginResult.account;
+      account = (loginResult && loginResult.account) || app.getAllAccounts()[0] || null;
     }
 
     try {
@@ -295,16 +295,16 @@ const OneDriveOAuth = {
         throw new Error('无法静默获取 OneDrive 令牌');
       }
       const popup = await app.acquireTokenPopup({
-        account,
+        account: account || undefined,
         scopes: ONEDRIVE_OAUTH_SCOPES,
-        prompt: 'consent',
+        prompt: forceSelectAccount ? 'select_account' : 'consent',
       });
       return popup.accessToken;
     }
   },
 
-  async uploadJson(fileName, jsonText) {
-    const token = await OneDriveOAuth.acquireAccessToken(true);
+  async uploadJson(fileName, jsonText, options = {}) {
+    const token = await OneDriveOAuth.acquireAccessToken(true, !!options.forceSelectAccount);
     const safeName = (fileName || buildBackupFileName()).replace(/[\\/:*?"<>|]/g, '_');
     const encodedPath = `${ONEDRIVE_APP_FOLDER}/${safeName}`
       .split('/')
@@ -326,7 +326,20 @@ const OneDriveOAuth = {
     if (!resp.ok) {
       const detail = await resp.text();
       const shortDetail = detail ? detail.slice(0, 200) : '';
-      throw new Error(`OneDrive 上传失败 (${resp.status}) ${shortDetail}`.trim());
+      let serviceMessage = '';
+      try {
+        const parsed = JSON.parse(detail);
+        serviceMessage = (parsed && parsed.error && parsed.error.message) || '';
+      } catch {
+        serviceMessage = '';
+      }
+
+      const mergedMessage = `${serviceMessage} ${shortDetail}`.trim();
+      if (/Tenant does not have a SPO license/i.test(mergedMessage)) {
+        throw new Error('当前登录账户所在租户未开通 OneDrive/SharePoint 许可证，请切换为个人微软账号或已分配许可证的 Microsoft 365 账号');
+      }
+
+      throw new Error(`OneDrive 上传失败 (${resp.status}) ${(serviceMessage || shortDetail).trim()}`.trim());
     }
 
     return resp.json();
@@ -1067,8 +1080,38 @@ const Actions = {
       Toast.show('已通过 OneDrive OAuth 备份成功');
     } catch (err) {
       console.error('OneDrive OAuth backup failed:', err);
+      let finalErr = err;
+      const initialMsg = (err && err.message) || '';
+      const isSPOProvisioningError = /Tenant does not have a SPO license|OneDrive\/SharePoint 许可证/i.test(initialMsg);
+
+      if (isSPOProvisioningError) {
+        const retryWithAnotherAccount = confirm(
+          '检测到当前账号所在租户未开通 OneDrive/SharePoint 许可证。\n\n是否立即切换 Microsoft 账号后重试？\n建议选择个人微软账号，或已分配 OneDrive 许可证的 Microsoft 365 账号。'
+        );
+
+        if (retryWithAnotherAccount) {
+          try {
+            const uploaded = await OneDriveOAuth.uploadJson(
+              exported.fileName,
+              exported.jsonText,
+              { forceSelectAccount: true }
+            );
+            if (uploaded && uploaded.webUrl) {
+              window.open(uploaded.webUrl, '_blank', 'noopener');
+            } else {
+              window.open(ONEDRIVE_WEB_URL, '_blank', 'noopener');
+            }
+            Toast.show('切换账号后已通过 OneDrive OAuth 备份成功');
+            return;
+          } catch (retryErr) {
+            console.error('OneDrive OAuth retry backup failed:', retryErr);
+            finalErr = retryErr;
+          }
+        }
+      }
+
       const askFallback = confirm(
-        `OneDrive OAuth 备份失败：${(err && err.message) || '未知错误'}\n\n是否改为本地下载备份文件？`
+        `OneDrive OAuth 备份失败：${(finalErr && finalErr.message) || '未知错误'}\n\n是否改为本地下载备份文件？`
       );
       if (!askFallback) {
         Toast.show('OneDrive 备份已取消');
