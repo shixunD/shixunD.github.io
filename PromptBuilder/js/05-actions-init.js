@@ -13,6 +13,113 @@ const ONEDRIVE_CONFIG_REDIRECT_KEY = 'pb-onedrive-redirect-uri';
 const ONEDRIVE_USE_CUSTOM_CONFIG_KEY = 'pb-onedrive-use-custom-config';
 const ONEDRIVE_APP_FOLDER = 'PaperDesignBackups';
 const ONEDRIVE_OAUTH_SCOPES = ['Files.ReadWrite.AppFolder', 'User.Read'];
+const UPDATE_CHECK_LAST_REMOTE_KEY = 'pb-update-last-remote-pushed-at';
+const UPDATE_CHECK_RELOAD_GUARD_KEY = 'pb-update-reload-guard';
+
+const StartupUpdateChecker = {
+  _isHttpPage() {
+    return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  },
+
+  _resolveGitHubRepoCandidates() {
+    const host = (window.location.hostname || '').toLowerCase();
+    if (!host.endsWith('.github.io')) return null;
+
+    const owner = host.slice(0, -'.github.io'.length);
+    if (!owner) return null;
+
+    const seg = (window.location.pathname || '')
+      .split('/')
+      .filter(Boolean);
+
+    const candidates = [];
+    const seen = new Set();
+
+    const pushCandidate = (repo) => {
+      const normalized = (repo || '').trim();
+      if (!normalized) return;
+      const key = `${owner}/${normalized}`.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ owner, repo: normalized });
+    };
+
+    if (seg.length > 0) {
+      pushCandidate(seg[0]);
+    }
+    pushCandidate(`${owner}.github.io`);
+
+    return candidates.length > 0 ? candidates : null;
+  },
+
+  _buildReloadUrl(remoteStamp) {
+    const url = new URL(window.location.href);
+    const stamp = String(remoteStamp || Date.now());
+    url.searchParams.set('pb_update', stamp);
+    return url.toString();
+  },
+
+  async _fetchRemotePushStamp(owner, repo) {
+    const endpoint = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    const resp = await fetch(endpoint, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/vnd.github+json',
+      },
+    });
+
+    if (!resp.ok) {
+      throw new Error(`GitHub API ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    return data && (data.pushed_at || data.updated_at || null);
+  },
+
+  async checkAndReloadIfUpdated() {
+    if (!StartupUpdateChecker._isHttpPage()) return false;
+
+    const repoCandidates = StartupUpdateChecker._resolveGitHubRepoCandidates();
+    if (!repoCandidates || repoCandidates.length === 0) return false;
+
+    let remoteStamp = null;
+    let lastErr = null;
+    try {
+      for (const repoInfo of repoCandidates) {
+        try {
+          remoteStamp = await StartupUpdateChecker._fetchRemotePushStamp(repoInfo.owner, repoInfo.repo);
+          if (remoteStamp) break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+    } catch {
+      // noop
+    }
+
+    if (!remoteStamp) {
+      if (lastErr) console.warn('Update check skipped:', lastErr);
+      return false;
+    }
+
+    const previousRemoteStamp = localStorage.getItem(UPDATE_CHECK_LAST_REMOTE_KEY);
+    localStorage.setItem(UPDATE_CHECK_LAST_REMOTE_KEY, String(remoteStamp));
+
+    if (!previousRemoteStamp) return false;
+    if (previousRemoteStamp === String(remoteStamp)) return false;
+
+    const guard = sessionStorage.getItem(UPDATE_CHECK_RELOAD_GUARD_KEY);
+    if (guard === String(remoteStamp)) return false;
+    sessionStorage.setItem(UPDATE_CHECK_RELOAD_GUARD_KEY, String(remoteStamp));
+
+    Toast.show('检测到线上更新，正在刷新到最新版本...', 1800);
+    setTimeout(() => {
+      window.location.replace(StartupUpdateChecker._buildReloadUrl(remoteStamp));
+    }, 280);
+    return true;
+  },
+};
 
 const OneDriveOAuth = {
   _msalApp: null,
@@ -1244,6 +1351,13 @@ function bindEvents() {
    ===================================================================== */
 async function init() {
   Theme.init();
+
+  try {
+    const reloading = await StartupUpdateChecker.checkAndReloadIfUpdated();
+    if (reloading) return;
+  } catch (err) {
+    console.warn('Startup update check failed:', err);
+  }
 
   try {
     await DB.open();

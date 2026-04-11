@@ -253,6 +253,8 @@
 	- 处理：toast“请先选择或新建一个 Canvas”
 - 导入块缺失 `htmlContent`（仅有 `textContent/content`）
 	- 处理：自动转义并回填为 `htmlContent`（保留换行）
+- OneDrive OAuth SDK 加载失败
+	- 处理：MSAL SDK 改为 `jsdelivr` 主源，失败自动回退 `unpkg`，仍失败则提示检查网络并可本地下载备份
 
 ##### 20. 后续 AI 维护准则（文档同步要求）
 - 任意新增按钮：必须同步更新“按钮矩阵 + 事件索引 + 状态触发矩阵”。
