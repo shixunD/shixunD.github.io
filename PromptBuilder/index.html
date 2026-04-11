@@ -110,7 +110,6 @@
 <ul id="data-ctx-menu" class="ctx-menu hidden">
   <li data-action="export-data">导出全部数据</li>
   <li data-action="import-data">导入并覆盖数据</li>
-  <li data-action="configure-onedrive-oauth">配置 OneDrive OAuth（高级）</li>
   <li data-action="backup-onedrive">OneDrive 备份</li>
   <li class="sep"></li>
   <li id="data-storage-status" class="muted" data-action="noop">存储持久化: 检查中</li>
@@ -146,6 +145,38 @@
     <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:4px;">
       <button class="btn" id="btn-send-cancel">取消</button>
       <button class="btn primary" id="btn-send-ok">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog: OneDrive backup manager -->
+<div id="onedrive-overlay" class="hidden">
+  <div id="onedrive-box">
+    <div id="onedrive-head">
+      <div id="onedrive-title">OneDrive 备份</div>
+      <button class="btn" id="btn-od-close">关闭</button>
+    </div>
+
+    <div class="dialog-field">
+      <label for="od-backup-name">上传文件名（默认：年-月-日--时-分-秒）</label>
+      <input id="od-backup-name" type="text" maxlength="80" placeholder="2026-01-01--02-01-03">
+    </div>
+
+    <div id="onedrive-upload-actions">
+      <button class="btn primary" id="btn-od-upload">上传当前数据到 OneDrive</button>
+      <button class="btn" id="btn-od-refresh">刷新历史</button>
+    </div>
+
+    <div id="onedrive-history-head">
+      <span>历史备份（每页 10 条）</span>
+      <span id="od-page-info">第 1 页</span>
+    </div>
+
+    <div id="od-history-list" aria-live="polite"></div>
+
+    <div id="onedrive-pager">
+      <button class="btn" id="btn-od-prev">上一页</button>
+      <button class="btn" id="btn-od-next">下一页</button>
     </div>
   </div>
 </div>

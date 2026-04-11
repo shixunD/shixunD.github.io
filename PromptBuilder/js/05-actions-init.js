@@ -2,17 +2,13 @@
 
 const BACKUP_SCHEMA_VERSION = 2;
 const BACKUP_FILE_PREFIX = 'paperdesign-backup';
-const ONEDRIVE_WEB_URL = 'https://onedrive.live.com/';
 const APP_PREF_PREFIX = 'pb-';
 const ONEDRIVE_DEFAULT_CLIENT_ID = 'f5bc199c-44bd-495e-9168-7efb5262b048';
 const ONEDRIVE_DEFAULT_TENANT = 'a27888d4-ada2-4871-b099-316283e9bdf5';
 const ONEDRIVE_DEFAULT_REDIRECT_URI = 'https://shixund.github.io/PromptBuilder';
-const ONEDRIVE_CONFIG_CLIENT_ID_KEY = 'pb-onedrive-client-id';
-const ONEDRIVE_CONFIG_TENANT_KEY = 'pb-onedrive-tenant';
-const ONEDRIVE_CONFIG_REDIRECT_KEY = 'pb-onedrive-redirect-uri';
-const ONEDRIVE_USE_CUSTOM_CONFIG_KEY = 'pb-onedrive-use-custom-config';
 const ONEDRIVE_APP_FOLDER = 'PaperDesignBackups';
 const ONEDRIVE_OAUTH_SCOPES = ['Files.ReadWrite.AppFolder', 'User.Read'];
+const ONEDRIVE_HISTORY_PAGE_SIZE = 10;
 const UPDATE_CHECK_LAST_REMOTE_KEY = 'pb-update-last-remote-pushed-at';
 const UPDATE_CHECK_RELOAD_GUARD_KEY = 'pb-update-reload-guard';
 
@@ -131,12 +127,6 @@ const OneDriveOAuth = {
     return text.endsWith('/') ? text.slice(0, -1) : text;
   },
 
-  _guessRedirectUri() {
-    const current = `${window.location.origin}${window.location.pathname}`;
-    if (!current || current.includes('null')) return ONEDRIVE_DEFAULT_REDIRECT_URI;
-    return OneDriveOAuth._normalizeRedirect(current);
-  },
-
   _presetConfig() {
     return {
       clientId: ONEDRIVE_DEFAULT_CLIENT_ID,
@@ -147,91 +137,17 @@ const OneDriveOAuth = {
   },
 
   readConfig() {
-    const useCustom = localStorage.getItem(ONEDRIVE_USE_CUSTOM_CONFIG_KEY) === '1';
-    if (!useCustom) {
-      return OneDriveOAuth._presetConfig();
-    }
-
-    const clientId = (localStorage.getItem(ONEDRIVE_CONFIG_CLIENT_ID_KEY) || ONEDRIVE_DEFAULT_CLIENT_ID).trim();
-    const tenant = (localStorage.getItem(ONEDRIVE_CONFIG_TENANT_KEY) || ONEDRIVE_DEFAULT_TENANT).trim() || ONEDRIVE_DEFAULT_TENANT;
-    const redirectRaw = localStorage.getItem(ONEDRIVE_CONFIG_REDIRECT_KEY);
-    const redirectUri = OneDriveOAuth._normalizeRedirect(redirectRaw || ONEDRIVE_DEFAULT_REDIRECT_URI);
-    return { clientId, tenant, redirectUri, source: 'custom' };
-  },
-
-  saveConfig(config) {
-    const current = OneDriveOAuth.readConfig();
-    const next = {
-      clientId: (config.clientId || ONEDRIVE_DEFAULT_CLIENT_ID).trim(),
-      tenant: (config.tenant || ONEDRIVE_DEFAULT_TENANT).trim() || ONEDRIVE_DEFAULT_TENANT,
-      redirectUri: OneDriveOAuth._normalizeRedirect(config.redirectUri || ONEDRIVE_DEFAULT_REDIRECT_URI),
-      source: 'custom',
-    };
-
-    localStorage.setItem(ONEDRIVE_CONFIG_CLIENT_ID_KEY, next.clientId);
-    localStorage.setItem(ONEDRIVE_CONFIG_TENANT_KEY, next.tenant);
-    localStorage.setItem(ONEDRIVE_CONFIG_REDIRECT_KEY, next.redirectUri);
-    localStorage.setItem(ONEDRIVE_USE_CUSTOM_CONFIG_KEY, '1');
-
-    if (
-      current.clientId !== next.clientId
-      || current.tenant !== next.tenant
-      || current.redirectUri !== next.redirectUri
-    ) {
-      OneDriveOAuth._msalApp = null;
-      OneDriveOAuth._configKey = '';
-    }
+    return OneDriveOAuth._presetConfig();
   },
 
   isConfigured(config) {
     return !!(config && config.clientId);
   },
 
-  clearCustomConfig() {
-    localStorage.removeItem(ONEDRIVE_CONFIG_CLIENT_ID_KEY);
-    localStorage.removeItem(ONEDRIVE_CONFIG_TENANT_KEY);
-    localStorage.removeItem(ONEDRIVE_CONFIG_REDIRECT_KEY);
-    localStorage.removeItem(ONEDRIVE_USE_CUSTOM_CONFIG_KEY);
-    OneDriveOAuth._msalApp = null;
-    OneDriveOAuth._configKey = '';
-  },
-
-  async configureByPrompt() {
-    const current = OneDriveOAuth.readConfig();
-
-    const clientId = (prompt(
-      '请输入 Azure 应用 (Entra ID App) 的 Client ID（GUID）',
-      current.clientId || ''
-    ) || '').trim();
-    if (!clientId) throw new Error('已取消 OneDrive OAuth 配置');
-
-    const tenant = (prompt(
-      '请输入 Tenant（默认 common，可填组织租户 ID）',
-      current.tenant || 'common'
-    ) || 'common').trim() || 'common';
-
-    const redirectUri = (prompt(
-      '请输入重定向 URI（需与 Azure 中完全一致）',
-      current.redirectUri || OneDriveOAuth._guessRedirectUri() || ONEDRIVE_DEFAULT_REDIRECT_URI
-    ) || '').trim();
-    if (!redirectUri) throw new Error('已取消 OneDrive OAuth 配置');
-
-    const normalized = {
-      clientId,
-      tenant,
-      redirectUri: OneDriveOAuth._normalizeRedirect(redirectUri),
-    };
-    OneDriveOAuth.saveConfig(normalized);
-    return normalized;
-  },
-
-  async ensureConfigured(interactive = false) {
+  async ensureConfigured() {
     const config = OneDriveOAuth.readConfig();
     if (OneDriveOAuth.isConfigured(config)) return config;
-    if (!interactive) {
-      throw new Error('未配置 OneDrive OAuth，请先点击“配置 OneDrive OAuth”');
-    }
-    return OneDriveOAuth.configureByPrompt();
+    throw new Error('OneDrive OAuth 默认配置不可用，请联系维护者检查 Client ID');
   },
 
   _ensureSdkLoaded() {
@@ -303,6 +219,29 @@ const OneDriveOAuth = {
     }
   },
 
+  _extractServiceMessage(detail) {
+    if (!detail) return '';
+    try {
+      const parsed = JSON.parse(detail);
+      return (parsed && parsed.error && parsed.error.message) || '';
+    } catch {
+      return '';
+    }
+  },
+
+  _buildGraphError(prefix, status, detail) {
+    const serviceMessage = OneDriveOAuth._extractServiceMessage(detail);
+    const shortDetail = detail ? detail.slice(0, 200) : '';
+    const mergedMessage = `${serviceMessage} ${shortDetail}`.trim();
+
+    if (/Tenant does not have a SPO license/i.test(mergedMessage)) {
+      return new Error('当前登录账户所在租户未开通 OneDrive/SharePoint 许可证，请切换为个人微软账号或已分配许可证的 Microsoft 365 账号');
+    }
+
+    const text = (serviceMessage || shortDetail || '未知错误').trim();
+    return new Error(`${prefix} (${status}) ${text}`.trim());
+  },
+
   async uploadJson(fileName, jsonText, options = {}) {
     const token = await OneDriveOAuth.acquireAccessToken(true, !!options.forceSelectAccount);
     const safeName = (fileName || buildBackupFileName()).replace(/[\\/:*?"<>|]/g, '_');
@@ -325,24 +264,68 @@ const OneDriveOAuth = {
 
     if (!resp.ok) {
       const detail = await resp.text();
-      const shortDetail = detail ? detail.slice(0, 200) : '';
-      let serviceMessage = '';
-      try {
-        const parsed = JSON.parse(detail);
-        serviceMessage = (parsed && parsed.error && parsed.error.message) || '';
-      } catch {
-        serviceMessage = '';
-      }
-
-      const mergedMessage = `${serviceMessage} ${shortDetail}`.trim();
-      if (/Tenant does not have a SPO license/i.test(mergedMessage)) {
-        throw new Error('当前登录账户所在租户未开通 OneDrive/SharePoint 许可证，请切换为个人微软账号或已分配许可证的 Microsoft 365 账号');
-      }
-
-      throw new Error(`OneDrive 上传失败 (${resp.status}) ${(serviceMessage || shortDetail).trim()}`.trim());
+      throw OneDriveOAuth._buildGraphError('OneDrive 上传失败', resp.status, detail);
     }
 
     return resp.json();
+  },
+
+  async listBackupHistory(nextLink = '') {
+    const token = await OneDriveOAuth.acquireAccessToken(true);
+    const endpoint = nextLink ||
+      `https://graph.microsoft.com/v1.0/me/drive/special/approot:/${encodeURIComponent(ONEDRIVE_APP_FOLDER)}:/children?$top=${ONEDRIVE_HISTORY_PAGE_SIZE}&$orderby=lastModifiedDateTime desc&$select=id,name,size,lastModifiedDateTime,file`;
+
+    const resp = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (resp.status === 404) {
+      return { items: [], nextLink: '' };
+    }
+
+    if (!resp.ok) {
+      const detail = await resp.text();
+      throw OneDriveOAuth._buildGraphError('读取 OneDrive 历史失败', resp.status, detail);
+    }
+
+    const data = await resp.json();
+    const rawItems = Array.isArray(data.value) ? data.value : [];
+    const items = rawItems
+      .filter((item) => item && item.file)
+      .map((item) => ({
+        id: item.id,
+        name: item.name || '',
+        size: Number.isFinite(item.size) ? item.size : Number(item.size || 0),
+        lastModifiedDateTime: item.lastModifiedDateTime || '',
+      }));
+
+    return {
+      items,
+      nextLink: data['@odata.nextLink'] || '',
+    };
+  },
+
+  async downloadHistoryItem(itemId) {
+    const token = await OneDriveOAuth.acquireAccessToken(true);
+    const resp = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(itemId)}/content`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!resp.ok) {
+      const detail = await resp.text();
+      throw OneDriveOAuth._buildGraphError('下载 OneDrive 历史备份失败', resp.status, detail);
+    }
+
+    return resp.blob();
   },
 };
 
@@ -385,8 +368,43 @@ function buildBackupFileName() {
   return `${BACKUP_FILE_PREFIX}-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.json`;
 }
 
-function downloadJsonFile(fileName, jsonText) {
-  const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
+function buildOneDriveDialogDefaultName() {
+  const now = new Date();
+  const pad = (num) => String(num).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}--${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+}
+
+function normalizeOneDriveUploadName(fileName) {
+  let name = (fileName || '').trim();
+  if (!name) name = buildOneDriveDialogDefaultName();
+  name = name.replace(/[\\/:*?"<>|]/g, '-');
+  if (!/\.json$/i.test(name)) name += '.json';
+  return name;
+}
+
+function formatOneDriveHistoryTime(isoText) {
+  const ts = new Date(isoText || '');
+  if (Number.isNaN(ts.getTime())) return '时间未知';
+  const pad = (num) => String(num).padStart(2, '0');
+  return `${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())} ${pad(ts.getHours())}:${pad(ts.getMinutes())}:${pad(ts.getSeconds())}`;
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (!Number.isFinite(size) || size <= 0) return '0 B';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = size;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function triggerBlobDownload(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -395,6 +413,11 @@ function downloadJsonFile(fileName, jsonText) {
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadJsonFile(fileName, jsonText) {
+  const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
+  triggerBlobDownload(blob, fileName);
 }
 
 function normalizeCanvasName(name, index) {
@@ -1045,41 +1068,183 @@ const Actions = {
     }
   },
 
-  async configureOneDriveOAuth() {
-    try {
-      const shouldCustom = confirm('当前已内置 OneDrive OAuth 默认配置。\n\n点击“确定”后将进入高级自定义配置（会覆盖默认值）；点击“取消”保持默认配置。');
-      if (!shouldCustom) {
-        OneDriveOAuth.clearCustomConfig();
-        Toast.show('已使用内置 OneDrive OAuth 配置');
-        return;
-      }
+  _oneDriveHistoryState: {
+    page: 1,
+    pageCache: {},
+    nextLinks: { 1: '' },
+    loading: false,
+    uploading: false,
+  },
 
-      const config = await OneDriveOAuth.configureByPrompt();
-      Toast.show(`OneDrive OAuth 已配置 (${config.tenant})`);
+  _resetOneDriveHistoryState() {
+    Actions._oneDriveHistoryState = {
+      page: 1,
+      pageCache: {},
+      nextLinks: { 1: '' },
+      loading: false,
+      uploading: false,
+    };
+  },
+
+  _setOneDriveUploadDefaultName() {
+    const input = document.getElementById('od-backup-name');
+    if (!input) return;
+    input.value = buildOneDriveDialogDefaultName();
+  },
+
+  _renderOneDriveHistory(items, emptyText = '暂无备份历史') {
+    const list = document.getElementById('od-history-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    if (!Array.isArray(items) || items.length === 0) {
+      list.innerHTML = `<div class="od-history-empty">${emptyText}</div>`;
+      return;
+    }
+
+    items.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'od-history-item';
+
+      const info = document.createElement('div');
+      info.className = 'od-history-info';
+
+      const name = document.createElement('div');
+      name.className = 'od-history-name';
+      name.textContent = item.name || '未命名备份';
+
+      const meta = document.createElement('div');
+      meta.className = 'od-history-meta';
+      meta.textContent = `${formatOneDriveHistoryTime(item.lastModifiedDateTime)} · ${formatFileSize(item.size)}`;
+
+      info.appendChild(name);
+      info.appendChild(meta);
+
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.textContent = '下载';
+      btn.addEventListener('click', () => Actions.downloadOneDriveHistoryItem(item.id, item.name));
+
+      row.appendChild(info);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  },
+
+  _updateOneDriveHistoryPager() {
+    const state = Actions._oneDriveHistoryState;
+    const pageInfo = document.getElementById('od-page-info');
+    const prevBtn = document.getElementById('btn-od-prev');
+    const nextBtn = document.getElementById('btn-od-next');
+    const refreshBtn = document.getElementById('btn-od-refresh');
+    const uploadBtn = document.getElementById('btn-od-upload');
+
+    if (pageInfo) pageInfo.textContent = `第 ${state.page} 页`;
+    if (prevBtn) prevBtn.disabled = state.loading || state.page <= 1;
+    if (nextBtn) nextBtn.disabled = state.loading || !state.nextLinks[state.page + 1];
+    if (refreshBtn) refreshBtn.disabled = state.loading;
+    if (uploadBtn) uploadBtn.disabled = state.uploading;
+  },
+
+  async _loadOneDriveHistoryPage(page, forceReload = false) {
+    const state = Actions._oneDriveHistoryState;
+    const list = document.getElementById('od-history-list');
+    if (!list) return;
+    if (state.loading) return;
+    if (page < 1) return;
+
+    if (!forceReload && state.pageCache[page]) {
+      state.page = page;
+      Actions._renderOneDriveHistory(state.pageCache[page]);
+      Actions._updateOneDriveHistoryPager();
+      return;
+    }
+
+    const pageLink = page === 1 ? '' : state.nextLinks[page];
+    if (page > 1 && !pageLink) {
+      Toast.show('没有更多历史备份');
+      return;
+    }
+
+    state.loading = true;
+    Actions._updateOneDriveHistoryPager();
+    list.innerHTML = '<div class="od-history-empty">正在加载历史备份...</div>';
+
+    try {
+      const result = await OneDriveOAuth.listBackupHistory(pageLink || '');
+      state.pageCache[page] = result.items;
+      state.nextLinks[page + 1] = result.nextLink || '';
+      state.page = page;
+      Actions._renderOneDriveHistory(result.items);
     } catch (err) {
-      if (!err || !err.message || !err.message.includes('已取消')) {
-        console.error('OneDrive OAuth configure failed:', err);
-        Toast.show(`配置失败：${(err && err.message) || '未知错误'}`);
-      }
+      console.error('Load OneDrive history failed:', err);
+      list.innerHTML = '<div class="od-history-empty">读取失败，请稍后重试</div>';
+      Toast.show(`读取历史失败：${(err && err.message) || '未知错误'}`);
+    } finally {
+      state.loading = false;
+      Actions._updateOneDriveHistoryPager();
     }
   },
 
-  async backupToOneDrive() {
+  async openOneDriveBackupDialog() {
     if (!Actions._dbReady()) return;
 
-    const exported = await Actions.exportData(false);
-    if (!exported) return;
+    Actions._resetOneDriveHistoryState();
+    Actions._setOneDriveUploadDefaultName();
+    document.getElementById('onedrive-overlay')?.classList.remove('hidden');
+    Actions._renderOneDriveHistory([], '正在加载历史备份...');
+    Actions._updateOneDriveHistoryPager();
+    await Actions._loadOneDriveHistoryPage(1, true);
+  },
+
+  closeOneDriveBackupDialog() {
+    document.getElementById('onedrive-overlay')?.classList.add('hidden');
+  },
+
+  async refreshOneDriveHistory() {
+    Actions._resetOneDriveHistoryState();
+    Actions._updateOneDriveHistoryPager();
+    await Actions._loadOneDriveHistoryPage(1, true);
+  },
+
+  async prevOneDriveHistoryPage() {
+    const targetPage = Actions._oneDriveHistoryState.page - 1;
+    if (targetPage < 1) return;
+    await Actions._loadOneDriveHistoryPage(targetPage);
+  },
+
+  async nextOneDriveHistoryPage() {
+    const state = Actions._oneDriveHistoryState;
+    const targetPage = state.page + 1;
+    if (!state.nextLinks[targetPage]) {
+      Toast.show('没有更多历史备份');
+      return;
+    }
+    await Actions._loadOneDriveHistoryPage(targetPage);
+  },
+
+  async downloadOneDriveHistoryItem(itemId, fileName) {
+    if (!itemId) {
+      Toast.show('历史项无效');
+      return;
+    }
 
     try {
-      const uploaded = await OneDriveOAuth.uploadJson(exported.fileName, exported.jsonText);
-      if (uploaded && uploaded.webUrl) {
-        window.open(uploaded.webUrl, '_blank', 'noopener');
-      } else {
-        window.open(ONEDRIVE_WEB_URL, '_blank', 'noopener');
-      }
-      Toast.show('已通过 OneDrive OAuth 备份成功');
+      const blob = await OneDriveOAuth.downloadHistoryItem(itemId);
+      const safeName = normalizeOneDriveUploadName(fileName || buildOneDriveDialogDefaultName());
+      triggerBlobDownload(blob, safeName);
+      Toast.show('已下载历史备份文件');
     } catch (err) {
-      console.error('OneDrive OAuth backup failed:', err);
+      console.error('Download OneDrive history item failed:', err);
+      Toast.show(`下载失败：${(err && err.message) || '未知错误'}`);
+    }
+  },
+
+  async _uploadToOneDriveWithRetry(fileName, jsonText) {
+    try {
+      return await OneDriveOAuth.uploadJson(fileName, jsonText);
+    } catch (err) {
       let finalErr = err;
       const initialMsg = (err && err.message) || '';
       const isSPOProvisioningError = /Tenant does not have a SPO license|OneDrive\/SharePoint 许可证/i.test(initialMsg);
@@ -1091,36 +1256,63 @@ const Actions = {
 
         if (retryWithAnotherAccount) {
           try {
-            const uploaded = await OneDriveOAuth.uploadJson(
-              exported.fileName,
-              exported.jsonText,
+            return await OneDriveOAuth.uploadJson(
+              fileName,
+              jsonText,
               { forceSelectAccount: true }
             );
-            if (uploaded && uploaded.webUrl) {
-              window.open(uploaded.webUrl, '_blank', 'noopener');
-            } else {
-              window.open(ONEDRIVE_WEB_URL, '_blank', 'noopener');
-            }
-            Toast.show('切换账号后已通过 OneDrive OAuth 备份成功');
-            return;
           } catch (retryErr) {
-            console.error('OneDrive OAuth retry backup failed:', retryErr);
+            console.error('OneDrive OAuth retry upload failed:', retryErr);
             finalErr = retryErr;
           }
         }
       }
 
+      throw finalErr;
+    }
+  },
+
+  async uploadOneDriveBackupFromDialog() {
+    if (!Actions._dbReady()) return;
+
+    const state = Actions._oneDriveHistoryState;
+    if (state.uploading) return;
+
+    const uploadInput = document.getElementById('od-backup-name');
+    const fileName = normalizeOneDriveUploadName(uploadInput ? uploadInput.value : '');
+    let exported = null;
+
+    state.uploading = true;
+    Actions._updateOneDriveHistoryPager();
+
+    try {
+      exported = await Actions.exportData(false);
+      if (!exported) return;
+
+      await Actions._uploadToOneDriveWithRetry(fileName, exported.jsonText);
+      Toast.show(`已上传到 OneDrive：${fileName}`);
+      Actions._setOneDriveUploadDefaultName();
+      await Actions.refreshOneDriveHistory();
+    } catch (err) {
+      console.error('OneDrive OAuth upload failed:', err);
       const askFallback = confirm(
-        `OneDrive OAuth 备份失败：${(finalErr && finalErr.message) || '未知错误'}\n\n是否改为本地下载备份文件？`
+        `OneDrive OAuth 备份失败：${(err && err.message) || '未知错误'}\n\n是否改为本地下载备份文件？`
       );
       if (!askFallback) {
         Toast.show('OneDrive 备份已取消');
         return;
       }
-      downloadJsonFile(exported.fileName, exported.jsonText);
-      window.open(ONEDRIVE_WEB_URL, '_blank', 'noopener');
-      Toast.show('已下载备份文件，请手动上传到 OneDrive');
+      if (!exported) return;
+      downloadJsonFile(fileName, exported.jsonText);
+      Toast.show('已下载备份文件');
+    } finally {
+      state.uploading = false;
+      Actions._updateOneDriveHistoryPager();
     }
+  },
+
+  async backupToOneDrive() {
+    await Actions.openOneDriveBackupDialog();
   },
 
   _fallback(text) {
@@ -1286,7 +1478,6 @@ function bindEvents() {
 
     if (act === 'export-data') Actions.exportData();
     if (act === 'import-data') Actions.openImportDialog();
-    if (act === 'configure-onedrive-oauth') Actions.configureOneDriveOAuth();
     if (act === 'backup-onedrive') Actions.backupToOneDrive();
   });
 
@@ -1329,6 +1520,20 @@ function bindEvents() {
   document.getElementById('send-target-canvas').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') Actions.confirmSendToCanvas();
     if (e.key === 'Escape') hideSendDialog();
+  });
+
+  // OneDrive backup dialog
+  document.getElementById('btn-od-close').addEventListener('click', () => Actions.closeOneDriveBackupDialog());
+  document.getElementById('btn-od-upload').addEventListener('click', () => Actions.uploadOneDriveBackupFromDialog());
+  document.getElementById('btn-od-refresh').addEventListener('click', () => Actions.refreshOneDriveHistory());
+  document.getElementById('btn-od-prev').addEventListener('click', () => Actions.prevOneDriveHistoryPage());
+  document.getElementById('btn-od-next').addEventListener('click', () => Actions.nextOneDriveHistoryPage());
+  document.getElementById('od-backup-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') Actions.uploadOneDriveBackupFromDialog();
+    if (e.key === 'Escape') Actions.closeOneDriveBackupDialog();
+  });
+  document.getElementById('onedrive-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('onedrive-overlay')) Actions.closeOneDriveBackupDialog();
   });
 
   // Canvas right-click (empty area -> new block)

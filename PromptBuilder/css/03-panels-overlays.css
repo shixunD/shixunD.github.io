@@ -259,6 +259,141 @@
   font-weight: 600;
 }
 
+#onedrive-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 680;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+#onedrive-overlay.hidden { display: none; }
+
+#onedrive-box {
+  background: var(--bg-modal);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: min(620px, 94vw);
+  max-height: min(86vh, 760px);
+  padding: 16px;
+  box-shadow: var(--shadow-float);
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(180px, 1fr) auto;
+  gap: 12px;
+  overflow: hidden;
+}
+
+#onedrive-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#onedrive-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#onedrive-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#onedrive-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+#od-page-info {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#od-history-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 180px;
+}
+
+.od-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-toolbar);
+}
+
+.od-history-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.od-history-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(380px, 56vw);
+}
+
+.od-history-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.od-history-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 24px 10px;
+}
+
+#onedrive-pager {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#onedrive-box .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  #onedrive-box {
+    width: 96vw;
+    padding: 12px;
+  }
+
+  #onedrive-upload-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .od-history-name {
+    max-width: 48vw;
+  }
+}
+
 /* ===== TOAST ===== */
 #toast {
   position: fixed;

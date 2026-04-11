@@ -71,6 +71,14 @@
 	- `Actions`（6）
 	- `LayoutResize`（243）
 - 函数
+	- `buildOneDriveDialogDefaultName`（304）
+	- `normalizeOneDriveUploadName`（311）
+	- `formatOneDriveHistoryTime`（318）
+	- `formatFileSize`（326）
+	- `openOneDriveBackupDialog`（1275）
+	- `uploadOneDriveBackupFromDialog`（1360）
+	- `refreshOneDriveHistory`（1291）
+	- `downloadOneDriveHistoryItem`（1312）
 	- `initPipelineDropZone`（219）
 	- `bindEvents`（341）
 	- `init`（449）
@@ -148,6 +156,13 @@
 	- `btn-send-cancel click`（379）
 	- `send-overlay click`（380）
 	- `send-target-canvas keydown`（383）
+	- `btn-od-close click` -> `Actions.closeOneDriveBackupDialog`
+	- `btn-od-upload click` -> `Actions.uploadOneDriveBackupFromDialog`
+	- `btn-od-refresh click` -> `Actions.refreshOneDriveHistory`
+	- `btn-od-prev click` -> `Actions.prevOneDriveHistoryPage`
+	- `btn-od-next click` -> `Actions.nextOneDriveHistoryPage`
+	- `od-backup-name keydown` -> `Enter 上传`、`Escape 关闭`
+	- `onedrive-overlay click` -> 点击遮罩关闭 OneDrive 备份窗口
 	- `canvas-panel contextmenu`（389）
 	- `canvas-ctx-menu click`（404）
 	- `block-ctx-menu click`（411）
@@ -200,11 +215,24 @@
 	- 处理：`Actions.exportData`
 	- 副作用：导出 `blocks` 同时包含 `htmlContent` 与 `textContent`（纯文本快照）
 
+- `Data 菜单: import-data`
+	- 处理：`Actions.openImportDialog`
+	- 副作用：选择 JSON 文件后覆盖导入全部数据
+
+- `Data 菜单: backup-onedrive`
+	- 处理：`Actions.backupToOneDrive -> Actions.openOneDriveBackupDialog`
+	- 副作用：打开 OneDrive 备份页面（上传 + 历史分页下载）
+
 ###### 16.2 对话框按钮
 - `#btn-dlg-ok` -> `Actions.confirmDialog`
 - `#btn-dlg-cancel` -> `hideDialog`
 - `#btn-send-ok` -> `Actions.confirmSendToCanvas`
 - `#btn-send-cancel` -> `hideSendDialog`
+- `#btn-od-upload` -> `Actions.uploadOneDriveBackupFromDialog`
+- `#btn-od-refresh` -> `Actions.refreshOneDriveHistory`
+- `#btn-od-prev` -> `Actions.prevOneDriveHistoryPage`
+- `#btn-od-next` -> `Actions.nextOneDriveHistoryPage`
+- `#btn-od-close` -> `Actions.closeOneDriveBackupDialog`
 
 ###### 16.3 块内部按钮
 - `.color-btn` -> 打开/关闭颜色菜单
@@ -227,6 +255,9 @@
 - 发送对话框 `send-target-canvas`
 	- `Enter`：确认发送
 	- `Escape`：关闭
+- OneDrive 备份文件名输入 `od-backup-name`
+	- `Enter`：上传当前数据到 OneDrive
+	- `Escape`：关闭 OneDrive 备份窗口
 
 ##### 18. 状态变更 -> UI 重绘触发矩阵
 - `Actions.selectCanvas`
@@ -257,6 +288,12 @@
 	- 处理：MSAL SDK 改为 `jsdelivr` 主源，失败自动回退 `unpkg`，仍失败则提示检查网络并可本地下载备份
 - OneDrive 上传返回 Tenant 无 SPO 许可证
 	- 处理：识别并转为中文可读提示；支持弹窗切换 Microsoft 账号后自动重试；重试失败继续本地下载兜底
+- OneDrive 历史列表读取失败
+	- 处理：历史区显示失败提示并 toast 报错，可点击“刷新历史”重试
+- OneDrive 普通上传失败（网络/权限等）
+	- 处理：弹出“是否改为本地下载备份文件”确认，保证数据可落地
+- 高级 OAuth 配置入口移除
+	- 处理：Data 菜单仅保留导出、导入、OneDrive 备份，默认使用内置 OAuth 配置
 
 ##### 20. 后续 AI 维护准则（文档同步要求）
 - 任意新增按钮：必须同步更新“按钮矩阵 + 事件索引 + 状态触发矩阵”。
