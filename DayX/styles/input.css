@@ -266,6 +266,10 @@
     background: #ffebee;
 }
 
+.word-item.color-purple {
+    background: #f3e5f5;
+}
+
 /* 右键颜色菜单 */
 .word-color-menu {
     position: fixed;
@@ -312,6 +316,10 @@
 
 .color-preview.color-red {
     background: #ffebee;
+}
+
+.color-preview.color-purple {
+    background: #f3e5f5;
 }
 
 .color-label {

@@ -307,6 +307,11 @@
       return '';
     },
 
+    // 获取数据目录（浏览器无本地目录）
+    async getDataDir() {
+      return '';
+    },
+
     // 显示保存对话框（浏览器返回默认路径）
     async showSaveDialog(defaultPath, filters) {
       return defaultPath || `DayX_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
@@ -1112,4 +1117,7 @@
 
   // export to global as TauriAPI so existing code works without changes
   global.TauriAPI = WebAPI;
+  if (global.SyncReminder) {
+    global.SyncReminder.installApiHooks(WebAPI);
+  }
 })(window);

@@ -5,6 +5,8 @@ const AppState = {
     displayOffsets: [0, 1, 2, 5, 7, 14, 30], // 默认显示配置
     columnsPerRow: 7, // 默认每行显示7列
     syncOnStartup: false, // 开启时同步最新数据
+    syncReminderEnabled: true, // 数据变更后提醒同步
+    syncReminderIntervalSeconds: 300, // 默认5分钟后提醒
     calendarYear: new Date().getFullYear(),
     calendarMonth: new Date().getMonth(), // 0-11
     datesWithWordCounts: new Map(), // 存储有单词记录的日期及其词条数量 {date: count}
@@ -82,6 +84,19 @@ const AppState = {
                 this.syncOnStartup = savedSyncOnStartup === 'true';
             }
         }
+
+        const savedSyncReminderEnabled = localStorage.getItem('syncReminderEnabled');
+        if (savedSyncReminderEnabled !== null) {
+            this.syncReminderEnabled = savedSyncReminderEnabled === 'true';
+        }
+
+        const savedSyncReminderInterval = localStorage.getItem('syncReminderIntervalSeconds');
+        if (savedSyncReminderInterval) {
+            const interval = parseInt(savedSyncReminderInterval, 10);
+            if (!isNaN(interval) && interval > 0) {
+                this.syncReminderIntervalSeconds = interval;
+            }
+        }
     },
 
     // 从后端加载 syncOnStartup（桌面版专用，异步）
@@ -99,6 +114,8 @@ const AppState = {
     saveSettings() {
         localStorage.setItem('displayOffsets', JSON.stringify(this.displayOffsets));
         localStorage.setItem('columnsPerRow', this.columnsPerRow.toString());
+        localStorage.setItem('syncReminderEnabled', this.syncReminderEnabled.toString());
+        localStorage.setItem('syncReminderIntervalSeconds', this.syncReminderIntervalSeconds.toString());
         // syncOnStartup: Web 版存 localStorage，桌面版存后端
         if (typeof TauriAPI !== 'undefined' && TauriAPI.isWebBuild) {
             localStorage.setItem('syncOnStartup', this.syncOnStartup.toString());

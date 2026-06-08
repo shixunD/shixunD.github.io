@@ -206,6 +206,10 @@
     background: #ffebee;
 }
 
+.word-item-review.color-purple {
+    background: #f3e5f5;
+}
+
 /* 编辑状态样式 */
 .word-item-review .word-text.editing {
     outline: 2px solid var(--primary-color);

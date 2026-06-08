@@ -174,7 +174,8 @@ const HomePage = {
             { name: 'grey', label: '灰色' },
             { name: 'green', label: '绿色' },
             { name: 'blue', label: '蓝色' },
-            { name: 'red', label: '红色' }
+            { name: 'red', label: '红色' },
+            { name: 'purple', label: '紫色' }
         ];
 
         colors.forEach(color => {
@@ -195,7 +196,7 @@ const HomePage = {
         document.body.appendChild(menu);
 
         // 检查是否需要向上展开
-        const menuHeight = 5 * 40; // 5个选项，每个约40px高度
+        const menuHeight = 6 * 40; // 6个选项，每个约40px高度
         const spaceBelow = window.innerHeight - event.clientY;
         const shouldOpenUpward = spaceBelow < menuHeight && event.clientY > menuHeight;
 
@@ -248,7 +249,7 @@ const HomePage = {
             );
             if (wordItem) {
                 // 移除旧的颜色类
-                wordItem.classList.remove('color-grey', 'color-green', 'color-blue', 'color-red');
+                wordItem.classList.remove('color-grey', 'color-green', 'color-blue', 'color-red', 'color-purple');
                 // 添加新的颜色类
                 wordItem.classList.add(`color-${color}`);
             }

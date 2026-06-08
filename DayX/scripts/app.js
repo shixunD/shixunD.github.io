@@ -55,6 +55,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 1. 加载设置
     AppState.loadSettings();
+    if (window.SyncReminder) {
+        SyncReminder.init();
+    }
 
     // 1.5 桌面版：从后端加载 syncOnStartup（文件持久化，不依赖 localStorage）
     await AppState.loadSyncOnStartupFromBackend();
@@ -607,6 +610,9 @@ async function performStartupSync() {
 
             // 4. 导入数据
             await TauriAPI.importData(data);
+            if (window.SyncReminder) {
+                SyncReminder.recordUpload();
+            }
 
             // 检查是否在导入后取消
             if (syncCancelled) {

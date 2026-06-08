@@ -1,6 +1,6 @@
 // DayX Service Worker - PWA 支持
 // 版本号用于缓存管理 - 构建脚本会自动替换为构建时间戳
-const CACHE_NAME = 'dayx-cache-20260307160033';
+const CACHE_NAME = 'dayx-cache-20260608170721';
 
 // 需要缓存的关键资源（离线时使用）
 const URLS_TO_CACHE = [
@@ -19,6 +19,7 @@ const URLS_TO_CACHE = [
     './scripts/app.js',
     './scripts/api.js',
     './scripts/state.js',
+    './scripts/syncReminder.js',
     './scripts/navigation.js',
     './scripts/pages/home.js',
     './scripts/pages/input.js',

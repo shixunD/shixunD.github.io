@@ -173,6 +173,23 @@
                                         设置主页面每行显示多少个复习卡片（建议1-10列）
                                     </div>
                                 </div>
+                                <div class="setting-item sync-reminder-setting">
+                                    <label class="checkbox-label-inline">
+                                        <input type="checkbox" id="sync-reminder-enabled" />
+                                        <span>数据修改后提醒同步</span>
+                                    </label>
+                                    <div class="setting-help">
+                                        添加、删除、编辑、改背景色等本地数据变化后，超过设定时间未上传则提醒同步。
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label>同步提醒间隔（秒）：</label>
+                                    <input type="number" id="sync-reminder-interval" min="1" max="86400" placeholder="例如: 300" />
+                                    <div class="setting-help">
+                                        默认 300 秒。取消、Esc 或点击提示框外侧会视为本次不同步，并在下个间隔后再次提醒。
+                                    </div>
+                                </div>
                                 <div class="setting-preview">
                                     <h3>当前配置预览：</h3>
                                     <div id="settings-preview"></div>
@@ -275,6 +292,7 @@
                                 <div class="import-export-actions">
                                     <button id="export-data-btn" class="btn-primary">📤 导出数据</button>
                                     <button id="import-data-btn" class="btn-secondary">📥 导入数据</button>
+                                    <button id="open-data-folder-btn" class="btn-secondary">📂 打开数据文件夹</button>
                                     <input type="file" id="import-file-input" accept=".json" style="display: none;">
                                 </div>
                             </div>
@@ -288,7 +306,7 @@
                                 </div>
                                 <div class="version-info-row">
                                     <span class="version-info-label">发布日期</span>
-                                    <span class="version-info-date">2026-03-07</span>
+                                    <span class="version-info-date">2026-06-08</span>
                                 </div>
                                 <a href="https://xxxx.com" id="view-docs-btn" class="btn-docs" target="_blank" rel="noopener noreferrer">📖 查询使用说明</a>
                             </div>
@@ -405,6 +423,7 @@
 
         <script src="scripts/components/toast.js"></script>
         <script src="scripts/state.js"></script>
+        <script src="scripts/syncReminder.js"></script>
         <script src="scripts/api.js"></script>
         <script src="scripts/navigation.js"></script>
         <script src="scripts/pages/home.js"></script>

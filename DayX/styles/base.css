@@ -116,6 +116,68 @@ body {
     background: rgba(231, 76, 60, 0.05);
 }
 
+/* 数据变更后的同步提醒 */
+.sync-reminder-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(128, 128, 128, 0.5);
+    z-index: 10001;
+}
+
+.sync-reminder-dialog {
+    width: min(320px, calc(100vw - 32px));
+    padding: 16px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #e0e6ed);
+    border-left: 4px solid var(--primary-color, #4a90e2);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+
+.sync-reminder-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary, #2c3e50);
+    margin-bottom: 6px;
+}
+
+.sync-reminder-text {
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--text-secondary, #7f8c8d);
+    margin-bottom: 12px;
+}
+
+.sync-reminder-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.sync-reminder-actions button {
+    min-width: 72px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 0.86rem;
+    cursor: pointer;
+}
+
+.sync-reminder-confirm {
+    background: var(--primary-color, #4a90e2);
+    color: #fff;
+    border: 1px solid var(--primary-color, #4a90e2);
+}
+
+.sync-reminder-cancel {
+    background: transparent;
+    color: var(--text-secondary, #7f8c8d);
+    border: 1px solid var(--border-color, #e0e6ed);
+}
+
 .container {
     margin: 1rem auto;
     padding: 0 1rem;

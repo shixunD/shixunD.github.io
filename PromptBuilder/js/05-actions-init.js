@@ -4,7 +4,7 @@ const BACKUP_SCHEMA_VERSION = 2;
 const BACKUP_FILE_PREFIX = 'paperdesign-backup';
 const APP_PREF_PREFIX = 'pb-';
 const ONEDRIVE_DEFAULT_CLIENT_ID = 'f5bc199c-44bd-495e-9168-7efb5262b048';
-const ONEDRIVE_DEFAULT_TENANT = 'common';
+const ONEDRIVE_DEFAULT_TENANT = 'a27888d4-ada2-4871-b099-316283e9bdf5';
 const ONEDRIVE_DEFAULT_REDIRECT_URI = 'https://shixund.github.io/PromptBuilder';
 const ONEDRIVE_APP_FOLDER = 'PaperDesignBackups';
 const ONEDRIVE_OAUTH_SCOPES = ['Files.ReadWrite.AppFolder', 'User.Read'];
@@ -326,27 +326,6 @@ const OneDriveOAuth = {
     }
 
     return resp.blob();
-  },
-
-  async logoutCurrentAccount() {
-    const config = await OneDriveOAuth.ensureConfigured();
-    const app = await OneDriveOAuth._getMsalApp(config);
-    const account = app.getAllAccounts()[0] || null;
-
-    if (!account) return false;
-    if (typeof app.logoutPopup !== 'function') {
-      throw new Error('当前环境不支持 OneDrive 退出登录');
-    }
-
-    await app.logoutPopup({
-      account,
-      postLogoutRedirectUri: config.redirectUri,
-      mainWindowRedirectUri: config.redirectUri,
-    });
-
-    OneDriveOAuth._msalApp = null;
-    OneDriveOAuth._configKey = '';
-    return true;
   },
 };
 
@@ -1160,14 +1139,12 @@ const Actions = {
     const nextBtn = document.getElementById('btn-od-next');
     const refreshBtn = document.getElementById('btn-od-refresh');
     const uploadBtn = document.getElementById('btn-od-upload');
-    const logoutBtn = document.getElementById('btn-od-logout');
 
     if (pageInfo) pageInfo.textContent = `第 ${state.page} 页`;
     if (prevBtn) prevBtn.disabled = state.loading || state.page <= 1;
     if (nextBtn) nextBtn.disabled = state.loading || !state.nextLinks[state.page + 1];
     if (refreshBtn) refreshBtn.disabled = state.loading;
     if (uploadBtn) uploadBtn.disabled = state.uploading;
-    if (logoutBtn) logoutBtn.disabled = state.loading || state.uploading;
   },
 
   async _loadOneDriveHistoryPage(page, forceReload = false) {
@@ -1223,24 +1200,6 @@ const Actions = {
 
   closeOneDriveBackupDialog() {
     document.getElementById('onedrive-overlay')?.classList.add('hidden');
-  },
-
-  async logoutOneDriveAccount() {
-    const shouldLogout = confirm('确定退出当前 OneDrive 登录账号？');
-    if (!shouldLogout) return;
-
-    try {
-      const signedOut = await OneDriveOAuth.logoutCurrentAccount();
-      Actions._resetOneDriveHistoryState();
-      Actions._renderOneDriveHistory([], '已退出登录。点击“刷新历史”可重新登录并加载备份。');
-      Actions._updateOneDriveHistoryPager();
-
-      if (signedOut) Toast.show('已退出 OneDrive 登录');
-      else Toast.show('当前未检测到已登录 OneDrive 账号');
-    } catch (err) {
-      console.error('OneDrive logout failed:', err);
-      Toast.show(`退出登录失败：${(err && err.message) || '未知错误'}`);
-    }
   },
 
   async refreshOneDriveHistory() {
@@ -1567,7 +1526,6 @@ function bindEvents() {
   document.getElementById('btn-od-close').addEventListener('click', () => Actions.closeOneDriveBackupDialog());
   document.getElementById('btn-od-upload').addEventListener('click', () => Actions.uploadOneDriveBackupFromDialog());
   document.getElementById('btn-od-refresh').addEventListener('click', () => Actions.refreshOneDriveHistory());
-  document.getElementById('btn-od-logout').addEventListener('click', () => Actions.logoutOneDriveAccount());
   document.getElementById('btn-od-prev').addEventListener('click', () => Actions.prevOneDriveHistoryPage());
   document.getElementById('btn-od-next').addEventListener('click', () => Actions.nextOneDriveHistoryPage());
   document.getElementById('od-backup-name').addEventListener('keydown', (e) => {

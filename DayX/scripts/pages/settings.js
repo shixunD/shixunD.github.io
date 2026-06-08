@@ -14,6 +14,7 @@ const SettingsPage = {
         const deleteAllBtn = document.getElementById('delete-all-btn');
         const exportBtn = document.getElementById('export-data-btn');
         const importBtn = document.getElementById('import-data-btn');
+        const openDataFolderBtn = document.getElementById('open-data-folder-btn');
         const importFileInput = document.getElementById('import-file-input');
 
         // 删除弹窗相关元素
@@ -35,6 +36,7 @@ const SettingsPage = {
         deleteAllBtn.addEventListener('click', () => this.openDeleteModal());
         exportBtn.addEventListener('click', () => this.exportData());
         importBtn.addEventListener('click', () => importFileInput.click());
+        openDataFolderBtn.addEventListener('click', () => this.openDataFolder());
         importFileInput.addEventListener('change', (e) => this.importData(e));
 
         // 删除弹窗事件监听
@@ -126,6 +128,16 @@ const SettingsPage = {
         const columnsInput = document.getElementById('columns-per-row');
         columnsInput.value = AppState.columnsPerRow;
 
+        const syncReminderEnabled = document.getElementById('sync-reminder-enabled');
+        if (syncReminderEnabled) {
+            syncReminderEnabled.checked = AppState.syncReminderEnabled;
+        }
+
+        const syncReminderInterval = document.getElementById('sync-reminder-interval');
+        if (syncReminderInterval) {
+            syncReminderInterval.value = AppState.syncReminderIntervalSeconds;
+        }
+
         this.updatePreview();
         this.loadStats();
         await this.checkOneDriveStatus();
@@ -151,6 +163,9 @@ const SettingsPage = {
 
         const columnsInput = document.getElementById('columns-per-row');
         const columnsValue = columnsInput.value.trim();
+        const syncReminderEnabled = document.getElementById('sync-reminder-enabled');
+        const syncReminderInterval = document.getElementById('sync-reminder-interval');
+        const syncReminderIntervalValue = syncReminderInterval ? syncReminderInterval.value.trim() : '300';
 
         if (!value) {
             Toast.warning('请输入配置');
@@ -176,9 +191,19 @@ const SettingsPage = {
                 throw new Error('列数必须是大于0的整数');
             }
 
+            const reminderInterval = parseInt(syncReminderIntervalValue, 10);
+            if (isNaN(reminderInterval) || reminderInterval < 1) {
+                throw new Error('同步提醒间隔必须是大于0的整数');
+            }
+
             AppState.displayOffsets = offsets;
             AppState.columnsPerRow = columns;
+            AppState.syncReminderEnabled = syncReminderEnabled ? syncReminderEnabled.checked : true;
+            AppState.syncReminderIntervalSeconds = reminderInterval;
             AppState.saveSettings();
+            if (window.SyncReminder) {
+                SyncReminder.onSettingsChanged();
+            }
 
             this.updatePreview();
             Toast.success('设置已保存');
@@ -193,6 +218,8 @@ const SettingsPage = {
     resetSettings() {
         AppState.displayOffsets = [0, 1, 2, 5, 7, 14, 30];
         AppState.columnsPerRow = 7;
+        AppState.syncReminderEnabled = true;
+        AppState.syncReminderIntervalSeconds = 300;
         AppState.saveSettings();
 
         const offsetsInput = document.getElementById('display-offsets');
@@ -200,6 +227,20 @@ const SettingsPage = {
 
         const columnsInput = document.getElementById('columns-per-row');
         columnsInput.value = AppState.columnsPerRow;
+
+        const syncReminderEnabled = document.getElementById('sync-reminder-enabled');
+        if (syncReminderEnabled) {
+            syncReminderEnabled.checked = AppState.syncReminderEnabled;
+        }
+
+        const syncReminderInterval = document.getElementById('sync-reminder-interval');
+        if (syncReminderInterval) {
+            syncReminderInterval.value = AppState.syncReminderIntervalSeconds;
+        }
+
+        if (window.SyncReminder) {
+            SyncReminder.onSettingsChanged();
+        }
 
         this.updatePreview();
         Toast.success('已恢复默认设置');
@@ -250,11 +291,21 @@ const SettingsPage = {
                 localStorage.removeItem('displayOffsets');
                 localStorage.removeItem('columnsPerRow');
                 localStorage.removeItem('syncOnStartup');
+                localStorage.removeItem('syncReminderEnabled');
+                localStorage.removeItem('syncReminderIntervalSeconds');
+                localStorage.removeItem('syncReminderLastMutationAt');
+                localStorage.removeItem('syncReminderLastUploadAt');
+                localStorage.removeItem('syncReminderSnoozedUntil');
                 // 恢复默认设置
                 AppState.displayOffsets = [0, 1, 2, 5, 7, 14, 30];
                 AppState.columnsPerRow = 7;
                 AppState.syncOnStartup = false;
+                AppState.syncReminderEnabled = true;
+                AppState.syncReminderIntervalSeconds = 300;
                 await AppState.saveSyncOnStartupToBackend();
+                if (window.SyncReminder) {
+                    SyncReminder.onSettingsChanged();
+                }
                 deletedItems.push('用户设置');
             }
 
@@ -386,6 +437,25 @@ const SettingsPage = {
         } catch (error) {
             console.error('导入数据失败:', error);
             Toast.error(`导入失败: ${error.message || error}`);
+        }
+    },
+
+    async openDataFolder() {
+        if (TauriAPI.isWebBuild) {
+            Toast.info('Web 版没有本地数据文件夹');
+            return;
+        }
+
+        try {
+            const dir = await TauriAPI.getDataDir();
+            if (!dir) {
+                Toast.error('无法获取数据文件夹路径');
+                return;
+            }
+            await TauriAPI.openExternalUrl(dir);
+        } catch (error) {
+            console.error('打开数据文件夹失败:', error);
+            Toast.error(`打开失败: ${error.message || error}`);
         }
     },
 
@@ -736,6 +806,9 @@ const SettingsPage = {
 
             // 导入数据
             await TauriAPI.importData(data);
+            if (window.SyncReminder) {
+                SyncReminder.recordUpload();
+            }
 
             Toast.success(`恢复成功！已从云端恢复 ${data.length} 天的记录`);
 

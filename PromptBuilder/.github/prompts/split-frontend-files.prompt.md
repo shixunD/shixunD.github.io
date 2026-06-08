@@ -75,6 +75,7 @@
 	- `normalizeOneDriveUploadName`（311）
 	- `formatOneDriveHistoryTime`（318）
 	- `formatFileSize`（326）
+	- `_isConsumerAccountUnsupportedError`（334）
 	- `openOneDriveBackupDialog`（1275）
 	- `uploadOneDriveBackupFromDialog`（1360）
 	- `refreshOneDriveHistory`（1291）
@@ -297,6 +298,8 @@
 	- 处理：弹出“是否改为本地下载备份文件”确认，保证数据可落地
 - OneDrive 个人账号误入组织租户导致 SPO 许可证报错
 	- 处理：默认 OAuth tenant 调整为 `common`，优先兼容个人微软账号与组织账号
+- OneDrive 登录返回 `unauthorized_client`（not enabled for consumers）
+	- 处理：转为中文可读提示；历史加载/上传均支持“切换工作或学校账号后重试”
 - OneDrive 退出登录失败
 	- 处理：toast 显示退出失败原因，保留当前控制页面可继续操作
 - 高级 OAuth 配置入口移除
