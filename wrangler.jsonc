@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "personalpage",
+  "compatibility_date": "2026-04-19",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": ".",
+    "exclude": [
+      ".git",
+      "node_modules",
+      ".wrangler"
+    ]
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
