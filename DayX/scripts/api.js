@@ -75,18 +75,43 @@
     throw new Error('所有 MSAL CDN 均不可用，请检查网络或使用桌面客户端');
   }
 
+  // 移动端浏览器的 window.open 弹窗经常被系统当作整页跳转处理，
+  // 导致 loginPopup 在返回页时报 block_nested_popups，因此移动端改用 loginRedirect。
+  function _isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }
+
+  // 清除 MSAL 残留的"交互进行中"标记，避免上一次未完成的登录导致
+  // 后续登录被误判为 block_nested_popups / interaction_in_progress
+  function _clearMsalInteractionStatus() {
+    try {
+      sessionStorage.removeItem('msal.interaction.status');
+      Object.keys(sessionStorage)
+        .filter(k => k.indexOf('interaction.status') !== -1)
+        .forEach(k => sessionStorage.removeItem(k));
+    } catch (e) { /* ignore */ }
+  }
+
   // 始终启动 MSAL 初始化（不受 msal 全局变量是否存在影响）
   // 在 popup 返回本页时 handleRedirectPromise() 必须尽早调用
   _msalInitPromise = (async () => {
     try {
       await _loadMSALScript(); // 若已加载则立即 resolve
       const instance = new msal.PublicClientApplication(_buildMSALConfig());
-      await instance.handleRedirectPromise();
+      const redirectResponse = await instance.handleRedirectPromise();
       _msalInstance = instance;
+      if (redirectResponse && redirectResponse.account) {
+        // 移动端 loginRedirect 整页跳转回来后，在这里标记登录刚完成，
+        // 供 app.js 在初始化后显示成功提示并刷新 OneDrive 状态
+        global.__dayxOneDriveLoginJustCompleted = true;
+        console.log('[MSAL] ✅ redirect 登录成功，账户:', redirectResponse.account.username);
+      }
       console.log('[MSAL] ✅ 初始化完成，账户数:', instance.getAllAccounts().length);
       return instance;
     } catch (e) {
       console.warn('[MSAL] ⚠️ 初始化失败:', e.message);
+      // 清理残留的交互状态，避免下次登录立即报 block_nested_popups
+      _clearMsalInteractionStatus();
       return null;
     }
   })();
@@ -712,6 +737,22 @@
         throw new Error('MSAL 未加载。请确保网络正常后刷新页面，或使用桌面客户端。');
       }
 
+      // 清除上次可能残留的"交互进行中"标记，避免误判 block_nested_popups
+      _clearMsalInteractionStatus();
+
+      // 移动端：window.open 在很多移动浏览器中会被当作整页跳转，
+      // 导致 loginPopup 在跳回本页时报 block_nested_popups。
+      // 改用整页跳转的 loginRedirect，登录结果由初始化时的
+      // handleRedirectPromise() 处理（见上方 _msalInitPromise）。
+      if (_isMobileDevice()) {
+        await msalInst.loginRedirect({
+          scopes: MSAL_SCOPES,
+          prompt: 'select_account',
+        });
+        // loginRedirect 会跳转整页，正常情况下不会执行到这里
+        return null;
+      }
+
       try {
         const response = await msalInst.loginPopup({
           scopes: MSAL_SCOPES,
@@ -723,8 +764,20 @@
         if (err.errorCode === 'user_cancelled' || err.message?.includes('user_cancelled')) {
           throw new Error('user_cancelled');
         }
+        if (err.errorCode === 'block_nested_popups' || err.errorCode === 'interaction_in_progress') {
+          // 残留状态导致的误判，清理后提示用户重试
+          _clearMsalInteractionStatus();
+          throw new Error('登录状态异常，已自动清理，请重新点击登录');
+        }
         throw err;
       }
+    },
+
+    // 消费"OneDrive 登录刚完成"标记（移动端 redirect 登录返回后使用）
+    consumeOneDriveLoginJustCompleted() {
+      const done = !!global.__dayxOneDriveLoginJustCompleted;
+      global.__dayxOneDriveLoginJustCompleted = false;
+      return done;
     },
 
     // 监听来自授权标签页的消息

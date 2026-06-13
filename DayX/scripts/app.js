@@ -107,6 +107,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         await syncPromise;
     }
 
+    // 10. 移动端 OneDrive 登录（loginRedirect）整页跳转返回后，提示登录成功并刷新状态
+    if (TauriAPI.useMSAL && TauriAPI.consumeOneDriveLoginJustCompleted && TauriAPI.consumeOneDriveLoginJustCompleted()) {
+        if (typeof Toast !== 'undefined') {
+            Toast.success('OneDrive 登录成功！');
+        }
+        if (typeof SettingsPage !== 'undefined' && SettingsPage.checkOneDriveStatus) {
+            SettingsPage.checkOneDriveStatus();
+        }
+    }
+
     console.log('DayX 应用初始化完成！');
 });
 
