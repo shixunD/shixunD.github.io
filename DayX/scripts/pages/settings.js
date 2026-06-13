@@ -447,12 +447,7 @@ const SettingsPage = {
         }
 
         try {
-            const dir = await TauriAPI.getDataDir();
-            if (!dir) {
-                Toast.error('无法获取数据文件夹路径');
-                return;
-            }
-            await TauriAPI.openExternalUrl(dir);
+            await TauriAPI.openDataFolder();
         } catch (error) {
             console.error('打开数据文件夹失败:', error);
             Toast.error(`打开失败: ${error.message || error}`);

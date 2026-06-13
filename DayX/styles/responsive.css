@@ -2,11 +2,39 @@
 
 @media (max-width: 480px) {
 
-    /* 只在非常小的屏幕（手机竖屏）才改为纵向布局 */
+    /* 小屏幕也保持单行显示，仅缩小尺寸以容纳所有内容 */
     .navbar {
-        flex-direction: column;
-        gap: 1rem;
-        padding: 0.75rem 1rem;
+        flex-direction: row;
+        gap: 0.4rem;
+        padding: 0.5rem 0.6rem;
+        height: 56px;
+        box-sizing: border-box;
+    }
+
+    .nav-brand {
+        font-size: 1.05rem;
+    }
+
+    .nav-brand-container {
+        gap: 0.3rem;
+    }
+
+    .nav-homepagedirector {
+        font-size: 0.75rem;
+    }
+
+    .nav-links {
+        gap: 0.3rem;
+    }
+
+    .nav-btn {
+        padding: 0.4rem 0.7rem;
+        font-size: 0.85rem;
+    }
+
+    /* 导航栏变矮，主页内容区上边距随之缩小，避免被遮挡 */
+    #home-page {
+        top: 56px;
     }
 
     /* 小屏幕时录入和日历纵向排列 */
