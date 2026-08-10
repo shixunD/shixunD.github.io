@@ -1,0 +1,175 @@
+{
+  "book_id": "rich-dad-poor-dad",
+  "title": "Rich Dad Poor Dad",
+  "author": "Robert T. Kiyosaki",
+  "chapters": [
+    {
+      "chapter_id": "01-rich-dad-p",
+      "order": 1,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "01-rich-dad-poor-dad--rich-dad-p.md"
+    },
+    {
+      "chapter_id": "02-rich-dad-p-2",
+      "order": 2,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "02-rich-dad-poor-dad--rich-dad-p-2.md"
+    },
+    {
+      "chapter_id": "03-rich-dad-p-3",
+      "order": 3,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "03-rich-dad-poor-dad--rich-dad-p-3.md"
+    },
+    {
+      "chapter_id": "04-rich-dad-p-4",
+      "order": 4,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "04-rich-dad-poor-dad--rich-dad-p-4.md"
+    },
+    {
+      "chapter_id": "05-rich-dad-p-5",
+      "order": 5,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "05-rich-dad-poor-dad--rich-dad-p-5.md"
+    },
+    {
+      "chapter_id": "06-rich-dad-p-6",
+      "order": 6,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "06-rich-dad-poor-dad--rich-dad-p-6.md"
+    },
+    {
+      "chapter_id": "07-rich-dad-p-7",
+      "order": 7,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "07-rich-dad-poor-dad--rich-dad-p-7.md"
+    },
+    {
+      "chapter_id": "08-rich-dad-p-8",
+      "order": 8,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "08-rich-dad-poor-dad--rich-dad-p-8.md"
+    },
+    {
+      "chapter_id": "09-rich-dad-p-9",
+      "order": 9,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "09-rich-dad-poor-dad--rich-dad-p-9.md"
+    },
+    {
+      "chapter_id": "10-rich-dad-p-10",
+      "order": 10,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "10-rich-dad-poor-dad--rich-dad-p-10.md"
+    },
+    {
+      "chapter_id": "11-rich-dad-p-11",
+      "order": 11,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "11-rich-dad-poor-dad--rich-dad-p-11.md"
+    },
+    {
+      "chapter_id": "12-rich-dad-p-12",
+      "order": 12,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "12-rich-dad-poor-dad--rich-dad-p-12.md"
+    },
+    {
+      "chapter_id": "13-rich-dad-p-13",
+      "order": 13,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "13-rich-dad-poor-dad--rich-dad-p-13.md"
+    },
+    {
+      "chapter_id": "14-rich-dad-p-14",
+      "order": 14,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "14-rich-dad-poor-dad--rich-dad-p-14.md"
+    },
+    {
+      "chapter_id": "15-rich-dad-p-15",
+      "order": 15,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "15-rich-dad-poor-dad--rich-dad-p-15.md"
+    },
+    {
+      "chapter_id": "16-rich-dad-p-16",
+      "order": 16,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "16-rich-dad-poor-dad--rich-dad-p-16.md"
+    },
+    {
+      "chapter_id": "17-rich-dad-p-17",
+      "order": 17,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "17-rich-dad-poor-dad--rich-dad-p-17.md"
+    },
+    {
+      "chapter_id": "18-rich-dad-p-18",
+      "order": 18,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "18-rich-dad-poor-dad--rich-dad-p-18.md"
+    },
+    {
+      "chapter_id": "19-rich-dad-p-19",
+      "order": 19,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "19-rich-dad-poor-dad--rich-dad-p-19.md"
+    },
+    {
+      "chapter_id": "20-rich-dad-p-20",
+      "order": 20,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "20-rich-dad-poor-dad--rich-dad-p-20.md"
+    },
+    {
+      "chapter_id": "21-rich-dad-p-21",
+      "order": 21,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "21-rich-dad-poor-dad--rich-dad-p-21.md"
+    },
+    {
+      "chapter_id": "22-rich-dad-p-22",
+      "order": 22,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "22-rich-dad-poor-dad--rich-dad-p-22.md"
+    },
+    {
+      "chapter_id": "23-rich-dad-p-23",
+      "order": 23,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "23-rich-dad-poor-dad--rich-dad-p-23.md"
+    },
+    {
+      "chapter_id": "24-rich-dad-p-24",
+      "order": 24,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "24-rich-dad-poor-dad--rich-dad-p-24.md"
+    },
+    {
+      "chapter_id": "25-rich-dad-p-25",
+      "order": 25,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "25-rich-dad-poor-dad--rich-dad-p-25.md"
+    },
+    {
+      "chapter_id": "26-rich-dad-p-26",
+      "order": 26,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "26-rich-dad-poor-dad--rich-dad-p-26.md"
+    },
+    {
+      "chapter_id": "27-rich-dad-p-27",
+      "order": 27,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "27-rich-dad-poor-dad--rich-dad-p-27.md"
+    },
+    {
+      "chapter_id": "28-rich-dad-p-28",
+      "order": 28,
+      "title": "Rich Dad Poor Dad",
+      "markdown_file": "28-rich-dad-poor-dad--rich-dad-p-28.md"
+    }
+  ]
+}

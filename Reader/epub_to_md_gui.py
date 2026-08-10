@@ -4,7 +4,6 @@ EPUB to Markdown Converter with Tkinter GUI
 Converts EPUB files to Markdown format with metadata and assets
 """
 
-import html2text
 import os
 import json
 import re
@@ -19,8 +18,26 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from typing import List, Dict, Tuple, Optional
 
+# 部分 Windows 控制台使用 GBK 编码，直接 print 含特殊符号的文本会抛
+# UnicodeEncodeError 导致程序崩溃退出，因此这里尽量把 stdout/stderr
+# 切换为 UTF-8，并在无法切换（如无控制台窗口）时静默忽略。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
-def check_and_install_dependencies():
+
+def safe_print(message: str) -> None:
+    """打印信息，即使没有可用的控制台（如 pythonw 启动）也不会报错"""
+    try:
+        print(message)
+    except Exception:
+        pass
+
+
+def check_and_install_dependencies() -> bool:
     """检查并自动安装所需的依赖"""
     required_packages = {
         'html2text': 'html2text'
@@ -35,29 +52,40 @@ def check_and_install_dependencies():
             missing_packages.append(package_name)
 
     if missing_packages:
-        print(f"检测到缺失的依赖包: {', '.join(missing_packages)}")
-        print("正在自动安装...")
+        safe_print(f"检测到缺失的依赖包: {', '.join(missing_packages)}")
+        safe_print("正在自动安装...")
 
         for package in missing_packages:
             try:
                 subprocess.check_call(
                     [sys.executable, "-m", "pip", "install", package])
-                print(f"✓ 成功安装 {package}")
-            except subprocess.CalledProcessError:
-                print(f"✗ 安装 {package} 失败，请手动安装: pip install {package}")
+                safe_print(f"[OK] 成功安装 {package}")
+            except (subprocess.CalledProcessError, OSError) as e:
+                safe_print(f"[FAIL] 安装 {package} 失败: {e}")
+                safe_print(f"请手动安装: pip install {package}")
                 return False
 
-        print("所有依赖已安装完成！\n")
+        safe_print("所有依赖已安装完成！\n")
 
     return True
 
 
-# 检查依赖
-if not check_and_install_dependencies():
-    input("按回车键退出...")
+# 检查依赖；任何未预料的异常都不应让窗口一闪而过却看不到原因
+try:
+    _deps_ok = check_and_install_dependencies()
+except Exception as e:
+    safe_print(f"依赖检查过程中出现未知错误: {e}")
+    _deps_ok = False
+
+if not _deps_ok:
+    try:
+        input("按回车键退出...")
+    except Exception:
+        pass
     sys.exit(1)
 
 # 现在安全地导入 html2text
+import html2text
 
 
 class EpubConverter:

@@ -1,5 +1,12 @@
 [
   {
+    "book_id": "rich-dad-poor-dad",
+    "title": "Rich Dad Poor Dad",
+    "author": "Robert T. Kiyosaki",
+    "cover_image": "books_src/rich-dad-poor-dad/assets/9781612680187.jpg",
+    "meta_path": "books_src/rich-dad-poor-dad/meta.json"
+  },
+  {
     "book_id": "how-to-know-a-person",
     "title": "How to Know a Person",
     "author": "David Brooks",
