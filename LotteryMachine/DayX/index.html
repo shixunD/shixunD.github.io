@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>DayX 词汇复习</title>
+
+        <!-- PWA Manifest -->
+        <link rel="manifest" href="./manifest.json">
+
+        <!-- Favicon: PNG for all modern browsers (web build) -->
+        <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="./favicon-32x32.png">
+        <link rel="apple-touch-icon" href="./favicon-32x32.png">
+
+
+        <!-- Google Fonts: Caveat -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+
+        <!-- 样式文件 - 按加载顺序 -->
+        <link rel="stylesheet" href="styles/base.css">
+        <link rel="stylesheet" href="styles/navbar.css">
+        <link rel="stylesheet" href="styles/home.css">
+        <link rel="stylesheet" href="styles/input.css">
+        <link rel="stylesheet" href="styles/calendar.css">
+        <link rel="stylesheet" href="styles/settings.css">
+        <link rel="stylesheet" href="styles/toast.css">
+        <link rel="stylesheet" href="styles/responsive.css">
+    </head>
+
+    <body>
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="nav-brand-container">
+                <div class="nav-brand">DayX 词汇复习</div>
+                <div class="nav-homepagedirector">by Shixun</div>
+            </div>
+            <div class="nav-links">
+                <button class="nav-btn active" data-page="home">主页</button>
+                <button class="nav-btn" data-page="input">录入</button>
+                <button class="nav-btn" data-page="settings">设置</button>
+            </div>
+        </nav>
+
+        <!-- 导航栏右键菜单 -->
+        <div class="navbar-context-menu" id="navbar-context-menu">
+            <div class="context-menu-item" id="toggle-lock-menu-item">
+                <span id="lock-menu-text">🔒 固定位置</span>
+            </div>
+            <div class="context-menu-item" id="toggle-desktop-pin-menu-item">
+                <span id="desktop-pin-menu-text">📌 固定到桌面</span>
+            </div>
+        </div>
+
+        <!-- 主页面 -->
+        <div class="page active" id="home-page">
+            <div class="container">
+                <div class="review-grid" id="review-grid">
+                    <!-- 动态生成的复习卡片 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 录入页面 -->
+        <div class="page" id="input-page">
+            <div class="container">
+                <div class="input-header">
+                    <div class="date-selector">
+                        <span class="current-day-info" id="current-day-info"></span>
+                        <button class="year-overview-btn" id="year-overview-btn">📅 选择月份</button>
+                        <button class="sync-btn" id="sync-onedrive-btn" title="同步到 OneDrive">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 年度总览弹窗 -->
+                <div class="year-overview-modal" id="year-overview-modal">
+                    <div class="year-overview-content">
+                        <div class="year-overview-header">
+                            <button class="year-nav-btn" id="prev-year-btn">◀</button>
+                            <div class="year-title" id="year-title"></div>
+                            <button class="year-nav-btn" id="next-year-btn">▶</button>
+                            <button class="close-year-overview" id="close-year-overview">✕</button>
+                        </div>
+                        <div class="months-grid" id="months-grid">
+                            <!-- 12个月份卡片将动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-calendar-layout">
+                    <!-- 左侧：录入区域 -->
+                    <div class="input-section">
+                        <div class="add-word-form">
+                            <input type="text" id="word-input" placeholder="输入单词或词组..." autocomplete="off" />
+                            <button id="add-word-btn" class="btn-primary">添加</button>
+                        </div>
+
+                        <div class="words-list" id="words-list">
+                            <!-- 动态生成的单词列表 -->
+                        </div>
+                    </div>
+
+                    <!-- 右侧：日历和搜索框 -->
+                    <div class="calendar-search-wrapper">
+                        <!-- 日历视图 -->
+                        <div class="calendar-container">
+                            <div class="calendar-header">
+                                <button class="calendar-nav-btn" id="prev-month-btn">◀</button>
+                                <div class="calendar-title" id="calendar-title"></div>
+                                <button class="calendar-nav-btn" id="next-month-btn">▶</button>
+                            </div>
+                            <div class="calendar-weekdays">
+                                <div class="calendar-weekday">一</div>
+                                <div class="calendar-weekday">二</div>
+                                <div class="calendar-weekday">三</div>
+                                <div class="calendar-weekday">四</div>
+                                <div class="calendar-weekday">五</div>
+                                <div class="calendar-weekday">六</div>
+                                <div class="calendar-weekday">日</div>
+                                <div class="calendar-weekday week-header">周计</div>
+                            </div>
+                            <div class="calendar-grid" id="calendar-grid">
+                                <!-- 日历日期将动态生成 -->
+                            </div>
+                        </div>
+
+                        <!-- 搜索框 -->
+                        <div class="word-search-container">
+                            <div class="word-search-input-wrapper">
+                                <input type="text" id="word-search-input" placeholder="🔍 搜索单词..." autocomplete="off" />
+                            </div>
+                            <div class="word-search-results" id="word-search-results">
+                                <!-- 搜索结果将动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设置页面 -->
+        <div class="page" id="settings-page">
+            <div class="container">
+                <div class="settings-container">
+                    <!-- 左栏：主页面显示配置 -->
+                    <div class="settings-left-column">
+                        <div class="settings-section" id="settings-config">
+                            <h2>⚙️ 主页面显示配置</h2>
+                            <p class="settings-desc">配置主页面显示哪些天数前的单词（按DayX计算，非公历日期）</p>
+
+                            <div class="settings-form">
+                                <div class="setting-item">
+                                    <label>显示的天数偏移（用逗号分隔）：</label>
+                                    <input type="text" id="display-offsets" placeholder="例如: 0,1,2,5,7,14,30" />
+                                    <div class="setting-help">
+                                        0 = 今天录入的, 1 = 1天前录入的, 以此类推
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label>每行显示列数：</label>
+                                    <input type="number" id="columns-per-row" min="1" max="20" placeholder="例如: 7" />
+                                    <div class="setting-help">
+                                        设置主页面每行显示多少个复习卡片（建议1-10列）
+                                    </div>
+                                </div>
+                                <div class="setting-item sync-reminder-setting">
+                                    <label class="checkbox-label-inline">
+                                        <input type="checkbox" id="sync-reminder-enabled" />
+                                        <span>数据修改后提醒同步</span>
+                                    </label>
+                                    <div class="setting-help">
+                                        添加、删除、编辑、改背景色等本地数据变化后，超过设定时间未上传则提醒同步。
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label>同步提醒间隔（秒）：</label>
+                                    <input type="number" id="sync-reminder-interval" min="1" max="86400" placeholder="例如: 300" />
+                                    <div class="setting-help">
+                                        默认 300 秒。取消、Esc 或点击提示框外侧会视为本次不同步，并在下个间隔后再次提醒。
+                                    </div>
+                                </div>
+                                <div class="setting-preview">
+                                    <h3>当前配置预览：</h3>
+                                    <div id="settings-preview"></div>
+                                </div>
+                                <div class="setting-item">
+                                    <button id="save-settings-btn" class="btn-primary">保存设置</button>
+                                    <button id="reset-settings-btn" class="btn-secondary">恢复默认</button>
+                                </div>
+
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右栏：其他设置 -->
+                    <div class="settings-right-column">
+                        <!-- 数据统计 -->
+                        <div class="settings-section" id="settings-stats">
+                            <h2>📊 数据统计</h2>
+                            <div id="stats-info">
+                                <!-- 统计信息 -->
+                            </div>
+                        </div>
+
+                        <!-- OneDrive 云备份 -->
+                        <div class="settings-section" id="settings-onedrive">
+                            <h2>☁️ OneDrive 云备份</h2>
+                            <p class="settings-desc">将数据自动备份到 OneDrive 云端（保存到应用专属文件夹）</p>
+
+                            <!-- 开启时同步最新数据设置 -->
+                            <div class="setting-item sync-on-startup-setting">
+                                <label class="checkbox-label-inline">
+                                    <input type="checkbox" id="sync-on-startup-checkbox" />
+                                    <span>开启时同步最新数据</span>
+                                </label>
+                                <div class="setting-help">启用后，每次打开应用会自动从 OneDrive 获取最新备份并恢复</div>
+                            </div>
+
+                            <!-- 未登录状态 -->
+                            <div id="onedrive-login-section" style="display: none;">
+                                <button id="onedrive-login-btn" class="btn-primary">🔑 登录 OneDrive</button>
+                            </div>
+
+                            <!-- 已登录状态 -->
+                            <div id="onedrive-logged-in-section" style="display: none;">
+                                <div class="onedrive-user-info">
+                                    <div class="user-avatar">👤</div>
+                                    <div class="user-details">
+                                        <div class="user-name" id="onedrive-user-name"></div>
+                                        <div class="user-email" id="onedrive-user-email"></div>
+                                    </div>
+                                    <button id="refresh-backups-btn" class="btn-secondary">🔄刷新列表</button>
+                                    <button id="onedrive-logout-btn" class="btn-secondary">退出登录</button>
+                                </div>
+
+                                <h3>云端备份列表</h3>
+                                <div class="onedrive-backups-list" id="onedrive-backups-list">
+                                    <!-- 备份列表将动态生成 -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Web 版本数据持久化提示（仅 Web 版显示） -->
+                        <div class="settings-section web-only-notice" id="web-data-notice" style="display: none;">
+                            <h2>💡 数据存储提示</h2>
+
+                            <!-- 存储状态实时显示 -->
+                            <div class="storage-status-card" id="storage-status-card">
+                                <div class="storage-status-header">
+                                    <span class="storage-status-icon">🔒</span>
+                                    <span class="storage-status-text">存储状态</span>
+                                </div>
+                                <div class="storage-status-body" id="storage-status-body">
+                                    <div class="storage-status-loading">检查中...</div>
+                                </div>
+                            </div>
+
+                            <div class="notice-content">
+                                <p class="settings-desc">
+                                    <strong>Web 版本使用浏览器本地存储（IndexedDB + localStorage）</strong>
+                                </p>
+                                <ul class="notice-list">
+                                    <li>✅ 清理浏览历史记录<strong>不会</strong>删除您的数据</li>
+                                    <li>⚠️ 清理"Cookie 和其他网站数据"<strong>会</strong>删除数据</li>
+                                    <li>💾 建议定期使用"导出数据"或"OneDrive 云备份"功能</li>
+                                    <li>🔒 应用已申请持久化存储权限，减少被自动清理的风险</li>
+                                </ul>
+                                <p class="settings-desc notice-tip">
+                                    💡 <strong>提示：</strong>清理浏览器数据时，请不要勾选"Cookie 和其他网站数据"选项，或在清理前先导出备份。
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 数据管理组 -->
+                        <div class="settings-group">
+                            <!-- 数据导入导出 -->
+                            <div class="settings-section" id="settings-import-export">
+                                <h2>💾 数据导入导出</h2>
+                                <p class="settings-desc">备份或恢复您的词汇数据</p>
+                                <div class="import-export-actions">
+                                    <button id="export-data-btn" class="btn-primary">📤 导出数据</button>
+                                    <button id="import-data-btn" class="btn-secondary">📥 导入数据</button>
+                                    <button id="open-data-folder-btn" class="btn-secondary">📂 打开数据文件夹</button>
+                                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                                </div>
+                            </div>
+
+                            <!-- 版本信息 -->
+                            <div class="settings-section" id="settings-version">
+                                <h2>📦 版本信息</h2>
+                                <div class="version-info-row">
+                                    <span class="version-info-label">当前版本</span>
+                                    <span class="version-info-value">v1.3.22</span>
+                                </div>
+                                <div class="version-info-row">
+                                    <span class="version-info-label">发布日期</span>
+                                    <span class="version-info-date">2026-06-13</span>
+                                </div>
+                                <a href="https://xxxx.com" id="view-docs-btn" class="btn-docs" target="_blank" rel="noopener noreferrer">📖 查询使用说明</a>
+                            </div>
+
+                            <!-- 开机自启 -->
+                            <div class="settings-section" id="settings-autostart">
+                                <h2>🚀 开机自启</h2>
+                                <p class="settings-desc">开机时自动启动应用</p>
+                                <div class="setting-item">
+                                    <label class="checkbox-label-inline">
+                                        <input type="checkbox" id="autostart-checkbox" />
+                                        <span>开机时自动启动应用 (仅Windows)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 危险区域 -->
+                        <div class="settings-section danger-zone" id="settings-danger">
+                            <h2>⚠️ 危险区域</h2>
+                            <p class="settings-desc danger-desc">以下操作不可撤销，请谨慎操作！</p>
+                            <button id="delete-all-btn" class="btn-danger">🗑️ 删除数据</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 退出 OneDrive 确认弹窗 -->
+        <div class="delete-modal" id="logout-onedrive-modal" style="display: none;">
+            <div class="delete-modal-content">
+                <div class="delete-modal-header">
+                    <h2>⚠️ 退出登录</h2>
+                    <button class="close-delete-modal" id="close-logout-modal">✕</button>
+                </div>
+
+                <p class="delete-modal-desc">确定要退出 OneDrive 登录吗？</p>
+                <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+                    退出后需要重新登录才能使用云端备份功能。
+                </p>
+
+                <div class="delete-modal-actions">
+                    <button id="confirm-logout-btn" class="btn-danger">退出登录</button>
+                    <button id="cancel-logout-btn" class="btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 删除数据确认弹窗 -->
+        <div class="delete-modal" id="delete-modal" style="display: none;">
+            <div class="delete-modal-content">
+                <div class="delete-modal-header">
+                    <h2>⚠️ 删除数据</h2>
+                    <button class="close-delete-modal" id="close-delete-modal">✕</button>
+                </div>
+
+                <p class="delete-modal-desc">请选择要删除的数据类型（可多选）：</p>
+
+                <div class="delete-checkbox-group">
+                    <label class="delete-checkbox-item">
+                        <input type="checkbox" id="delete-vocab-data" class="delete-checkbox">
+                        <span class="checkbox-label">
+                            <span class="checkbox-icon">📚</span>
+                            <span class="checkbox-text">
+                                <strong>词汇数据</strong>
+                                <small>删除所有 Day 记录、日期和单词</small>
+                            </span>
+                        </span>
+                    </label>
+
+                    <label class="delete-checkbox-item">
+                        <input type="checkbox" id="delete-settings-data" class="delete-checkbox">
+                        <span class="checkbox-label">
+                            <span class="checkbox-icon">⚙️</span>
+                            <span class="checkbox-text">
+                                <strong>用户设置</strong>
+                                <small>删除显示配置和每行列数设置</small>
+                            </span>
+                        </span>
+                    </label>
+
+                    <label class="delete-checkbox-item">
+                        <input type="checkbox" id="delete-onedrive-token" class="delete-checkbox">
+                        <span class="checkbox-label">
+                            <span class="checkbox-icon">☁️</span>
+                            <span class="checkbox-text">
+                                <strong>OneDrive 登录状态</strong>
+                                <small>清除本地 Token（不影响云端备份）</small>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="delete-modal-actions">
+                    <button id="confirm-delete-btn" class="btn-danger" disabled>⚠️ 立即删除（不可撤销）</button>
+                    <button id="cancel-delete-btn" class="btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 启动同步冻结遮罩 -->
+        <div class="sync-freeze-overlay" id="sync-freeze-overlay" style="display: none;">
+            <div class="sync-freeze-content">
+                <div class="sync-freeze-spinner"></div>
+                <div class="sync-freeze-text">正在同步最新数据...</div>
+                <div class="sync-freeze-subtext">Token已过期,正在刷新...</div>
+                <button class="sync-cancel-btn" id="sync-cancel-btn">取消同步</button>
+            </div>
+        </div>
+
+        <!-- JavaScript 文件 - 按依赖顺序加载 -->
+    <!-- MSAL.js for silent OneDrive token refresh (web build only) -->
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js" crossorigin="anonymous"></script>
+
+        <script src="scripts/components/toast.js"></script>
+        <script src="scripts/state.js"></script>
+        <script src="scripts/syncReminder.js"></script>
+        <script src="scripts/api.js"></script>
+        <script src="scripts/navigation.js"></script>
+        <script src="scripts/pages/home.js"></script>
+        <script src="scripts/pages/input.js"></script>
+        <script src="scripts/pages/settings.js"></script>
+        <script src="scripts/components/calendar.js"></script>
+        <script src="scripts/components/yearOverview.js"></script>
+        <script src="scripts/app.js"></script>
+    </body>
+
+</html>

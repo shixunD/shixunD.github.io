@@ -1,0 +1,27 @@
+/* 移动端适配 */
+
+@media (max-width: 720px) {
+    .navbar {
+        padding: 0.7rem 1rem;
+    }
+    .nav-brand { font-size: 1.1rem; }
+    .nav-homepagedirector { display: none; }
+    .nav-btn { padding: 0.45rem 0.9rem; font-size: 0.88rem; }
+
+    .container { padding: 1rem 0.9rem 2.5rem; }
+
+    .roster-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+    .settings-left-column { max-width: none; }
+    .settings-right-column { grid-template-columns: 1fr; }
+
+    .wheel-stage { width: 92vw; }
+
+    .onedrive-dialog { padding: 1.1rem; }
+}
+
+@media (max-width: 420px) {
+    .student-fields { grid-template-columns: 1fr; }
+    .winner-dialog { padding: 1.5rem 1.4rem; }
+    .winner-photo { width: 110px; height: 110px; }
+}

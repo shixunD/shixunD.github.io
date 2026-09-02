@@ -1,0 +1,123 @@
+/* 设置页 */
+
+/* 整体两栏布局：左侧「抽奖设置 + 安装与存储」，右侧数据/备份/版本/危险区域独立成一组 */
+.settings-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.3rem;
+    flex-wrap: wrap;
+}
+
+.settings-left-column {
+    flex: 1 1 320px;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+/* 右侧四块两两一行，等宽等高排列 */
+.settings-right-column {
+    flex: 2 1 480px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem;
+    align-items: stretch;
+}
+
+.settings-section {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 1.2rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.settings-desc {
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    margin-bottom: 0.8rem;
+}
+
+.setting-item { margin-bottom: 0.9rem; }
+.setting-item:last-child { margin-bottom: 0; }
+
+.shortcut-key-badge {
+    display: inline-block;
+    background: var(--bg-color);
+    color: var(--primary-color);
+    font-weight: 700;
+    font-size: 0.86rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    font-family: 'Segoe UI', monospace;
+}
+
+.setting-item label:not(.checkbox-label-inline) {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.setting-help {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    margin-top: 0.3rem;
+}
+
+.setting-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.storage-status-card {
+    background: var(--bg-color);
+    border-radius: 10px;
+    padding: 0.8rem 0.9rem;
+    margin-bottom: 0.8rem;
+}
+.storage-status-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    font-size: 0.88rem;
+    margin-bottom: 0.35rem;
+}
+.storage-status-body {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.version-info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    font-size: 0.88rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.version-info-row:last-of-type { border-bottom: none; }
+.version-info-label { color: var(--text-secondary); }
+
+.danger-zone { border: 1px solid rgba(231,76,60,0.3); }
+.danger-desc { color: var(--danger-color); opacity: 0.85; }
+
+.import-export-actions,
+.settings-btn-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.settings-btn-row a.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}

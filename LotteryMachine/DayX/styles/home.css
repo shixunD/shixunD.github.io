@@ -1,0 +1,220 @@
+/* 主页面样式 */
+
+/* 主页面占据固定高度并隐藏滚动条 */
+#home-page {
+    position: fixed;
+    /* 固定定位，不受 body 滚动影响 */
+    top: 70px;
+    /* 导航栏下方 */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* 占据剩余空间 */
+    overflow-y: auto;
+    /* 允许垂直滚动 */
+    scrollbar-width: none;
+    /* Firefox - 隐藏滚动条 */
+    -ms-overflow-style: none;
+    /* IE 10+ - 隐藏滚动条 */
+}
+
+/* Chrome, Safari, Edge - 隐藏滚动条 */
+#home-page::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.review-grid {
+    display: grid;
+    /* grid-template-columns 将由 JavaScript 动态设置 */
+    gap: 0.5rem;
+}
+
+.review-card {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: var(--shadow);
+    /* 只监听 box-shadow 和 transform，避免 all 导致的性能问题 */
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.review-card:hover {
+    box-shadow: var(--shadow-hover);
+    /* transform: translateY(-1px); */
+}
+
+/* 空占位符样式 - 用于填充设置列数与实际列数的差值 */
+.review-card-placeholder {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.review-card-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    flex: 1;
+    justify-content: space-between;
+}
+
+.header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+    justify-content: space-between;
+}
+
+.review-count {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.review-count-controls {
+    display: flex;
+    gap: 0.2rem;
+    align-items: center;
+}
+
+.count-btn {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #ccc;
+    background: #f5f5f5;
+    color: #666;
+    border-radius: 2px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.count-btn:hover {
+    background: #e0e0e0;
+    color: #333;
+    border-color: #999;
+    transform: scale(1.05);
+}
+
+.count-btn:active {
+    transform: scale(0.95);
+    background: #d0d0d0;
+}
+
+.day-title {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    line-height: 1.2;
+}
+
+.day-date {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1.2;
+}
+
+.review-card-body {
+    /* 使用 column flex 并通过 gap 控制子项间距，避免子项使用 margin 导致累积间隙 */
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    /* 更小的行间距，能在同一空间容纳更多单词 */
+}
+
+.word-item-review {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* 缩小内部元素间隙 */
+    padding: 0.25rem 0.3rem;
+    /* 更紧凑的内边距 */
+    /* 去掉 margin-bottom，使用父容器的 gap 控制间距 */
+    margin-bottom: 0;
+    background: var(--bg-color);
+    border-radius: 4px;
+}
+
+/* 可选：紧凑模式，供用户/脚本添加 .compact 到 review-grid 或 review-card 以进一步压缩 */
+.compact .review-card-body {
+    gap: 0.12rem;
+}
+
+.compact .word-item-review {
+    gap: 0.25rem;
+    padding: 0.15rem 0.2rem;
+    border-radius: 3px;
+}
+
+.word-item-review .word-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+    background: rgba(200, 200, 200, 0.3);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #333;
+    flex-shrink: 0;
+}
+
+.word-text {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--text-color);
+    flex: 1;
+}
+
+/* 单词颜色样式 */
+.word-item-review.color-grey {
+    background: #f5f5f5;
+}
+
+.word-item-review.color-green {
+    background: #e8f5e9;
+}
+
+.word-item-review.color-blue {
+    background: #e3f2fd;
+}
+
+.word-item-review.color-red {
+    background: #ffebee;
+}
+
+.word-item-review.color-purple {
+    background: #f3e5f5;
+}
+
+/* 编辑状态样式 */
+.word-item-review .word-text.editing {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+    padding: 2px 4px;
+    background: white;
+}

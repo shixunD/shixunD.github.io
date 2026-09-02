@@ -1,0 +1,192 @@
+/* 录入页：学生名单 */
+
+.roster-toolbar {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.roster-toolbar-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.roster-stats {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.roster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.student-card {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: box-shadow 0.2s ease;
+}
+.student-card:hover { box-shadow: var(--shadow-hover); }
+
+.student-card-top {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.student-photo-wrap {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+}
+
+.student-photo {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-color);
+    border: 2px solid var(--border-color);
+}
+
+.student-photo-edit-btn {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.7rem;
+    border: 2px solid var(--card-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.student-name-input {
+    font-weight: 700;
+    font-size: 1rem;
+    border: none;
+    background: transparent;
+    padding: 0.2rem 0.3rem;
+    border-radius: 6px;
+}
+.student-name-input:focus { background: var(--bg-color); }
+
+.student-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.student-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.student-field label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.student-field input[type="number"] {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.88rem;
+}
+
+.weight-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.student-card-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.student-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.82rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+.student-remove-btn:hover { color: var(--danger-color); background: rgba(231,76,60,0.08); }
+
+/* 裁剪弹窗 */
+.cropper-modal .modal-box { width: min(420px, 100%); }
+.cropper-canvas-wrap {
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #111;
+    touch-action: none;
+    margin-bottom: 0.8rem;
+    position: relative;
+}
+#cropper-canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+#cropper-canvas:active { cursor: grabbing; }
+
+.cropper-zoom-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.cropper-zoom-row input[type="range"] { flex: 1; }
+
+/* TXT 批量导入预览 */
+.import-preview-list {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    margin: 0.8rem 0;
+}
+.import-preview-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.import-preview-row:last-child { border-bottom: none; }
+.import-preview-tag {
+    font-size: 0.72rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+}
+.import-preview-tag.new { background: rgba(34,193,164,0.15); color: var(--secondary-color); }
+.import-preview-tag.update { background: rgba(74,108,247,0.12); color: var(--primary-color); }
+
+.import-issue-row {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+.import-issue-row:last-child { border-bottom: none; }
+.import-issue-line { color: var(--text-primary); margin-bottom: 0.2rem; word-break: break-all; }
+.import-issue-line code { background: var(--bg-color); padding: 0.05rem 0.35rem; border-radius: 5px; }
+.import-issue-reason { color: var(--danger-color); font-size: 0.78rem; }

@@ -1,0 +1,93 @@
+/* 班级切换器（抽奖页/录入页左上角） */
+
+.class-switcher {
+    position: relative;
+    display: inline-block;
+}
+
+.class-switcher-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+.class-switcher-current:hover { border-color: var(--primary-color); }
+
+.class-switcher-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 260px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(20,24,45,0.18);
+    padding: 0.5rem;
+    z-index: 2000;
+}
+.class-switcher-panel[hidden] { display: none; }
+
+.class-switcher-list {
+    max-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.class-switcher-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.class-switcher-item:hover { background: var(--bg-color); }
+.class-switcher-item.active {
+    background: rgba(74, 108, 247, 0.1);
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+.class-item-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.class-item-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 0.15rem 0.3rem;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+.class-item-btn:hover { background: var(--bg-color); color: var(--primary-color); }
+.class-item-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.class-switcher-add-btn {
+    width: 100%;
+    margin-top: 0.4rem;
+    background: transparent;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem;
+    color: var(--primary-color);
+    font-size: 0.86rem;
+    cursor: pointer;
+}
+.class-switcher-add-btn:hover { background: var(--bg-color); }

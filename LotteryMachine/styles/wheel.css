@@ -1,0 +1,174 @@
+/* 抽奖页：转盘 */
+
+.wheel-page-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.wheel-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.wheel-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+/* 等权抽取/不重复抽取按钮的"开启"状态：默认和"重置"一样是 .btn-secondary 外观，
+   开启后叠加这个类变成主色高亮，跟 nav-btn.active 的"选中态=主色"视觉语言保持一致 */
+.btn-toggle-on {
+    background: var(--primary-color);
+    color: #fff;
+}
+.btn-toggle-on:hover { background: var(--primary-dark); }
+
+/* "重置"按钮：即使当前不该显示，盒子也一直占着位置（只是不可见/不可点），
+   这样它出现/消失绝不会改变 .wheel-toolbar-right 的总宽度，
+   前面"等权抽取"/"不重复抽取"两个按钮的位置就能保持绝对不动 */
+.wheel-reset-btn-off {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#wheel-stage-mount {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 0.9rem;
+}
+
+#wheel-stats {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.wheel-stage {
+    position: relative;
+    width: min(520px, 92vw);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wheel-pointer {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 18px solid transparent;
+    border-right: 18px solid transparent;
+    border-top: 32px solid var(--danger-color);
+    z-index: 10;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));
+}
+
+.wheel-canvas-wrap {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-shadow: 0 8px 30px rgba(35, 41, 70, 0.25);
+    overflow: hidden;
+    background: var(--card-bg);
+}
+
+#wheel-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    transform-origin: 50% 50%;
+}
+
+.wheel-hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 64px;
+    height: 64px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--card-bg);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: 800;
+    color: var(--primary-color);
+    font-size: 0.85rem;
+    user-select: none;
+    z-index: 11;
+    border: 3px solid var(--primary-color);
+    transition: transform 0.15s ease;
+}
+.wheel-hub:active { transform: translate(-50%, -50%) scale(0.94); }
+.wheel-hub.spinning { pointer-events: none; opacity: 0.7; }
+
+.wheel-empty-hint {
+    text-align: center;
+    color: var(--text-secondary);
+    max-width: 320px;
+}
+
+/* 中奖弹窗 */
+.winner-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 24, 45, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 6000;
+}
+.winner-overlay[hidden] { display: none; }
+
+.winner-dialog {
+    background: var(--card-bg);
+    border-radius: 18px;
+    padding: 2rem 2.5rem;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(20,24,45,0.35);
+    animation: winnerPop 0.35s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes winnerPop {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.winner-photo {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 5px solid var(--primary-color);
+    margin: 0 auto 1rem;
+    display: block;
+}
+
+.winner-name {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 0.3rem;
+}
+
+.winner-label {
+    color: var(--secondary-color);
+    font-weight: 700;
+    margin-bottom: 1.2rem;
+}

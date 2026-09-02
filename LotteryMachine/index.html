@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>班级抽奖点名机</title>
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon.png">
+    <link rel="apple-touch-icon" href="./icon.png">
+    <meta name="theme-color" content="#4a6cf7">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles/base.css">
+    <link rel="stylesheet" href="styles/navbar.css">
+    <link rel="stylesheet" href="styles/wheel.css">
+    <link rel="stylesheet" href="styles/roster.css">
+    <link rel="stylesheet" href="styles/settings.css">
+    <link rel="stylesheet" href="styles/onedrive.css">
+    <link rel="stylesheet" href="styles/update.css">
+    <link rel="stylesheet" href="styles/classSwitcher.css">
+    <link rel="stylesheet" href="styles/responsive.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-brand-container">
+            <div class="nav-brand" id="nav-brand-home-btn" title="返回抽奖首页">
+                <img src="./icon.png" alt="">
+                <span>班级抽奖点名机</span>
+            </div>
+            <span class="nav-homepagedirector" id="site-credit" title="访问 Shixun 的主页">by Shixun</span>
+        </div>
+        <div class="nav-links">
+            <button class="nav-btn active" data-page="wheel">抽奖</button>
+            <button class="nav-btn" data-page="roster">录入</button>
+            <button class="nav-btn" data-page="settings">设置</button>
+        </div>
+    </nav>
+
+    <!-- 抽奖页 -->
+    <div class="page active" id="wheel-page">
+        <div class="container">
+            <div class="wheel-page-layout" id="wheel-page-body"></div>
+        </div>
+    </div>
+
+    <!-- 录入页 -->
+    <div class="page" id="roster-page">
+        <div class="container">
+            <div id="roster-page-body"></div>
+        </div>
+    </div>
+
+    <!-- 设置页 -->
+    <div class="page" id="settings-page">
+        <div class="container">
+            <div id="settings-page-body"></div>
+        </div>
+    </div>
+
+    <!-- MSAL.js：OneDrive OAuth 静默刷新依赖 -->
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js" crossorigin="anonymous"></script>
+
+    <script src="scripts/components/toast.js"></script>
+    <script src="scripts/components/modal.js"></script>
+    <script src="scripts/components/imageCropper.js"></script>
+
+    <script src="scripts/state.js"></script>
+    <script src="scripts/components/classSwitcher.js"></script>
+    <script src="scripts/navigation.js"></script>
+    <script src="scripts/updateChecker.js"></script>
+    <script src="scripts/persistence.js"></script>
+    <script src="scripts/importExport.js"></script>
+    <script src="scripts/pwaInstall.js"></script>
+
+    <script src="scripts/onedrive/msalAuth.js"></script>
+    <script src="scripts/onedrive/onedriveApi.js"></script>
+
+    <script src="scripts/pages/wheel.js"></script>
+    <script src="scripts/pages/roster.js"></script>
+    <script src="scripts/pages/settings.js"></script>
+
+    <script src="scripts/app.js"></script>
+</body>
+
+</html>

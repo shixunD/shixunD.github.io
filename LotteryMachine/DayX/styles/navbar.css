@@ -1,0 +1,127 @@
+/* 导航栏样式 */
+
+.navbar {
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    flex-wrap: nowrap;
+    /* 防止换行 */
+    touch-action: manipulation;
+    /* 禁用移动端双击缩放，确保双击事件能触发 */
+}
+
+.nav-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    flex-shrink: 0;
+    /* 品牌名称不压缩 */
+    white-space: nowrap;
+    /* 防止文字换行 */
+    cursor: pointer;
+}
+
+.nav-brand-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.8rem;
+    flex-shrink: 0;
+}
+
+.nav-homepagedirector {
+    font-size: 1rem;
+    font-family: 'Caveat', 'Comic Sans MS', cursive;
+    color: var(--primary-color);
+    opacity: 0.75;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+    line-height: 1;
+    padding-bottom: 0.15rem;
+}
+
+.nav-homepagedirector:hover {
+    opacity: 1;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1rem;
+    flex-shrink: 0;
+    /* 按钮组不压缩 */
+}
+
+/* 允许作为 flex 子项时在空间不足时收缩，避免被“内容最小宽度”卡住 */
+.nav-brand,
+.nav-links {
+    min-width: 0;
+}
+
+.nav-btn {
+    background: transparent;
+    border: 2px solid transparent;
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    /* 优化性能：只监听必要属性 */
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    /* 防止按钮文字换行 */
+    flex-shrink: 0;
+    /* 防止按钮被压缩 */
+}
+
+.nav-btn:hover {
+    background: var(--bg-color);
+}
+
+.nav-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* 导航栏右键菜单 */
+.navbar-context-menu {
+    position: fixed;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 0.25rem 0;
+    min-width: 150px;
+    z-index: 2000;
+    display: none;
+}
+
+.navbar-context-menu.show {
+    display: block;
+}
+
+.context-menu-item {
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-color);
+}
+
+.context-menu-item:active {
+    background: var(--primary-light);
+}

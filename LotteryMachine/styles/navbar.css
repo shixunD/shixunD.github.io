@@ -1,0 +1,87 @@
+/* 顶部导航栏 */
+
+.navbar {
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    padding: 0.85rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    flex-wrap: nowrap;
+}
+
+.nav-brand-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.nav-brand {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+    padding: 0.3rem 0.5rem;
+    margin: -0.3rem -0.5rem;
+    border-radius: 8px;
+    transition: background-color 0.15s ease;
+}
+
+.nav-brand:hover { background: var(--bg-color); }
+.nav-brand:active { background: rgba(74, 108, 247, 0.12); }
+
+.nav-brand img {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+
+.nav-homepagedirector {
+    font-size: 1rem;
+    font-family: 'Caveat', 'Comic Sans MS', cursive;
+    color: var(--primary-color);
+    opacity: 0.75;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+    line-height: 1;
+    padding-bottom: 0.2rem;
+}
+
+.nav-homepagedirector:hover { opacity: 1; }
+
+.nav-links {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.nav-btn {
+    background: transparent;
+    border: 2px solid transparent;
+    padding: 0.5rem 1.3rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.nav-btn:hover { background: var(--bg-color); }
+
+.nav-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+}

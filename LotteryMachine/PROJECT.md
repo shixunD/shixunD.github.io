@@ -1,0 +1,292 @@
+# 班级抽奖点名机 — 项目说明文档
+
+> 本文档面向"后续接手这个项目的 AI 或人类"，目标是让你不需要逐行读代码，也能理解每个文件、每个函数/变量的作用，以及整体数据流转逻辑。
+
+## 一、这是什么
+
+纯静态网页应用（HTML + CSS + 原生 JS，无构建工具、无框架），部署在 GitHub Pages：`https://shixund.github.io/LotteryMachine/`。
+用途：课堂随机点名/抽奖。老师录入学生名单（含照片、按成绩自动计算的权重），在"抽奖"页面点击转盘随机抽取一名学生回答问题。
+
+三个页面（`index.html` 里通过 `.page` + `.page.active` 切换显隐，不是路由跳转）：
+- **抽奖**（`wheel-page`）：转盘
+- **录入**（`roster-page`）：学生名单管理
+- **设置**（`settings-page`）：通用设置、数据管理
+
+设计风格参考了同目录 `DayX/` 项目（配色变量、卡片圆角、按钮体系），但内容和数据完全独立。
+
+---
+
+## 二、整体架构
+
+```
+浏览器加载 index.html
+  → 依次加载 styles/*.css（纯样式，无逻辑）
+  → 依次加载 scripts/*.js（IIFE 模块，每个文件在 window 上挂一个全局对象，如 window.AppState）
+  → scripts/app.js 的 DOMContentLoaded 监听器执行 init()：
+      1. 注册 service-worker.js（离线缓存 + network-first 更新策略）
+      2. MsalAuth.init()（预加载 OneDrive 登录所需的 MSAL.js，处理登录回调）
+      3. AppState.load()（从 IndexedDB 读取学生名单和设置到内存）
+      4. Navigation.init()（绑定导航栏点击事件）
+      5. 渲染当前激活页面（默认"抽奖"页）
+      6. AppState.subscribe(...)：数据变化时自动重新渲染当前页面
+      7. Persistence.requestPersistence()（申请持久化存储）
+      8. UpdateChecker.check()（检查 version.json 是否有新版本，需要则弹窗）
+```
+
+**核心设计**：所有页面渲染都是"整段 innerHTML 重绘 + 重新绑定事件"，不是虚拟 DOM diff。数据唯一真源是 `AppState` 内存中的 `state` 对象，任何修改都通过 `AppState.xxx()` 方法完成并自动持久化到 IndexedDB，然后广播给订阅者（当前激活页面）重新渲染。**不要绕过 `AppState` 直接改 DOM 后又忘记调用 `AppState.updateStudent()` 之类的方法，否则数据不会持久化。**
+
+---
+
+## 三、数据模型（`scripts/state.js`）
+
+### 多班级结构（最外层）
+```js
+AppState 内存结构 = {
+  classes: [
+    { id, name, students: Student[], drawnStudentIds: string[] },  // 每个班级独立一份学生名单 + "已抽取"记录
+    ...
+  ],
+  activeClassId: string,   // 当前正在查看/操作的班级 id
+  settings: {              // 设置是全局共享的，不分班级
+    spinDurationMs,        // 转盘旋转动画时长，默认 2000
+    winnerAutoCloseMs,     // 中奖弹窗自动关闭毫秒数，默认 5000，0=不自动关闭
+    equalWeightMode,       // 等权抽取开关，默认 false
+    noRepeatMode,          // 不重复抽取开关，默认 false
+    spinShortcutKey        // 抽奖快捷键（KeyboardEvent.key 值），默认 'PageUp'
+  }
+}
+```
+- **`getStudents()` / `getTotalWeight()` / `addStudent()` / `updateStudent()` / `removeStudent()` / `clearStudents()` / `parseImportText()` / `applyScoreImport()` / `getDrawnIds()` / `markDrawn()` / `resetDrawn()` 这些函数操作的都是"当前激活班级"（`getActiveClass()`）的数据**，不是全局的。抽奖页、录入页永远只看到当前班级的人；"不重复抽取"的已抽名单（`class.drawnStudentIds`）也是随每个班级各自存储的，见下方"不重复抽取"小节。
+- 班级管理函数：`getClasses()`（全部班级）、`getActiveClass()` / `getActiveClassId()`、`switchClass(id)`（切换当前班级）、`addClass(name)`（新建并自动切换过去）、`renameClass(id, name)`、`removeClass(id)`（**至少保留一个班级，删除最后一个会被拒绝并返回 `false`**；删除当前激活班级时自动切到列表里第一个剩下的）。
+- **旧版本数据迁移**：早期版本没有"班级"概念，数据结构是 `{students, settings}`（没有 `classes` 字段）。`load()` 和 `replaceState()` 里都做了 `migrateLegacy()` 兼容处理——检测到旧格式时，自动包成一个名为"默认班级"的班级。**改数据结构时如果不兼容旧格式，要在这两个函数里都处理**，否则老用户升级后数据"凭空消失"（实际是读取失败被兜底成了空状态）。
+- UI 组件：`scripts/components/classSwitcher.js`（`window.ClassSwitcher.renderInto(containerEl)`），挂载在抽奖页和录入页顶部工具栏最左侧，是一个可展开的下拉面板：点班级名切换、✎ 重命名（用 `window.prompt`）、🗑️ 删除（只有 >1 个班级时可点，`Modal.confirm` 二次确认）、"➕ 新建班级"（也是 `window.prompt` 输入名称）。面板打开/关闭状态、点击面板外部自动关闭的逻辑是**模块级只注册一次**的 `document` 点击监听（写在 IIFE 顶层，不在 `renderInto` 里面），避免每次页面重绘都叠加新的全局监听器。
+
+### Student（单个学生）
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `id` | string (uuid) | 唯一标识 |
+| `name` | string | 姓名 |
+| `photoDataUrl` | string \| null | 裁剪为 1:1 的 base64 图片（JPEG，`ImageCropper` 生成），无照片则为 `null`，UI 用姓名首字母占位 |
+| `score` | number \| null | 最近一次考试成绩，可为空 |
+| `weightMode` | `'score'` \| `'manual'` | 权重来源。`'score'` = 权重随成绩自动计算；`'manual'` = 用户手动指定权重，不再随成绩变化 |
+| `weight` | number（≥1） | 实际参与抽奖的权重 |
+
+### 权重公式
+```js
+weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_WEIGHT = 1
+```
+即 `scoreToWeight(score)`。**这是唯一计算权重的地方**，如果以后要改基准分，只需要改 `state.js` 顶部的 `WEIGHT_BASE` 常量。
+- `weightMode === 'manual'` 时不调用此公式，直接使用用户输入的 `weight` 值（必须 > 0，否则回退为 `MIN_WEIGHT`）。
+- 抽奖概率 = `student.weight / 所有学生 weight 之和`（`AppState.getTotalWeight()`），**有放回**抽取（不会因为抽中过就排除，符合需求里"每次被抽到的概率固定"的描述）。
+- **等权抽取**（`settings.equalWeightMode`，默认 `false`）：抽奖页顶部工具栏右侧有个"等权抽取"勾选框，勾选后 `pages/wheel.js` 的 `weightedPick()` 会**完全跳过权重**，直接从候选池里等概率随机选一个（`Math.floor(Math.random() * pool.length)`），不管每个人的 `weight` 是多少。这个开关只影响"选中谁"，不影响 `weight` 字段本身的存储值——取消勾选后立刻恢复按权重抽取。转盘视觉上的扇区一直都是等分的（不随权重变化扇区大小），所以勾选与否不会改变转盘长相，只改变背后的中奖概率。
+- **不重复抽取**（`settings.noRepeatMode`，默认 `false`；已抽名单 `class.drawnStudentIds: string[]`，随**每个班级**各自存储在 `class` 对象里，不是全局的）：勾选后 `pages/wheel.js` 的 `getDrawPool(students)` 会先用 `AppState.getDrawnIds()` 过滤掉当前班级已经抽过的学生，剩下的才是这次抽奖的候选池（`weightedPick(pool)` 的入参从"全体学生"变成"候选池"）；`drawWheel()` 也会读同一份 `drawnIds` 把对应扇区涂成灰色（`DRAWN_SECTOR_COLOR`）并降低该扇区头像/文字的 `globalAlpha`，但**扇区的角度/位置不变**，只是变灰，不会从转盘上消失。候选池为空时点"开始抽奖"会被 `spin()` 提前拦下并 toast 提示，不会真的转。中奖者确定后，`spin()` 的 `finish()` 收尾阶段调用 `AppState.markDrawn(winner.id)`（写入当前班级的 `drawnStudentIds` 并持久化+通知刷新，让灰色扇区在弹出中奖弹窗之前就已经生效）。工具栏的"🔄 重置"按钮和"取消勾选不重复抽取"都会调用 `AppState.resetDrawn()` 清空当前班级的 `drawnStudentIds`；**切换班级本身不会调用 `resetDrawn()`**，纯粹是 `getActiveClass()` 指向了另一个自带独立 `drawnStudentIds` 的班级对象，所以天然做到"切班级不重置、已抽数据分班级保留"。
+
+### 存储位置
+- **主数据**（`classes` + `activeClassId` + `settings`，完整结构见本节最上方代码块）：存 **IndexedDB**（数据库名 `lottery-machine-db`，object store `app-state`，单条记录 key 为 `'main'`）。选 IndexedDB 而不是 localStorage 是因为学生照片是 base64，多张照片容易超过 localStorage 5MB 上限。
+- **更新检测的两个小标记**（`lastSeenVersion` / `skippedVersion`）：存 **localStorage**（见 `updateChecker.js`），因为这两个值只是简单字符串，同步读取更方便。
+
+### `state.js` 导出的主要函数（`window.AppState`）
+| 函数 | 作用 |
+|---|---|
+| `load()` | 启动时从 IndexedDB 读入内存，返回 state |
+| `subscribe(fn)` | 注册数据变化监听器，返回取消订阅函数 |
+| `getState()` / `getStudents()` / `getTotalWeight()` | 读取当前内存状态 |
+| `addStudent(data)` / `updateStudent(id, patch)` / `removeStudent(id)` / `clearStudents()` | 增删改学生，内部都会调用 `normalizeStudent()` 重新计算 weight，然后 `persist()` 写 IndexedDB，再 `notify()` 广播 |
+| `scoreToWeight(score)` | 权重公式，供 UI 显示"预计权重"时复用 |
+| `parseImportText(text)` | 解析 TXT 批量导入的文本，见第 4.2 节"TXT 批量导入"详细规则。**不直接写入**，成功时返回 `{ok:true, created, updated}` 预览数据，失败（格式冲突/无法解析）时返回 `{ok:false, issues, mixedFormat}`，调用方必须先处理 `ok:false` 的情况 |
+| `applyScoreImport(preview)` | 把 `parseImportText` 返回的 `{created, updated}`（`ok:true` 时的那部分）真正写入 state |
+| `updateSettings(patch)` | 修改 settings 并持久化 |
+| `replaceState(newState)` | 整体替换（本地导入 JSON / OneDrive 恢复备份都调用这个） |
+| `exportSnapshot()` | 生成导出用的 JSON 对象（本地导出 / OneDrive 上传都调用这个） |
+| `getDrawnIds()` / `markDrawn(id)` / `resetDrawn()` | "不重复抽取"功能用：读取/追加/清空**当前激活班级**的 `drawnStudentIds` |
+
+---
+
+## 四、页面模块
+
+### 4.1 抽奖页 —— `scripts/pages/wheel.js` + `styles/wheel.css`
+- `render()`：顶部工具栏（`.wheel-toolbar`，**宽度 100%、贴在 `.container` 真正的左右边缘**，左边是班级切换器 `ClassSwitcher.renderInto()`，右边依次是"等权抽取"按钮、"不重复抽取"按钮、"🔄 重置"按钮）+ 下方居中的转盘舞台，舞台正下方是学生数统计（`#wheel-stats`，跟转盘一起放在 `#wheel-stage-mount` 里，不在顶部工具栏）。
+  - **"等权抽取"/"不重复抽取"是普通 `<button>` 而不是 checkbox**：默认 class 是 `btn-secondary`（和"重置"按钮同款外观，三个按钮长得像一组），开启时额外叠加 `.btn-toggle-on` 变成实心主色（跟导航栏 `.nav-btn.active` 的"选中态=主色"视觉语言一致）。点击时用 `e.currentTarget.classList.contains('btn-toggle-on')` 的反值算出"点完之后应该是什么状态"，再调 `AppState.updateSettings()`；`render()` 每次重绘都会用 `classList.toggle('btn-toggle-on', !!settings.xxxMode)` 把按钮外观和 state 同步，不依赖按钮自身记忆状态。**之前是用 `<input type="checkbox">`，用户反馈跟"重置"按钮的风格不统一，改成了现在这样**——以后再加类似的"开关型"操作，优先照这个 `.btn-secondary` + `.btn-toggle-on` 的模式做，不要混用 checkbox。
+  - "🔄 重置"按钮只在开启"不重复抽取"时可见，直接跟在"不重复抽取"按钮后面。**这里刻意不用 `hidden` 属性（也不用 `display:none`），而是用一个自定义类 `.wheel-reset-btn-off { visibility:hidden; pointer-events:none; }`**：`hidden`/`display:none` 会把元素整个从布局流里摘掉，`.wheel-toolbar-right` 的总宽度就会跟着重置按钮的出现/消失而变化，进而导致"等权抽取"/"不重复抽取"这两个在它前面的按钮的绝对位置跟着左右挪——这是实测发现过的真问题，用户报告点"不重复抽取"后前两个按钮会跟着移位。改成 `visibility:hidden` 后，重置按钮的盒子**始终占着位置**，只是不可见/不可点击，`.wheel-toolbar-right` 的宽度永远不变，前面两个按钮的坐标就固定死了。**以后这种"某个按钮只在特定条件下才该显示"的场景，只要它前面还有其他重要元素不能跟着挪动，都优先用这个 `visibility` 模式，不要用 `hidden`/`display:none`。**（另外，学生数统计 `#wheel-stats` 也已经从这一排工具栏挪到转盘正下方独立一行了，进一步减少这排按钮的拥挤程度。）
+- `drawWheel()`：用 Canvas 2D 把圆等分成 N 个扇区（N=学生数），扇区颜色从 `SECTOR_COLORS` 调色板循环取色，**除非该学生在"不重复抽取"模式下已经被抽过——那种情况扇区涂成灰色 `DRAWN_SECTOR_COLOR` 并把头像/文字的 `ctx.globalAlpha` 调到 0.6**（细节见上面"不重复抽取"小节）；每个扇区里画一个圆形头像缩略图（`loadPhotoImage()` 用 `Map` 缓存 `Image` 对象，避免重复解码 base64；图片异步加载完成后如果当前就在抽奖页会自动重绘）+ 姓名文字（沿半径方向排列，超过 6 个字截断加省略号）。
+- `getDrawPool(students)`：抽奖候选池计算，`settings.noRepeatMode` 关闭时直接返回全体学生；开启时过滤掉 `AppState.getDrawnIds()` 里的人。`spin()` 和 `weightedPick()` 都基于这个池子，但 `drawWheel()` 画扇区时用的还是**完整的** `students` 数组（只是把已抽的染灰），两者的下标/顺序必须保持一致，否则中奖扇区会跟指针对不上。
+- **旋转与中奖逻辑（`spin()`，这是最容易看错的部分）**：
+  1. 先算好候选池 `pool = getDrawPool(students)`；不重复模式下如果 `pool.length === 0`（全部抽完）直接 toast 提示并 `return`，不会真的转。
+  2. `weightedPick(pool)`：先检查 `settings.equalWeightMode`——**勾选"等权抽取"时直接跳过权重**，`Math.floor(Math.random() * pool.length)` 从候选池等概率随机选一个；否则走加权随机：生成 `[0, 候选池总权重)` 的随机数，依次减去每个候选人的 weight，减到 ≤0 时的那个学生就是中奖者。**中奖结果在动画开始前就已经确定**，转盘旋转只是视觉效果，不是"转到哪个算哪个"。
+  3. `winnerIndex = students.indexOf(winner)` —— 注意这里用的是**完整学生列表**里的下标（不是候选池里的下标），因为扇区位置是按完整列表画的。扇区 0 从正上方（指针位置）开始顺时针排列，第 i 个扇区中心角度 = `i*seg + seg/2`（`seg = 360/学生数`）。
+  4. 要让中奖扇区中心转到正上方，需要旋转 `desiredFinalAngle = (360 - winnerMidAngle % 360) % 360` 度（相对于扇区当前 0 点的角度）。
+  5. 因为 CSS `transform: rotate()` 是绝对角度而不是增量，代码用模块级变量 `currentRotation`（只增不减，记录 canvas 元素已经转过的总角度）来算出下一次要设置的绝对角度：先算出从当前角度到目标角度还差多少度（`delta`，取值 `[0,360)`），再加上 `EXTRA_SPINS * 360`（额外转几整圈，纯视觉效果，默认 6 圈），得到 `nextRotation = currentRotation + EXTRA_SPINS*360 + delta`。
+  6. 用 CSS `transition`（时长取自 `settings.spinDurationMs`）驱动 `canvas.style.transform = rotate(nextRotation deg)`，正常靠监听 `transitionend` 事件收尾。**同时挂了一个 `setTimeout(finish, durationMs + 300)` 兜底**：极端情况下（比如把旋转时长调得很短、或动画被打断）浏览器有时不会派发 `transitionend`，没有兜底的话 `spinning` 标志会永久卡 `true`，转盘再也点不动，必须刷新页面才能恢复——这是实测发现过的真实问题，`finish()` 内部用 `finished` 标志保证 `transitionend` 和兜底定时器谁先触发都只真正收尾一次。收尾时如果开启了"不重复抽取"，先 `AppState.markDrawn(winner.id)`（会触发重绘让扇区立刻变灰），再弹出中奖弹窗（`showWinnerDialog`）。**弹窗自动关闭**：读取 `settings.winnerAutoCloseMs`（设置页可调，默认 5000ms，0 表示禁用自动关闭需手动点"好的"），大于 0 时用 `setTimeout` 定时移除弹窗；用户手动关闭时会 `clearTimeout` 取消这个定时器。
+  - 如果以后要改成"转盘扇区大小按权重比例画"而不是"等分"，需要同时改 `drawWheel()` 里的扇区角度计算和 `spin()` 里的 `winnerMidAngle` 计算逻辑，两处必须保持一致。
+- **抽奖快捷键（配合翻页笔）**：`WheelPage` 额外导出一个 `triggerShortcutSpin()`（做了个空判断——`#wheel-hub` 都还没渲染出来就不执行，比如学生名单为空的时候），供 `app.js` 的全局按键监听调用。真正的监听逻辑在 `app.js` 的 `bindSpinShortcut()`：`document` 上挂 `keydown`，命中条件是——① `window.__recordingShortcut` 不是 `true`（设置页正在录入新快捷键时跳过，见第 4.3 节）② 当前激活页面是 `#wheel-page` ③ `e.key === settings.spinShortcutKey`；命中后 `e.preventDefault()`（防止 `PageUp` 之类的键触发浏览器自身翻页/滚动）再调用 `WheelPage.triggerShortcutSpin()`，内部直接复用 `spin()`，`<2人`、候选池为空、正在旋转中这些保护逻辑全部自动继承，不需要重复判断。默认快捷键是 `PageUp`，因为市面上大多数翻页笔/演示遥控器的"下一页"键发送的就是这个键。
+
+### 4.2 录入页 —— `scripts/pages/roster.js` + `styles/roster.css`
+- `render()`：渲染工具栏（统计信息 + "📄 TXT 批量导入" / "➕ 添加学生" / "☁️ 打开 OneDrive 备份" / "🔄 立即同步"**四个按钮，统一用 `.btn-primary`**——早期这四个按钮颜色不一致，用户反馈"格格不入"后统一成同一个颜色）+ 学生卡片网格。
+  - "☁️ 打开 OneDrive 备份"直接调用 `OneDriveApi.open()`，和设置页的入口是同一个弹窗组件，命名也保持一致，不要在两处用不同的文案。
+  - "🔄 立即同步"（`handleQuickSync()`）是**跳过弹窗的快捷上传**：先 `MsalAuth.getAccount()` 查有没有登录，没登录就 toast 提示 + `OneDriveApi.open()`（引导去弹窗登录，不在这里做登录 UI）；已登录则直接 `OneDriveApi.uploadBackup(`${ImportExport.timestampName()}.json`, AppState.exportSnapshot())` 一步到位上传一份新备份，按钮临时变"同步中..."并禁用，成功/失败都有 toast。这是"打开 OneDrive 备份"弹窗里手动点上传的快捷方式，底层复用的是同一个 `OneDriveApi.uploadBackup`，命名文件的规则（`年-月-日--时-分-秒.json`）也完全一致。
+  - 每张学生卡片包含：照片（点击 ✎ 触发 `handleEditPhoto`）、姓名输入框、成绩输入框、权重输入框（`weightMode==='score'` 时只读）、"手动设置权重"勾选框、删除按钮。
+- 所有输入框都是 `change` 事件（失焦或回车才提交），调用对应的 `AppState.updateStudent()`。
+- `handleEditPhoto(studentId)`：动态创建一个 `<input type="file">` 触发系统选图，选中后调用 `ImageCropper.open(file)` 弹出裁剪弹窗，裁剪结果（base64 dataURL 或 `null` 表示取消）直接写回 `AppState.updateStudent`。
+- **TXT 批量导入流程（`handleTxtFile` → `AppState.parseImportText(text)`）**：支持两种格式，**每次导入只能是其中一种，混用会被当成数据冲突拒绝**：
+  - **格式 A（姓名+成绩）**：一行里含真正的 **Tab 字符**（`\t`），按 Tab 切成两段——姓名 + 成绩。**空格不算分隔符**，这是刻意的：早期版本用正则 `\S+\s+数字` 把空格当分隔符，容易把"姓名里带空格"或"误输入多个空格"的情况解析错，新版本严格要求 Tab，规则更可预测。
+  - **格式 B（仅姓名）**：一行不含 Tab、也不含任何空白字符，整行就是姓名，成绩固定按 `NAME_ONLY_DEFAULT_SCORE`（=130）计算权重。
+  - `parseImportText` 内部先把每一行分类成 `score`（格式 A，合法）/ `name`（格式 B，合法）/ `invalid`（两种都不是，比如 Tab 数量不对、成绩不是数字、或者一行里有空格导致既不能判定成 Tab 格式也不能判定成纯姓名格式）。**只要 `invalid` 不为空，或者 `score` 和 `name` 两类都同时存在（=格式混用），整个导入就判定失败**，返回 `{ok:false, issues, mixedFormat}`，`issues` 里精确列出每一个问题行的行号、原文、原因（`invalid` 行给出具体解析失败原因；混用情况下把 `score` 行和 `name` 行都列出来，各自标注"本行是哪种格式"，方便用户自己判断该统一成哪种）。**失败时不会返回任何 `created`/`updated`，调用方（`roster.js` 的 `showImportIssues()`）只弹一个"知道了"的问题清单弹窗，不允许部分导入**——用户必须把文件改成单一格式后重新选择文件导入。
+  - 只有全部行都合法且属于同一种格式时才会继续走原来的"按姓名匹配已有学生"逻辑，返回 `{ok:true, created, updated}`，后续流程（`showImportPreview` 弹窗、`.import-conflict-checkbox` 逐行/批量选择覆盖/跳过、`applyScoreImport`）跟之前完全一样，没有变化。
+  - 同一次导入文本中出现的重复姓名只取第一行；姓名如果和当前班级已有学生**完全相同**（`===`）则视为冲突（进 `updated`），否则视为新增（进 `created`）。
+
+### 4.3 设置页 —— `scripts/pages/settings.js` + `styles/settings.css`
+六个卡片区块，`render()` 里整体拼 HTML 再统一 `bindEvents()`。**布局是两栏**（`.settings-container` 用 `display:flex`）：
+- **左栏**（`.settings-left-column`，`flex:1 1 320px; max-width:380px`，内部纵向堆叠）：① 抽奖设置（`spinDurationMs` + `winnerAutoCloseMs` 输入框 + 快捷键录入，见下）② 安装与存储（`bindInstallButton()` 绑定 PWA 安装，见下；`loadStorageStatus()` 显示持久化存储状态）。这两块相对"经常要调"，放左边独立一栏。
+- **右栏**（`.settings-right-column`，`display:grid; grid-template-columns: repeat(2, 1fr)`，两列两行）：③ 数据导入导出（`ImportExport.exportToFile()` / `ImportExport.importFromFile()`）④ OneDrive 云备份（`OneDriveApi.open()`）⑤ 版本信息（`loadVersionInfo()` 拉取 `version.json`；"检查更新"按钮手动触发 `UpdateChecker.check()`；"📖 产品说明"是个 `<a href="./Handbook/index.html">`，新标签页打开使用手册，见第十节。**这里故意写成 `index.html` 而不是 `./Handbook/`**：早期用目录路径时，在某些静态托管环境下点击会先经过一个中转页需要二次点击才能真正进入，写死文件名可以绕开对"目录自动补 index.html"这个行为的依赖，更稳。）⑥ 危险区域（`AppState.clearStudents()`，二次确认）。这四块内容量不一，**用 `.settings-section { height:100%; display:flex; flex-direction:column; }` + grid 默认的 `align-items:stretch` 让同一行的两张卡片自动等高**，不需要手动计算高度。
+- **抽奖快捷键录入**（`bindShortcutRecorder()`，"抽奖设置"卡片里，`settings.spinShortcutKey` 默认 `'PageUp'`）：点击"🎹 录入键盘快捷键"后，按钮文字变成"请按下要设置的按键...（Esc 取消）"并禁用，同时把全局标记 `window.__recordingShortcut` 设为 `true`；然后在 `document` 上（`capture: true`）挂一个**一次性**的 `keydown` 监听，用户按下任意键就把 `e.key`（按 Esc 则不改动，保留原值）存进 `settings.spinShortcutKey`、更新 `#setting-shortcut-display` 显示，同时把 `window.__recordingShortcut` 复位为 `false`、按钮恢复原状。**`window.__recordingShortcut` 这个全局标记的作用**：告诉 `app.js` 里真正触发抽奖的那个全局快捷键监听器"现在正在录入新快捷键，这次按键不要当成触发抽奖来处理"，避免录入过程中意外拉动了转盘（虽然实际场景下设置页和抽奖页不会同时激活，理论上不太可能冲突，但留着这层保护更稳妥）。
+- 响应式：`responsive.css` 在 `max-width:720px` 时把 `.settings-left-column` 的 `max-width` 去掉、`.settings-right-column` 改成单列，两栏各自纵向堆叠成一栏。
+
+---
+
+## 五、通用组件（`scripts/components/`）
+
+| 文件 | 导出 | 说明 |
+|---|---|---|
+| `toast.js` | `window.Toast.{show,info,success,error,warning}` | 顶部居中的轻提示条，纯 JS 动态创建 DOM，自动淡出销毁 |
+| `modal.js` | `window.Modal.{confirm, escapeHtml}` | `confirm({title,text,confirmText,cancelText,danger})` 返回 `Promise<boolean>`，点遮罩/按 Esc 视为取消。`escapeHtml` 在所有把用户输入拼进 `innerHTML` 的地方都要用，防止 XSS（比如学生姓名） |
+| `imageCropper.js` | `window.ImageCropper.open(file)` | 纯 Canvas 实现的 1:1 裁剪器，无第三方库。内部：先按"覆盖填满"（`Math.max` 缩放比）画出图片，用户拖拽改 `offsetX/offsetY`、滑动条改 `zoom`，`clampOffset()` 防止拖出边界露白；确认时把 320×320 的预览画布再缩放绘制到 `OUTPUT_SIZE=320` 的输出画布，导出 `image/jpeg` quality 0.88 的 dataURL |
+
+---
+
+## 六、更新检测机制（需求 1）—— `scripts/updateChecker.js` + `version.json`
+
+**这是最容易被后续修改遗漏的部分，务必读完。**
+
+- `version.json`（仓库根目录）内容只有一个字段：`{"version": "一个字符串，通常是 ISO 时间戳"}`。
+- **⚠️ 每次往 GitHub Pages 发布新版本时，必须手动把 `version.json` 里的 `version` 改成新值**（改成当前时间即可，任何和上次不同的字符串都行）。这一步没有自动化，是本项目更新提示机制生效的前提。同时建议顺手把 `service-worker.js` 顶部的 `CACHE_NAME` 也改一个新值（否则依赖 SW 走 network-first 策略也能工作，但改一下能更彻底地清理旧缓存）。
+- 逻辑（`UpdateChecker.check()`，`app.js` 启动时调用一次，设置页"检查更新"按钮也会手动调用）：
+  1. `fetch('./version.json', {cache:'no-store'})` 拿远端最新版本号（`no-store` 绕过浏览器缓存，否则可能读到旧文件）。
+  2. 和 `localStorage['lottery.updateMeta.lastSeenVersion']` 比较：
+     - 首次访问（`lastSeenVersion` 是 `null`）：直接记录，不打扰用户。
+     - 相同：不提示。
+     - 不同 且 不等于 `localStorage['lottery.updateMeta.skippedVersion']`：弹出 `update.css` 样式的对话框。
+  3. 对话框三个操作：
+     - **立即升级**：把 `lastSeenVersion` 更新为新版本号 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`。
+     - **取消**（不勾选跳过）：什么都不存，下次打开页面还会再弹一次。
+     - **取消 + 勾选"本版本不再提示"**：把新版本号写进 `skippedVersion`，之后只要 `version.json` 没有变成比它更新的值就不会再弹（下次真正发新版才会重新提示）。
+- `service-worker.js` 的 `fetch` 事件处理器用的是 **network-first**：在线时永远优先请求网络最新资源并顺便更新缓存，离线才回退缓存。这从根源上减少"改了代码但用户看到旧版本"的情况；`version.json` 弹窗是在此之上**用户可感知的提示层**，两者互补，不要误以为二选一。
+
+---
+
+## 七、导入导出与 OneDrive 云备份（需求 2）
+
+### 7.1 本地导入导出 —— `scripts/importExport.js`
+- `timestampName(date)`：生成 `年-月-日--时-分-秒` 格式字符串（如 `2026-09-02--14-30-05`），本地导出和 OneDrive 上传的默认文件名都用这个函数。
+- `exportToFile()`：`AppState.exportSnapshot()` → 序列化成 JSON → 用 `Blob` + 临时 `<a download>` 触发浏览器下载，文件名 `{timestampName()}.json`。
+- `importFromFile(file)`：读取文件文本 → `JSON.parse` → `validateSnapshot()` 检查是否有 `students` 数组字段 → 调用 `AppState.replaceState()`。设置页在调用前会先弹二次确认（因为会覆盖当前数据）。
+
+### 7.2 OneDrive 云备份
+
+**两个独立文件分工**：
+- `scripts/onedrive/msalAuth.js`（`window.MsalAuth`）：只管登录态——加载 MSAL.js（CDN，走 `index.html` 里的 `<script>` 标签或本文件的动态加载兜底）、`login()`/`logout()`/`getAccount()`/`getAccessToken()`（静默刷新优先，失败才弹交互式登录）。
+- `scripts/onedrive/onedriveApi.js`（`window.OneDriveApi`）：Graph API 调用（上传/分页列表/下载/删除）+ 备份弹窗的完整 UI（`open()`/`close()`/`render()`）。
+
+**Azure 应用注册**（与 DayX 项目完全独立，各自的 Client ID 和 OneDrive 应用文件夹互不影响）：
+- Client ID: `77561bbd-07f6-4c50-a498-39b8bafdfcdd`（写死在 `msalAuth.js` 顶部的 `MSAL_CLIENT_ID` 常量）
+- Directory (tenant) ID: `a27888d4-ada2-4871-b099-316283e9bdf5`
+- Authority 用的是 `https://login.microsoftonline.com/consumers`（个人 Microsoft 账户）
+- Scope: `Files.ReadWrite.AppFolder`（只能读写该应用专属的 OneDrive 文件夹，拿不到用户其他文件）
+- **重定向 URI 必须在 Azure Portal 里配置成"单页应用程序 (SPA)"平台**，包含：
+  - `https://shixund.github.io/LotteryMachine/`（生产）
+  - 本地开发时的 `http://localhost:<端口>/`（`msalAuth.js` 的 `buildConfig()` 会在 `hostname === 'localhost'` 时自动用 `window.location.origin + '/'` 作为 redirectUri，本地起服务测试前记得把当时用的端口也加到 Azure 后台）
+- 备份文件存放路径：OneDrive 特殊文件夹 `approot`（即该应用的专属文件夹）下的 `LotteryMachine` 子目录，即 Graph API 路径 `/me/drive/special/approot:/LotteryMachine/xxx.json`（见 `onedriveApi.js` 的 `APP_SUBFOLDER` 常量）。
+
+**分页实现**（`onedriveApi.js` 内部状态：`pageCursors` / `currentPageIndex` / `currentPageItems`）：
+- 首次列表请求 URL：`.../LotteryMachine:/children?$top=10&$orderby=name desc`（文件名是时间戳格式，倒序即最新在前）。
+- `pageCursors` 是一个数组，`pageCursors[i]` = 第 i 页的请求 URL；每次 `loadPage(i)` 成功后，把响应里的 `@odata.nextLink` 存进 `pageCursors[i+1]`，这样"下一页"按钮点第二次时可以直接用缓存的 URL，不用重新从头翻页；"上一页"同理直接用已缓存的 `pageCursors[i-1]`。
+- 每页固定 10 条（`PAGE_SIZE`），UI 容器 `.onedrive-history-scroll` 是固定高度可滚动区域。
+
+**UI 状态机**（`OneDriveApi.render()`）：未登录显示登录按钮；已登录显示用户信息 + 退出 + 上传输入框（默认值 `ImportExport.timestampName()`）+ 上传按钮 + 历史列表 + 翻页按钮。每条历史记录有"恢复"（下载 JSON → 校验 → 二次确认 → `AppState.replaceState()`）和"删除"（Graph DELETE，二次确认）两个操作。
+
+---
+
+## 八、导航栏标题与署名角标
+
+仿照 `DayX/index.html` 的写法：导航栏左侧不再只放 `.nav-brand`，而是包一层 `.nav-brand-container`（`styles/navbar.css`），里面并排放 `.nav-brand`（图标+"班级抽奖点名机"，`id="nav-brand-home-btn"`）和 `<span class="nav-homepagedirector" id="site-credit">by Shixun</span>`——紧跟在标题文字后面，不是页面右下角固定角标（早期版本做成了固定在页面右下角，用户反馈要求改成跟 DayX 一样贴在标题旁边，已改正，不要再改回右下角）。`by Shixun` 字体用 Google Fonts 的 Caveat（`index.html` head 里 `<link>` 引入），颜色跟随 `--primary-color` 且 `opacity:0.75`（hover 到 1）。
+
+两者点击行为不同，分别在 `app.js` 里两个函数绑定（`init()` 里 Navigation 初始化前后各自调用一次，都不依赖网络，随时可绑定）：
+- `.nav-brand`（图标+"班级抽奖点名机"文字）点击 → `bindNavBrandHome()` → `Navigation.goTo('wheel')`，回到抽奖首页（站内跳转，不是外部链接）。
+- `#site-credit`（"by Shixun"）点击 → `bindSiteCredit()` → `window.open('https://shixund.github.io', '_blank', 'noopener')`，跳转到作者个人主页（新标签页打开）。
+
+两者是 `.nav-brand-container` 下的两个平级兄弟节点，不是嵌套关系，点击事件互不冒泡影响，不需要 `stopPropagation`。移动端窄屏（`responsive.css`，`max-width:720px`）会隐藏 `by Shixun`（`.nav-homepagedirector`），优先保证导航按钮不被挤压，但 `.nav-brand` 本身依然可点击跳转首页。
+
+## 九、PWA 安装与持久化存储（需求 5）
+
+- `manifest.json`：`start_url` / `scope` / `display: standalone`。**图标必须同时提供 192×192 和 512×512 两个尺寸**——早期版本只声明了一个 512×512（`purpose: "any maskable"`）图标，实测浏览器地址栏一直不出现安装图标；补上 `icon-192.png`（用 Pillow 从 `icon.png` 缩放生成，`python -c "from PIL import Image; ..."`，仓库根目录）并把 `icons` 数组拆成三条（192 any / 512 any / 512 maskable，不再用组合写法）后恢复正常。`index.html` 的 `<link rel="icon">` 也分别声明了 192/512 两个尺寸，`apple-touch-icon` 用 512 的。**以后如果要换图标，必须同时更新 `icon.png`、重新生成 `icon-192.png`，并保持 `manifest.json` 里三条 icons 记录都指向存在的文件**，否则安装能力可能又会悄悄失效。
+- **PWA 安装图标不出现时的排查顺序**：① `manifest.json` 能否被正常 fetch 到（DevTools → Application → Manifest 面板会直接列出解析出的字段和报错）；② `icons` 里是否有 ≥192px 的"any"用途图标；③ Service Worker 是否已激活且带 `fetch` 事件监听（这是安装资格的硬性要求之一）；④ 是否已经安装过（`PwaInstall.isStandalone()` 为 `true` 时浏览器不会再提示安装）；⑤ 是否在无痕/自动化浏览器环境（这类环境经常直接禁用 `beforeinstallprompt`，属于环境限制，不是网页本身的问题，务必在普通 Chrome/Edge 窗口里复测）。
+- `scripts/pwaInstall.js`（`window.PwaInstall`）：监听浏览器的 `beforeinstallprompt` 事件并 `preventDefault()`（阻止浏览器自己弹的迷你条），把事件对象缓存到 `deferredPrompt`；提供 `isAvailable()` / `promptInstall()`（调用缓存事件的 `.prompt()`）/ `onAvailabilityChange(fn)` 回调 / `isStandalone()`（判断当前是否已经是"已安装"状态运行）。设置页的"安装到桌面"按钮由 `settings.js` 的 `bindInstallButton()` 接到这些接口上。
+- **明确不支持"开机自启动"**：这是操作系统级能力，纯 Web PWA 无法实现，本项目里没有做假的开关。用户如果想开机自启，可以自行把安装后生成的快捷方式放进 Windows 的"启动"文件夹（`shell:startup`），这是浏览器/系统层面的操作，不属于代码范畴。
+- `scripts/persistence.js`（`window.Persistence`）：`requestPersistence()` 调用 `navigator.storage.persist()`（若尚未持久化）并用 `navigator.storage.estimate()` 读取已用空间；`getStatus()` 返回缓存的结果供其他地方读取（当前只有设置页用）。设置页会展示"是否已持久化 / 已用空间 MB"卡片。
+
+---
+
+## 十、产品使用手册（`Handbook/index.html`）
+
+面向**教师终端用户**（不是开发者）的简易产品文档，独立于主应用，纯静态单文件（自带 `<style>`，不依赖 `styles/*.css` 或 `scripts/*.js`，避免和主应用的脚本加载顺序耦合）。特点：
+- **全量加载**：所有章节内容一次性都在这一个 HTML 文件里，没有分页/懒加载，`Ctrl+F` 全文搜索都能搜到。
+- **左侧目录（TOC）快速跳转**：`<nav class="toc">` 内是一串 `<a href="#锚点">`，纯 CSS 锚点跳转（`html { scroll-behavior: smooth }`）不依赖 JS 也能用；额外加了一小段 JS（文件末尾 `<script>`）用 `scrollY` 计算当前滚动到哪个 section，给对应目录项加 `.active` 高亮，纯锦上添花，去掉也不影响基本可用性。
+- 入口：设置页「📦 版本信息」卡片里的"📖 产品说明"按钮（`<a href="./Handbook/" target="_blank">`），新标签页打开 `Handbook/index.html`；页面顶部也有"← 返回应用"链接回到 `../index.html`。
+- **内容和 `PROJECT.md` 的定位不同，不要混淆**：`PROJECT.md` 是给"后续维护这份代码的 AI/开发者"看的技术文档（变量、函数、实现细节）；`Handbook/index.html` 是给"用这个工具的老师"看的操作说明（怎么点、这个按钮是干嘛的），语言更口语化，不涉及代码实现。**新增面向用户的功能时，两边都要记得更新**——`PROJECT.md` 里记实现原理，`Handbook` 里记怎么用。
+
+---
+
+## 十一、Service Worker（`service-worker.js`）
+
+- 缓存名 `CACHE_NAME`：**每次发版都应该改成新字符串**（配合 `version.json` 一起改，见第六节）。
+- `install`：预缓存 `URLS_TO_CACHE` 里列出的所有静态资源（**新增/改名文件后要记得把路径加进这个列表**，否则该文件不会被离线缓存，虽然 network-first 策略下在线时不受影响，但离线时会缺失），然后 `skipWaiting()`。
+- `activate`：删除所有不等于当前 `CACHE_NAME` 的旧缓存，`clients.claim()` 立即接管所有已打开的页面。
+- `fetch`：只处理同源 GET 请求，network-first（在线优先拿最新，顺便更新缓存；离线才回退缓存）。**关键细节：请求时必须显式加 `{ cache: 'no-store' }`**（`fetch(event.request.url, { cache: 'no-store' })`，不能直接 `fetch(event.request)`）。原因是实测发现的一个真实坑：普通 `fetch(event.request)` 仍然会遵守浏览器自身的 HTTP 磁盘缓存语义——如果服务器（比如 GitHub Pages 默认的 `Cache-Control`）返回的资源还在新鲜期内，`fetch()` 会直接把磁盘缓存里的旧内容当作"网络响应"返回，SW 却误以为自己拿到了最新版本，"network-first" 名不副实，用户还是会看到旧版本。用 URL 字符串（而不是直接传 `event.request`）发起请求，是因为导航请求（`mode: 'navigate'`）等特殊模式的 `Request` 对象如果被 `new Request(event.request, {...})` 这样重新构造会直接报错，传 URL 字符串可以绕开这个限制。**改这段逻辑时不要图省事把 `cache: 'no-store'` 删掉**，否则更新检测机制会在某些托管环境下悄悄失效。
+- `message`：响应 `SKIP_WAITING`（立即激活新 SW）和 `CLEAR_CACHE`（清空所有缓存），由 `updateChecker.js` 在用户点"立即升级"时发送。
+
+---
+
+## 十二、文件清单速查
+
+```
+index.html                       页面骨架 + 三个 <div class="page">容器 + 所有 <script> 引入顺序
+manifest.json                    PWA 元数据（icons 需同时有 192/512 两个尺寸，否则装不上）
+service-worker.js                离线缓存 + network-first（fetch 必须带 cache:'no-store'，见十一节）
+version.json                     更新检测用的版本号（发版必改）
+icon.png                         用户提供的图标（512×512，favicon + PWA 图标）
+icon-192.png                     从 icon.png 用 Pillow 缩放生成的 192×192 版本，PWA 安装要求
+Handbook/index.html              面向教师用户的产品使用手册（独立静态页，自带样式，见第十节）
+styles/base.css                  CSS 变量、reset、通用按钮/表单/模态框/滚动条
+styles/navbar.css                顶部导航栏
+styles/wheel.css                 转盘、指针、中奖弹窗
+styles/roster.css                学生卡片网格、裁剪弹窗、TXT 导入预览
+styles/settings.css              设置页卡片网格、存储状态卡片
+styles/onedrive.css              OneDrive 备份弹窗
+styles/update.css                新版本提示弹窗
+styles/classSwitcher.css         班级切换器下拉面板
+styles/responsive.css            移动端断点适配
+scripts/state.js                 数据模型（多班级）+ IndexedDB + 权重公式（核心，改需求先看这里）
+scripts/navigation.js            三页面切换
+scripts/updateChecker.js         version.json 比对 + 升级/取消/跳过弹窗
+scripts/persistence.js           navigator.storage.persist() 封装
+scripts/importExport.js          本地 JSON 导出/导入 + 文件名生成
+scripts/pwaInstall.js            beforeinstallprompt 捕获 + 安装引导
+scripts/onedrive/msalAuth.js     OneDrive 登录态（MSAL.js 封装）
+scripts/onedrive/onedriveApi.js  OneDrive Graph API（分页/上传/下载/删除）+ 备份弹窗 UI
+scripts/components/toast.js      轻提示条
+scripts/components/modal.js      通用确认弹窗
+scripts/components/imageCropper.js  1:1 头像裁剪（纯 Canvas）
+scripts/components/classSwitcher.js 班级切换/新建/重命名/删除组件
+scripts/pages/wheel.js           抽奖页：画转盘 + 加权抽取 + 旋转动画
+scripts/pages/roster.js          录入页：学生 CRUD + 照片 + TXT 批量导入
+scripts/pages/settings.js        设置页：六个功能卡片
+scripts/app.js                   启动入口，把以上模块串起来
+```
+
+---
+
+## 十三、已知限制 / 未来可扩展点
+
+- 抽奖默认**有放回**（同一学生可能连续被抽到），如果想要"抽过的人不再参与"，开启「不重复抽取」即可（见第三节"不重复抽取"）——这个已经实现了，**不是**"从转盘上移除"，而是"扇区变灰、候选池排除"，扇区的角度/数量不会因为抽过人而变化，实现上更简单也更不容易出 bug。
+- TXT 批量导入的姓名匹配是**精确字符串匹配**，重名学生会被合并成同一人，导入前的预览弹窗是唯一的纠错机会，没有做"重名消歧"UI。
+- OneDrive 备份没有做"自动定时备份"，只有手动触发上传；如果要加，可以在 `AppState.subscribe()` 的回调里加防抖计时器，参考 DayX 项目的 `syncReminder.js` 思路（本项目未实现）。
+- "开机自启动"明确不支持（见第八节），不要在没有换成 Electron/Tauri 之类桌面壳的情况下试图伪造这个功能。

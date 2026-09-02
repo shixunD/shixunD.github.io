@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用说明 · 班级抽奖点名机</title>
+    <link rel="icon" type="image/png" href="../icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary-color: #4a6cf7;
+            --primary-dark: #3654d1;
+            --secondary-color: #22c1a4;
+            --danger-color: #e74c3c;
+            --warning-color: #f5a623;
+            --bg-color: #f4f6fb;
+            --card-bg: #ffffff;
+            --text-primary: #232946;
+            --text-secondary: #6b7280;
+            --border-color: #e3e7f1;
+            --shadow: 0 2px 8px rgba(35, 41, 70, 0.08);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.7;
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--card-bg);
+            box-shadow: var(--shadow);
+            padding: 0.9rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .topbar img { width: 28px; height: 28px; border-radius: 8px; }
+        .topbar .title { font-weight: 800; font-size: 1.15rem; color: var(--primary-color); }
+        .topbar .subtitle { color: var(--text-secondary); font-size: 0.85rem; margin-left: 0.3rem; }
+        .topbar a.back-link {
+            margin-left: auto;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .topbar a.back-link:hover { color: var(--primary-color); border-color: var(--primary-color); }
+
+        .layout {
+            display: flex;
+            align-items: flex-start;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 2rem;
+            padding: 1.5rem;
+        }
+
+        /* 左侧目录 */
+        .toc {
+            position: sticky;
+            top: 76px;
+            flex: 0 0 220px;
+            max-height: calc(100vh - 96px);
+            overflow-y: auto;
+            background: var(--card-bg);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            padding: 1rem;
+        }
+        .toc-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.3rem 0.6rem 0.6rem;
+        }
+        .toc a {
+            display: block;
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .toc a:hover { background: var(--bg-color); color: var(--primary-color); }
+        .toc a.sub { padding-left: 1.4rem; font-size: 0.8rem; }
+        .toc a.active { background: rgba(74,108,247,0.1); color: var(--primary-color); font-weight: 700; }
+
+        /* 右侧正文 */
+        .content { flex: 1; min-width: 0; }
+
+        .content section {
+            background: var(--card-bg);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            padding: 1.6rem 1.8rem;
+            margin-bottom: 1.2rem;
+            scroll-margin-top: 88px;
+        }
+
+        .content h1 {
+            font-size: 1.7rem;
+            margin-bottom: 0.6rem;
+            color: var(--text-primary);
+        }
+        .content h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.8rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .content h3 {
+            font-size: 1.02rem;
+            margin: 1.1rem 0 0.5rem;
+            color: var(--text-primary);
+        }
+        .content p { margin-bottom: 0.7rem; color: var(--text-primary); font-size: 0.94rem; }
+        .content ul, .content ol { margin: 0.4rem 0 0.8rem 1.3rem; }
+        .content li { margin-bottom: 0.35rem; font-size: 0.92rem; }
+        .content code {
+            background: var(--bg-color);
+            padding: 0.1rem 0.4rem;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: var(--primary-dark);
+        }
+        .content pre {
+            background: var(--bg-color);
+            border-radius: 10px;
+            padding: 0.9rem 1rem;
+            overflow-x: auto;
+            margin-bottom: 0.8rem;
+            font-size: 0.86rem;
+        }
+
+        .lede {
+            color: var(--text-secondary);
+            font-size: 0.98rem;
+            margin-bottom: 0;
+        }
+
+        .tip, .warn {
+            border-radius: 10px;
+            padding: 0.7rem 1rem;
+            font-size: 0.88rem;
+            margin: 0.6rem 0;
+        }
+        .tip { background: rgba(34,193,164,0.08); color: #17836c; border-left: 3px solid var(--secondary-color); }
+        .warn { background: rgba(231,76,60,0.08); color: #a83a2c; border-left: 3px solid var(--danger-color); }
+
+        .badge {
+            display: inline-block;
+            background: var(--bg-color);
+            color: var(--text-secondary);
+            font-size: 0.76rem;
+            padding: 0.1rem 0.55rem;
+            border-radius: 999px;
+            margin-left: 0.4rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0.8rem;
+            font-size: 0.88rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.5rem 0.7rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th { color: var(--text-secondary); font-weight: 600; }
+
+        @media (max-width: 860px) {
+            .layout { flex-direction: column; }
+            .toc { position: static; width: 100%; max-height: none; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topbar">
+        <img src="../icon.png" alt="">
+        <span class="title">班级抽奖点名机</span>
+        <span class="subtitle">使用说明</span>
+        <a class="back-link" href="../index.html">← 返回应用</a>
+    </div>
+
+    <div class="layout">
+        <nav class="toc" id="toc">
+            <div class="toc-title">目录</div>
+            <a href="#intro">简介</a>
+            <a href="#pages-overview">三个页面总览</a>
+            <a href="#wheel-page">抽奖页</a>
+            <a class="sub" href="#equal-weight">等权抽取</a>
+            <a class="sub" href="#no-repeat">不重复抽取</a>
+            <a class="sub" href="#spin-shortcut">抽奖快捷键</a>
+            <a href="#roster-page">录入页</a>
+            <a class="sub" href="#weight-score">成绩与权重</a>
+            <a class="sub" href="#photo-crop">照片与裁剪</a>
+            <a class="sub" href="#txt-import">TXT 批量导入</a>
+            <a href="#class-management">班级管理</a>
+            <a href="#settings-page">设置页</a>
+            <a class="sub" href="#data-backup">数据导入导出</a>
+            <a class="sub" href="#onedrive-backup">OneDrive 云备份</a>
+            <a class="sub" href="#install-storage">安装到桌面 / 存储</a>
+            <a class="sub" href="#version-update">版本与更新</a>
+            <a href="#faq">常见问题</a>
+        </nav>
+
+        <main class="content">
+            <section id="intro">
+                <h1>班级抽奖点名机</h1>
+                <p class="lede">一个课堂随机点名/抽奖小工具：把全班同学的照片和名字放到转盘上，按权重（可以和成绩挂钩）随机抽取一位同学来回答问题。所有数据保存在你自己的浏览器里，也可以导出备份或同步到你自己的 OneDrive，不会上传到任何第三方服务器。</p>
+            </section>
+
+            <section id="pages-overview">
+                <h2>📋 三个页面总览</h2>
+                <table>
+                    <tr><th>页面</th><th>作用</th></tr>
+                    <tr><td><strong>抽奖</strong></td><td>展示转盘，点击中心按钮开始抽奖，选出一名同学</td></tr>
+                    <tr><td><strong>录入</strong></td><td>维护学生名单：姓名、照片、成绩、权重</td></tr>
+                    <tr><td><strong>设置</strong></td><td>调整抽奖动画时长、数据备份、安装到桌面等通用设置</td></tr>
+                </table>
+                <p>三个页面共享同一份"班级"数据——你可以在页面左上角切换/新建/管理多个班级，互不影响。</p>
+            </section>
+
+            <section id="wheel-page">
+                <h2>🎡 抽奖页</h2>
+                <p>转盘上每个扇区代表一名学生（照片+姓名）。点击转盘中心的"开始抽奖"按钮，转盘会旋转一段时间后停下，指针指向的同学就是中奖者，会弹出照片+姓名的提示框。</p>
+                <ul>
+                    <li>至少需要 <strong>2 名学生</strong>才能开始抽奖。</li>
+                    <li>默认情况下抽奖结果<strong>有放回</strong>：同一名同学可能连续被抽到多次（不会因为抽过就被排除）；如果不希望重复，可以开启下面的「不重复抽取」。</li>
+                    <li>转盘旋转多久、中奖弹窗多久自动消失，都可以在「设置」页调整。</li>
+                </ul>
+
+                <h3 id="equal-weight">等权抽取</h3>
+                <p>转盘上方工具栏有一个「⚖️ 等权抽取」按钮，<strong>默认关闭</strong>（灰色）；点击一下切换成开启（变成蓝色高亮），再点一下变回关闭，跟「🔄 重置」是同一套按钮样式，点哪个按钮开着就是蓝色的。</p>
+                <div class="tip">关闭时：每个人被抽到的概率 = 该学生权重 ÷ 全班总权重（权重越高越容易被抽到）。<br>开启后：忽略所有权重，每个人被抽到的概率完全相同——适合"这次就想公平抽签，不看成绩权重"的场合。</div>
+                <p>这个开关只影响"这次抽谁"，不会修改任何学生的权重数值，随时可以开启/关闭。</p>
+
+                <h3 id="no-repeat">不重复抽取</h3>
+                <p>「等权抽取」右边还有一个「🚫 不重复抽取」按钮，<strong>默认关闭</strong>，点击方式和「等权抽取」一样（点亮=开启）。</p>
+                <div class="tip">开启后：每次抽奖结束，中奖同学对应的扇区会<strong>变灰</strong>，之后的抽奖只会在"还没抽过"的同学里进行，直到全班都抽过一轮为止（再点"开始抽奖"会提示"已全部抽完"）。</div>
+                <p>开启「不重复抽取」后，它右边会出现一个「🔄 重置」按钮：</p>
+                <ul>
+                    <li>点击<strong>重置</strong>：清空本班"已抽过"的记录，所有灰色扇区恢复原状，可以重新抽一轮。</li>
+                    <li><strong>关闭</strong>「不重复抽取」：同样会自动清空已抽过的记录，恢复原状。</li>
+                    <li><strong>切换班级不会触发重置</strong>：每个班级各自独立记录"抽过谁"，从 A 班切到 B 班再切回来，A 班已经变灰的同学还是灰的，不会被清空。</li>
+                </ul>
+                <p>「等权抽取」和「不重复抽取」可以同时开启，互不冲突：开启「不重复抽取」时，「等权抽取」只对"还没抽过的人"生效。</p>
+
+                <h3 id="spin-shortcut">抽奖快捷键</h3>
+                <p>如果你用翻页笔/演示遥控器上课，不想每次都跑去点鼠标，可以用快捷键触发抽奖：<strong>默认快捷键是 <code>PageUp</code></strong>（绝大多数翻页笔的"下一页"键发送的正是这个键），在「抽奖」页任意时候按下就等同于点击转盘中心的"开始抽奖"。想改成别的键，去「设置」页的"抽奖设置"卡片里点"🎹 录入键盘快捷键"，按下你想用的新键即可（详见下方设置页说明）。</p>
+                <div class="tip">快捷键只在「抽奖」页生效，切到「录入」「设置」页不会误触发。</div>
+            </section>
+
+            <section id="roster-page">
+                <h2>📝 录入页</h2>
+                <p>在这里维护当前班级的学生名单。点击「添加学生」新增一位，或直接在已有的卡片上修改姓名、成绩。工具栏一共四个按钮（颜色统一，方便识别是一组操作）：</p>
+                <ul>
+                    <li><strong>📄 TXT 批量导入</strong>：见下方"TXT 批量导入"说明。</li>
+                    <li><strong>➕ 添加学生</strong>：新增一位空白学生卡片。</li>
+                    <li><strong>☁️ 打开 OneDrive 备份</strong>：效果和设置页里的入口完全一样，打开备份弹窗（可上传/查看历史/恢复）。</li>
+                    <li><strong>🔄 立即同步</strong>：不用打开弹窗，一键把当前所有班级数据直接上传一份新备份到 OneDrive。如果还没登录，会提示你先登录（自动打开备份弹窗引导登录）。</li>
+                </ul>
+                <p>录完名单顺手点一下「🔄 立即同步」是个好习惯，不用像以前一样打开弹窗再点上传。</p>
+
+                <h3 id="weight-score">成绩与权重</h3>
+                <p>每个学生有一个「权重」，权重越高，被抽到的概率越高。权重有两种来源：</p>
+                <table>
+                    <tr><th>模式</th><th>说明</th></tr>
+                    <tr><td>按成绩自动计算<span class="badge">默认</span></td><td>权重 = 160 − 成绩（分数越低，权重越高，最低不小于 1）。填了成绩后权重会自动算好，不用手动改。</td></tr>
+                    <tr><td>手动设置</td><td>勾选卡片上的「手动设置权重」后，可以自己填任意权重数字，不再随成绩变化。</td></tr>
+                </table>
+                <p>举例：小明考了 98 分 → 权重 = 160 − 98 = <code>62</code>；小红考了 130 分 → 权重 = 160 − 130 = <code>30</code>。分数越不理想的同学，本轮被抽中巩固知识点的概率就越高。</p>
+
+                <h3 id="photo-crop">照片与裁剪</h3>
+                <p>点击学生头像右下角的 ✎ 图标可以上传照片，上传后会弹出一个裁剪框：拖动图片调整位置、拉动下方滑块缩放，最终会裁剪成 1:1 的正方形头像用在转盘上。</p>
+
+                <h3 id="txt-import">TXT 批量导入</h3>
+                <p>如果你手头已经有一份成绩单，或者只是想快速导入一批姓名，可以用「TXT 批量导入」一次性导入，不用一个个手填。<strong>支持两种文件格式，每次导入只能用其中一种，不能混用</strong>：</p>
+
+                <table>
+                    <tr><th>格式</th><th>写法</th><th>成绩</th></tr>
+                    <tr>
+                        <td>A. 姓名 + 成绩</td>
+                        <td>每行一个学生，姓名和成绩之间用 <strong>Tab 键</strong>分隔（⚠️ 不能用空格分隔，空格不算分隔符）</td>
+                        <td>按你填的成绩计算权重</td>
+                    </tr>
+                    <tr>
+                        <td>B. 只有姓名</td>
+                        <td>每行一个姓名，不带任何成绩或分隔符</td>
+                        <td>统一按 <code>130</code> 分算权重</td>
+                    </tr>
+                </table>
+
+                <p>格式 A 示例（姓名和成绩之间是 Tab，不是空格；从 Excel 复制一列姓名一列成绩粘贴过来天然就是 Tab 分隔，可以直接用）：</p>
+                <pre>徐佳莹	98
+李涛	107
+张伟	85</pre>
+                <p>格式 B 示例：</p>
+                <pre>徐佳莹
+李涛
+张伟</pre>
+                <div class="warn">⚠️ 两种格式不能在同一个文件里混用。如果导入时既有"姓名+Tab+成绩"的行，又有"只有姓名"的行，会弹出"数据格式冲突"提示，逐行列出哪一行是什么问题，需要你把文件改成统一格式后再重新导入，不会帮你部分导入。常见的问题行：姓名和成绩之间用的是空格而不是 Tab、成绩写的不是数字、一行里有超过一个 Tab。</div>
+                <p>格式没问题的话，导入前会弹出预览：</p>
+                <ul>
+                    <li><strong>全新姓名</strong>会被直接新增，不需要额外确认；</li>
+                    <li><strong>名单里已经存在</strong>的姓名，会单独列出来，默认勾选"覆盖"——如果你不想用新数据覆盖某个人的原有数据，取消勾选那一行即可（也可以用"全部覆盖 / 全部跳过"一键批量选择）。</li>
+                </ul>
+            </section>
+
+            <section id="class-management">
+                <h2>🏫 班级管理</h2>
+                <p>抽奖页和录入页左上角都有一个班级切换器（🏫 图标 + 当前班级名），点击展开面板可以：</p>
+                <ul>
+                    <li><strong>切换班级</strong>：点击列表里的班级名称即可切换，每个班级的学生名单完全独立。</li>
+                    <li><strong>新建班级</strong>：点击「➕ 新建班级」，输入新班级名称。</li>
+                    <li><strong>重命名</strong>：点击班级行的 ✎ 图标。</li>
+                    <li><strong>删除班级</strong>：点击 🗑️ 图标（<strong>至少要保留一个班级</strong>，删除最后一个班级会被拒绝）。</li>
+                </ul>
+                <div class="warn">删除班级会连同该班级下的所有学生数据一起永久删除，操作前会二次确认，建议先在「设置」页导出备份。</div>
+            </section>
+
+            <section id="settings-page">
+                <h2>⚙️ 设置页</h2>
+                <p>设置页分两栏：左边是「抽奖设置」和「安装与存储」，右边是数据备份、云备份、版本信息、危险区域这几个相对独立的功能块。</p>
+                <p>「抽奖设置」卡片里除了转盘时长、中奖弹窗自动关闭时间，还有<a href="#spin-shortcut">抽奖快捷键</a>的录入入口：点击"🎹 录入键盘快捷键"，按钮会变成"请按下要设置的按键..."，这时按一下你想用的键（比如翻页笔的按键）就设置成功了；按 <code>Esc</code> 可以取消，保留原来的快捷键。</p>
+
+                <h3 id="data-backup">数据导入导出</h3>
+                <p>「导出数据」会把<strong>所有班级</strong>的学生名单和设置打包成一个 JSON 文件下载到本地，文件名格式为「年-月-日--时-分-秒」；「导入数据」可以选择一个之前导出的 JSON 文件，把当前数据整体替换掉（会有二次确认，避免误操作覆盖）。</p>
+                <div class="tip">建议养成习惯：换电脑、清理浏览器数据前，或者每次考试录完成绩后，顺手导出一份备份。</div>
+
+                <h3 id="onedrive-backup">OneDrive 云备份</h3>
+                <p>点击「打开 OneDrive 备份」，登录你自己的 Microsoft 账号后，可以把数据上传到云端（默认文件名同样是"年-月-日--时-分-秒"），也可以从历史备份列表里选一份下载恢复。历史记录按最新在前排列，一页显示 10 条，可以翻页查看更早的备份。</p>
+                <p>数据只会保存在这个应用专属的 OneDrive 文件夹里，不会读取或修改你 OneDrive 里的其他文件。</p>
+
+                <h3 id="install-storage">安装到桌面 / 持久化存储</h3>
+                <p>在支持的浏览器（Chrome / Edge 等）里，点击「安装到桌面」可以把本应用安装成一个独立窗口的桌面/开始菜单快捷方式，打开体验更接近原生应用。如果按钮显示"暂不支持"，通常是因为浏览器不支持、或者已经安装过了。</p>
+                <p>应用还会自动申请"持久化存储"权限，降低浏览器在磁盘紧张时自动清空本应用数据的概率——但这不是 100% 保险，仍然建议定期导出备份或使用 OneDrive 云备份。</p>
+
+                <h3 id="version-update">版本与更新</h3>
+                <p>网页每次更新后，打开应用如果检测到有新版本，会弹窗提示，你可以选择「立即升级」「取消（下次再问）」，也可以勾选「本版本不再提示」暂时跳过这一个版本的提醒。设置页也有「检查更新」按钮可以手动触发一次检查。</p>
+            </section>
+
+            <section id="faq">
+                <h2>❓ 常见问题</h2>
+                <h3>抽奖结果好像不太公平？</h3>
+                <p>先检查是否勾选了「等权抽取」；没勾选的话，权重高的同学（一般是成绩相对较低的同学）本来就更容易被抽到，这是设计如此，用来照顾需要多巩固的同学。如果只是想公平抽签，勾选「等权抽取」即可。</p>
+                <h3>换了浏览器/电脑，数据不见了？</h3>
+                <p>数据默认保存在当前浏览器里，换设备不会自动带过去。请提前用「导出数据」或「OneDrive 云备份」，在新设备上用「导入数据」/OneDrive 恢复。</p>
+                <h3>OneDrive 登录不了？</h3>
+                <p>请确认使用的是允许弹窗的浏览器环境，并且用你自己的 Microsoft 个人账号登录；如果一直失败，可以改用「导出数据」的本地备份方式代替。</p>
+                <h3>清浏览器缓存/Cookie 会不会丢数据？</h3>
+                <p>清"浏览历史记录"不会影响数据；但清"Cookie 和其他网站数据"会连带清空本应用的数据，操作前请务必先导出备份。</p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // 简单的目录高亮：滚动时高亮当前所在的 section 对应的目录项
+        const sections = Array.from(document.querySelectorAll('.content section, .content h3[id]'));
+        const tocLinks = Array.from(document.querySelectorAll('.toc a'));
+
+        function highlightToc() {
+            let currentId = sections[0] && sections[0].id;
+            const scrollPos = window.scrollY + 100;
+            sections.forEach((sec) => {
+                if (sec.offsetTop <= scrollPos) currentId = sec.id;
+            });
+            tocLinks.forEach((a) => {
+                a.classList.toggle('active', a.getAttribute('href') === '#' + currentId);
+            });
+        }
+
+        window.addEventListener('scroll', highlightToc, { passive: true });
+        highlightToc();
+    </script>
+</body>
+
+</html>
