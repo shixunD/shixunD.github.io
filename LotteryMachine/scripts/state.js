@@ -26,9 +26,11 @@
         equalWeightMode: false,
         // 不重复抽取：开启后已经抽中过的学生本轮不再参与抽取（扇区变灰），默认关闭
         noRepeatMode: false,
-        // 抽奖快捷键：在抽奖页按下这个键（KeyboardEvent.key 的值）等同于点击"开始抽奖"，
-        // 默认 PageUp 是为了配合翻页笔／演示遥控器（大多数型号翻页键发送的就是 PageUp/PageDown）
-        spinShortcutKey: 'PageUp'
+        // 抽奖快捷键：在抽奖页按下这个键（或组合键，见 ShortcutUtil.formatFromEvent 的标准化格式，如 "Ctrl+T"）
+        // 等同于点击"开始抽奖"，默认 PageUp 是为了配合翻页笔／演示遥控器（大多数型号翻页键发送的就是 PageUp/PageDown）
+        spinShortcutKey: 'PageUp',
+        // 隐藏屏幕底部的"抽取历史"条，默认不开启（即默认显示）
+        hideDrawHistory: false
     };
 
     const DEFAULT_CLASS_NAME = '默认班级';

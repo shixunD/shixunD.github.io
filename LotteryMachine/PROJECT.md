@@ -52,7 +52,8 @@ AppState 内存结构 = {
     winnerAutoCloseMs,     // 中奖弹窗自动关闭毫秒数，默认 5000，0=不自动关闭
     equalWeightMode,       // 等权抽取开关，默认 false
     noRepeatMode,          // 不重复抽取开关，默认 false
-    spinShortcutKey        // 抽奖快捷键（KeyboardEvent.key 值），默认 'PageUp'
+    spinShortcutKey,       // 抽奖快捷键，支持组合键，标准化字符串见 ShortcutUtil，默认 'PageUp'
+    hideDrawHistory        // 隐藏屏幕底部"抽取历史"条，默认 false（即默认显示）
   }
 }
 ```
@@ -116,14 +117,16 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
   3. `winnerIndex = students.indexOf(winner)` —— 注意这里用的是**完整学生列表**里的下标（不是候选池里的下标），因为扇区位置是按完整列表画的。扇区 0 从正上方（指针位置）开始顺时针排列，第 i 个扇区中心角度 = `i*seg + seg/2`（`seg = 360/学生数`）。
   4. 要让中奖扇区中心转到正上方，需要旋转 `desiredFinalAngle = (360 - winnerMidAngle % 360) % 360` 度（相对于扇区当前 0 点的角度）。
   5. 因为 CSS `transform: rotate()` 是绝对角度而不是增量，代码用模块级变量 `currentRotation`（只增不减，记录 canvas 元素已经转过的总角度）来算出下一次要设置的绝对角度：先算出从当前角度到目标角度还差多少度（`delta`，取值 `[0,360)`），再加上 `EXTRA_SPINS * 360`（额外转几整圈，纯视觉效果，默认 6 圈），得到 `nextRotation = currentRotation + EXTRA_SPINS*360 + delta`。
-  6. 用 CSS `transition`（时长取自 `settings.spinDurationMs`）驱动 `canvas.style.transform = rotate(nextRotation deg)`，正常靠监听 `transitionend` 事件收尾。**同时挂了一个 `setTimeout(finish, durationMs + 300)` 兜底**：极端情况下（比如把旋转时长调得很短、或动画被打断）浏览器有时不会派发 `transitionend`，没有兜底的话 `spinning` 标志会永久卡 `true`，转盘再也点不动，必须刷新页面才能恢复——这是实测发现过的真实问题，`finish()` 内部用 `finished` 标志保证 `transitionend` 和兜底定时器谁先触发都只真正收尾一次。收尾时如果开启了"不重复抽取"，先 `AppState.markDrawn(winner.id)`（会触发重绘让扇区立刻变灰），再弹出中奖弹窗（`showWinnerDialog`）。**弹窗自动关闭**：读取 `settings.winnerAutoCloseMs`（设置页可调，默认 5000ms，0 表示禁用自动关闭需手动点"好的"），大于 0 时用 `setTimeout` 定时移除弹窗；用户手动关闭时会 `clearTimeout` 取消这个定时器。
+  6. 用 CSS `transition`（时长取自 `settings.spinDurationMs`）驱动 `canvas.style.transform = rotate(nextRotation deg)`，正常靠监听 `transitionend` 事件收尾。**同时挂了一个 `setTimeout(finish, durationMs + 300)` 兜底**：极端情况下（比如把旋转时长调得很短、或动画被打断）浏览器有时不会派发 `transitionend`，没有兜底的话 `spinning` 标志会永久卡 `true`，转盘再也点不动，必须刷新页面才能恢复——这是实测发现过的真实问题，`finish()` 内部用 `finished` 标志保证 `transitionend` 和兜底定时器谁先触发都只真正收尾一次。收尾时如果开启了"不重复抽取"，先 `AppState.markDrawn(winner.id)`（会触发重绘让扇区立刻变灰），再弹出中奖弹窗（`showWinnerDialog`）。**弹窗自动关闭**：读取 `settings.winnerAutoCloseMs`（设置页可调，默认 5000ms，0 表示禁用自动关闭需手动点"好的"），大于 0 时用 `setTimeout` 定时移除弹窗；用户手动关闭时会 `clearTimeout` 取消这个定时器。**再次发起抽奖时自动关闭上一个还没关的弹窗**：`spin()` 一进来就调用 `closeExistingWinnerDialog()`（`document.querySelectorAll('.winner-overlay').forEach(el => el.remove())`），`showWinnerDialog()` 内部也会先调用一次保险；这是因为中奖弹窗展示期间转盘本身并没有被禁用（`spinning` 在弹窗弹出前就已经复位成 `false`），如果不这么处理，连续快速点"开始抽奖"或触发快捷键会导致多个 `.winner-overlay` 层叠在页面上。
   - 如果以后要改成"转盘扇区大小按权重比例画"而不是"等分"，需要同时改 `drawWheel()` 里的扇区角度计算和 `spin()` 里的 `winnerMidAngle` 计算逻辑，两处必须保持一致。
-- **抽奖快捷键（配合翻页笔）**：`WheelPage` 额外导出一个 `triggerShortcutSpin()`（做了个空判断——`#wheel-hub` 都还没渲染出来就不执行，比如学生名单为空的时候），供 `app.js` 的全局按键监听调用。真正的监听逻辑在 `app.js` 的 `bindSpinShortcut()`：`document` 上挂 `keydown`，命中条件是——① `window.__recordingShortcut` 不是 `true`（设置页正在录入新快捷键时跳过，见第 4.3 节）② 当前激活页面是 `#wheel-page` ③ `e.key === settings.spinShortcutKey`；命中后 `e.preventDefault()`（防止 `PageUp` 之类的键触发浏览器自身翻页/滚动）再调用 `WheelPage.triggerShortcutSpin()`，内部直接复用 `spin()`，`<2人`、候选池为空、正在旋转中这些保护逻辑全部自动继承，不需要重复判断。默认快捷键是 `PageUp`，因为市面上大多数翻页笔/演示遥控器的"下一页"键发送的就是这个键。
+- **抽奖快捷键（配合翻页笔，支持组合键）**：`WheelPage` 额外导出一个 `triggerShortcutSpin()`（做了个空判断——`#wheel-hub` 都还没渲染出来就不执行，比如学生名单为空的时候），供 `app.js` 的全局按键监听调用。真正的监听逻辑在 `app.js` 的 `bindSpinShortcut()`：`document` 上挂 `keydown`，命中条件是——① `window.__recordingShortcut` 不是 `true`（设置页正在录入新快捷键时跳过，见第 4.3 节）② 当前激活页面是 `#wheel-page` ③ `ShortcutUtil.matches(e, settings.spinShortcutKey)` 为真；命中后 `e.preventDefault()`（防止 `PageUp` 之类的键触发浏览器自身翻页/滚动）再调用 `WheelPage.triggerShortcutSpin()`，内部直接复用 `spin()`，`<2人`、候选池为空、正在旋转中这些保护逻辑全部自动继承，不需要重复判断。默认快捷键是 `PageUp`，因为市面上大多数翻页笔/演示遥控器的"下一页"键发送的就是这个键。**组合键支持见 `scripts/shortcutUtil.js`（`window.ShortcutUtil`）**：`formatFromEvent(e)` 把一次 `KeyboardEvent` 标准化成 `"Ctrl+Shift+T"` / `"PageUp"` 这样的字符串（单独按下 `Control`/`Shift`/`Alt`/`Meta` 时返回 `null`，因为组合键必须以一个非修饰键结束）；`matches(e, combo)` 拿这个标准化结果去和保存的 `settings.spinShortcutKey` 做字符串比较。这个模块被 `app.js`（触发判断）和 `settings.js`（录入时生成 combo）两处共用，**改快捷键匹配逻辑时两边都要看**，且 `index.html` 里 `shortcutUtil.js` 必须排在用到它的脚本之前。
+- **抽中后写入底部"抽取历史"条**：`spin()` 的 `finish()` 收尾阶段，弹中奖弹窗之前会调用 `DrawHistory.add(winner, SECTOR_COLORS[winnerIndex % SECTOR_COLORS.length])`，把当时的扇区颜色也传过去，让历史条卡片和转盘视觉对应。详见第十二节。
 
 ### 4.2 录入页 —— `scripts/pages/roster.js` + `styles/roster.css`
-- `render()`：渲染工具栏（统计信息 + "📄 TXT 批量导入" / "➕ 添加学生" / "☁️ 打开 OneDrive 备份" / "🔄 立即同步"**四个按钮，统一用 `.btn-primary`**——早期这四个按钮颜色不一致，用户反馈"格格不入"后统一成同一个颜色）+ 学生卡片网格。
+- `render()`：渲染工具栏（统计信息 + "📄 TXT 批量导入" / "➕ 添加学生" / "☁️ 打开 OneDrive 备份" / "📤 立即上传"**四个按钮，统一用 `.btn-primary`**——早期这四个按钮颜色不一致，用户反馈"格格不入"后统一成同一个颜色）+ 学生卡片网格。
   - "☁️ 打开 OneDrive 备份"直接调用 `OneDriveApi.open()`，和设置页的入口是同一个弹窗组件，命名也保持一致，不要在两处用不同的文案。
-  - "🔄 立即同步"（`handleQuickSync()`）是**跳过弹窗的快捷上传**：先 `MsalAuth.getAccount()` 查有没有登录，没登录就 toast 提示 + `OneDriveApi.open()`（引导去弹窗登录，不在这里做登录 UI）；已登录则直接 `OneDriveApi.uploadBackup(`${ImportExport.timestampName()}.json`, AppState.exportSnapshot())` 一步到位上传一份新备份，按钮临时变"同步中..."并禁用，成功/失败都有 toast。这是"打开 OneDrive 备份"弹窗里手动点上传的快捷方式，底层复用的是同一个 `OneDriveApi.uploadBackup`，命名文件的规则（`年-月-日--时-分-秒.json`）也完全一致。
+  - "📤 立即上传"（`handleQuickSync()`，早期文案是"🔄 立即同步"，用户反馈这个操作只上传不做双向同步，改成了"上传"更准确）是**跳过弹窗的快捷上传**：先 `MsalAuth.getAccount()` 查有没有登录，没登录就 toast 提示 + `OneDriveApi.open()`（引导去弹窗登录，不在这里做登录 UI）；已登录则直接 `OneDriveApi.uploadBackup(`${ImportExport.timestampName()}.json`, AppState.exportSnapshot())` 一步到位上传一份新备份，按钮临时变"上传中..."并禁用，成功/失败都有 toast。这是"打开 OneDrive 备份"弹窗里手动点上传的快捷方式，底层复用的是同一个 `OneDriveApi.uploadBackup`，命名文件的规则（`年-月-日--时-分-秒.json`）也完全一致，`AppState.exportSnapshot()` 本身就包含 `settings`，所以云备份/本地导出天然都含设置，不需要额外处理。
+  - "➕ 添加学生"（`handleAdd()`）新建学生默认 `score: 130`（对应 `weight = 160 - 130 = 30`），跟 TXT 批量导入"仅姓名"格式的默认分数（`NAME_ONLY_DEFAULT_SCORE`，见下方）保持一致，避免新加的学生因为成绩空着导致权重掉到 `MIN_WEIGHT=1`、抽中概率远低于其他人。
   - 每张学生卡片包含：照片（点击 ✎ 触发 `handleEditPhoto`）、姓名输入框、成绩输入框、权重输入框（`weightMode==='score'` 时只读）、"手动设置权重"勾选框、删除按钮。
 - 所有输入框都是 `change` 事件（失焦或回车才提交），调用对应的 `AppState.updateStudent()`。
 - `handleEditPhoto(studentId)`：动态创建一个 `<input type="file">` 触发系统选图，选中后调用 `ImageCropper.open(file)` 弹出裁剪弹窗，裁剪结果（base64 dataURL 或 `null` 表示取消）直接写回 `AppState.updateStudent`。
@@ -138,7 +141,8 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 六个卡片区块，`render()` 里整体拼 HTML 再统一 `bindEvents()`。**布局是两栏**（`.settings-container` 用 `display:flex`）：
 - **左栏**（`.settings-left-column`，`flex:1 1 320px; max-width:380px`，内部纵向堆叠）：① 抽奖设置（`spinDurationMs` + `winnerAutoCloseMs` 输入框 + 快捷键录入，见下）② 安装与存储（`bindInstallButton()` 绑定 PWA 安装，见下；`loadStorageStatus()` 显示持久化存储状态）。这两块相对"经常要调"，放左边独立一栏。
 - **右栏**（`.settings-right-column`，`display:grid; grid-template-columns: repeat(2, 1fr)`，两列两行）：③ 数据导入导出（`ImportExport.exportToFile()` / `ImportExport.importFromFile()`）④ OneDrive 云备份（`OneDriveApi.open()`）⑤ 版本信息（`loadVersionInfo()` 拉取 `version.json`；"检查更新"按钮手动触发 `UpdateChecker.check()`；"📖 产品说明"是个 `<a href="./Handbook/index.html">`，新标签页打开使用手册，见第十节。**这里故意写成 `index.html` 而不是 `./Handbook/`**：早期用目录路径时，在某些静态托管环境下点击会先经过一个中转页需要二次点击才能真正进入，写死文件名可以绕开对"目录自动补 index.html"这个行为的依赖，更稳。）⑥ 危险区域（`AppState.clearStudents()`，二次确认）。这四块内容量不一，**用 `.settings-section { height:100%; display:flex; flex-direction:column; }` + grid 默认的 `align-items:stretch` 让同一行的两张卡片自动等高**，不需要手动计算高度。
-- **抽奖快捷键录入**（`bindShortcutRecorder()`，"抽奖设置"卡片里，`settings.spinShortcutKey` 默认 `'PageUp'`）：点击"🎹 录入键盘快捷键"后，按钮文字变成"请按下要设置的按键...（Esc 取消）"并禁用，同时把全局标记 `window.__recordingShortcut` 设为 `true`；然后在 `document` 上（`capture: true`）挂一个**一次性**的 `keydown` 监听，用户按下任意键就把 `e.key`（按 Esc 则不改动，保留原值）存进 `settings.spinShortcutKey`、更新 `#setting-shortcut-display` 显示，同时把 `window.__recordingShortcut` 复位为 `false`、按钮恢复原状。**`window.__recordingShortcut` 这个全局标记的作用**：告诉 `app.js` 里真正触发抽奖的那个全局快捷键监听器"现在正在录入新快捷键，这次按键不要当成触发抽奖来处理"，避免录入过程中意外拉动了转盘（虽然实际场景下设置页和抽奖页不会同时激活，理论上不太可能冲突，但留着这层保护更稳妥）。
+- **抽奖快捷键录入（支持组合键）**（`bindShortcutRecorder()`，"抽奖设置"卡片里，`settings.spinShortcutKey` 默认 `'PageUp'`）：点击"🎹 录入键盘快捷键"后，按钮文字变成"请按下要设置的按键...（Esc 取消）"并禁用，同时把全局标记 `window.__recordingShortcut` 设为 `true`；然后在 `document` 上（`capture: true`）挂一个 `keydown` 监听，每次按键先用 `ShortcutUtil.formatFromEvent(e)` 标准化——**如果只是单独按下了 `Ctrl`/`Alt`/`Shift`/`Meta` 会返回 `null`，此时监听器不摘除，继续等待用户按下组合的最后一个非修饰键**；拿到非空的 combo 字符串后才真正结束录入：`combo === 'Escape'` 时不改动（取消录入，保留原值），否则存进 `settings.spinShortcutKey`、更新 `#setting-shortcut-display` 显示，同时把 `window.__recordingShortcut` 复位为 `false`、按钮恢复原状。**`window.__recordingShortcut` 这个全局标记的作用**：告诉 `app.js` 里真正触发抽奖的那个全局快捷键监听器"现在正在录入新快捷键，这次按键不要当成触发抽奖来处理"，避免录入过程中意外拉动了转盘（虽然实际场景下设置页和抽奖页不会同时激活，理论上不太可能冲突，但留着这层保护更稳妥）。
+- **隐藏"抽取历史"条**：同一张"抽奖设置"卡片里还有一个勾选框（`#setting-hide-draw-history`），对应 `settings.hideDrawHistory`（默认 `false`，即默认显示），勾选后调用 `AppState.updateSettings({hideDrawHistory:true})`；具体怎么隐藏见第十二节 `DrawHistory` 的 `applyVisibility()`。
 - 响应式：`responsive.css` 在 `max-width:720px` 时把 `.settings-left-column` 的 `max-width` 去掉、`.settings-right-column` 改成单列，两栏各自纵向堆叠成一栏。
 
 ---
@@ -150,6 +154,9 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 | `toast.js` | `window.Toast.{show,info,success,error,warning}` | 顶部居中的轻提示条，纯 JS 动态创建 DOM，自动淡出销毁 |
 | `modal.js` | `window.Modal.{confirm, escapeHtml}` | `confirm({title,text,confirmText,cancelText,danger})` 返回 `Promise<boolean>`，点遮罩/按 Esc 视为取消。`escapeHtml` 在所有把用户输入拼进 `innerHTML` 的地方都要用，防止 XSS（比如学生姓名） |
 | `imageCropper.js` | `window.ImageCropper.open(file)` | 纯 Canvas 实现的 1:1 裁剪器，无第三方库。内部：先按"覆盖填满"（`Math.max` 缩放比）画出图片，用户拖拽改 `offsetX/offsetY`、滑动条改 `zoom`，`clampOffset()` 防止拖出边界露白；确认时把 320×320 的预览画布再缩放绘制到 `OUTPUT_SIZE=320` 的输出画布，导出 `image/jpeg` quality 0.88 的 dataURL |
+| `drawHistory.js` | `window.DrawHistory.add(student, color)` | 屏幕底部"抽取历史"条，详见第十二节 |
+
+`scripts/shortcutUtil.js`（`window.ShortcutUtil`，不在 `components/` 目录下，因为它不渲染任何 UI，纯粹是键盘事件处理的小工具）：`formatFromEvent(e)` / `matches(e, combo)`，详见第 4.1 节"抽奖快捷键"。
 
 ---
 
@@ -178,7 +185,7 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 ### 7.1 本地导入导出 —— `scripts/importExport.js`
 - `timestampName(date)`：生成 `年-月-日--时-分-秒` 格式字符串（如 `2026-09-02--14-30-05`），本地导出和 OneDrive 上传的默认文件名都用这个函数。
 - `exportToFile()`：`AppState.exportSnapshot()` → 序列化成 JSON → 用 `Blob` + 临时 `<a download>` 触发浏览器下载，文件名 `{timestampName()}.json`。
-- `importFromFile(file)`：读取文件文本 → `JSON.parse` → `validateSnapshot()` 检查是否有 `students` 数组字段 → 调用 `AppState.replaceState()`。设置页在调用前会先弹二次确认（因为会覆盖当前数据）。
+- `importFromFile(file)`：读取文件文本 → `JSON.parse` → `validateSnapshot()` → 调用 `AppState.replaceState()`。设置页在调用前会先弹二次确认（因为会覆盖当前数据）。**`validateSnapshot(obj)` 必须同时接受 `Array.isArray(obj.classes)`（当前多班级格式）和 `Array.isArray(obj.students)`（旧版单班级格式）——曾经这里只判断了 `obj.students`，而 `exportSnapshot()` 早就已经改成多班级的 `{classes, activeClassId, settings}` 结构、顶层根本没有 `students` 字段，导致这个校验对着当前格式的备份文件永远返回 `false`：本地导入和 OneDrive 恢复会 100% 报"备份文件格式无效"而失败，是一个实测存在过的真实 bug，不是假设性风险。**以后如果 `exportSnapshot()` 的顶层结构再变，这个函数要同步更新，且最好靠自动化测试或至少手动跑一次"导出后再导入"覆盖住这条路径，不要只看代码顺眼就当它对。
 
 ### 7.2 OneDrive 云备份
 
@@ -203,17 +210,24 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 
 **UI 状态机**（`OneDriveApi.render()`）：未登录显示登录按钮；已登录显示用户信息 + 退出 + 上传输入框（默认值 `ImportExport.timestampName()`）+ 上传按钮 + 历史列表 + 翻页按钮。每条历史记录有"恢复"（下载 JSON → 校验 → 二次确认 → `AppState.replaceState()`）和"删除"（Graph DELETE，二次确认）两个操作。
 
+**弹窗层级（z-index）**：`.onedrive-overlay` 是 `7000`，"恢复备份"点击后弹出的二次确认走的是通用组件 `Modal.confirm()`（`.modal-overlay`）。**`.modal-overlay` 的 z-index 必须比 `.onedrive-overlay` 更高**（`styles/base.css`，当前是 `7500`）——早期两个都各自设置、没考虑过谁盖谁，`.modal-overlay` 曾经是 `5000`，比 OneDrive 弹窗的 `7000` 还低，导致在 OneDrive 弹窗内点"恢复"时，二次确认框会被挡在 OneDrive 弹窗**下面**，用户点不到确认按钮，是一个实测存在过的真实 bug。以后新增任何"可能叠在其他弹窗之上"的浮层，都要显式对比一下涉及到的 z-index 数值，不要假设"后创建的元素自然显示在上层"（因为它们都是 `position: fixed`，层叠顺序只看 `z-index`，和 DOM 创建先后无关）。当前几个浮层的 z-index 一览（按数值从小到大排列）：`.draw-history-bar` 800（屏幕最下方的常驻条，故意给最低值，不需要盖住任何东西）< `.navbar` 1000 < `.classSwitcher` 下拉面板 2000 < `.winner-overlay` 中奖弹窗 6000 < `.onedrive-overlay` OneDrive 备份弹窗 7000 < `.modal-overlay` 通用确认框 7500（必须比它可能从中被触发的所有弹窗都高，比如 OneDrive 弹窗里点"恢复"弹出的二次确认）< `update.css` 里的新版本提示 9999（全局唯一、不和其它弹窗共存，所以给了最高值，不受这条规则约束）。
+
 ---
 
 ## 八、导航栏标题与署名角标
 
 仿照 `DayX/index.html` 的写法：导航栏左侧不再只放 `.nav-brand`，而是包一层 `.nav-brand-container`（`styles/navbar.css`），里面并排放 `.nav-brand`（图标+"班级抽奖点名机"，`id="nav-brand-home-btn"`）和 `<span class="nav-homepagedirector" id="site-credit">by Shixun</span>`——紧跟在标题文字后面，不是页面右下角固定角标（早期版本做成了固定在页面右下角，用户反馈要求改成跟 DayX 一样贴在标题旁边，已改正，不要再改回右下角）。`by Shixun` 字体用 Google Fonts 的 Caveat（`index.html` head 里 `<link>` 引入），颜色跟随 `--primary-color` 且 `opacity:0.75`（hover 到 1）。
 
-两者点击行为不同，分别在 `app.js` 里两个函数绑定（`init()` 里 Navigation 初始化前后各自调用一次，都不依赖网络，随时可绑定）：
-- `.nav-brand`（图标+"班级抽奖点名机"文字）点击 → `bindNavBrandHome()` → `Navigation.goTo('wheel')`，回到抽奖首页（站内跳转，不是外部链接）。
-- `#site-credit`（"by Shixun"）点击 → `bindSiteCredit()` → `window.open('https://shixund.github.io', '_blank', 'noopener')`，跳转到作者个人主页（新标签页打开）。
+两者点击行为**现在完全一致**，都在 `app.js` 里绑定，共用同一个 `siteRootUrl()`：
+```js
+function siteRootUrl() { return `${window.location.origin}/`; }
+```
+- `.nav-brand`（图标+"班级抽奖点名机"文字）点击 → `bindNavBrandHome()` → `window.open(siteRootUrl(), '_blank', 'noopener')`。
+- `#site-credit`（"by Shixun"）点击 → `bindSiteCredit()` → `window.open(siteRootUrl(), '_blank', 'noopener')`。
 
-两者是 `.nav-brand-container` 下的两个平级兄弟节点，不是嵌套关系，点击事件互不冒泡影响，不需要 `stopPropagation`。移动端窄屏（`responsive.css`，`max-width:720px`）会隐藏 `by Shixun`（`.nav-homepagedirector`），优先保证导航按钮不被挤压，但 `.nav-brand` 本身依然可点击跳转首页。
+**`siteRootUrl()` 用 `window.location.origin` 动态拼，而不是写死字符串**（早期两处分别是"站内跳回抽奖页"和硬编码 `https://shixund.github.io`，用户反馈"两个点击行为应该一致，且不该写死作者的域名"后改成现在这样）：这样无论这份代码被部署在 `shixund.github.io` 还是别的域名/别人 fork 之后的站点，点击后都会跳到"当前这次实际部署所在网站"的根路径，而不是永远指向作者本人的站点。**注意这里跳的是"域名根路径"（`origin + '/'`），不是"这个应用自己所在的子目录"**——如果以后这个应用本身就需要部署在某个子路径下（比如 `https://example.com/lottery/`），且这两个链接语义上应该跳回"这个应用的首页"而不是"整个域名的根"，需要重新评估要不要改成基于 `<base>` 标签或者应用自身已知的子路径，而不是简单的 `origin + '/'`。
+
+两者是 `.nav-brand-container` 下的两个平级兄弟节点，不是嵌套关系，点击事件互不冒泡影响，不需要 `stopPropagation`。移动端窄屏（`responsive.css`，`max-width:720px`）会隐藏 `by Shixun`（`.nav-homepagedirector`），优先保证导航按钮不被挤压，但 `.nav-brand` 本身依然可点击跳转。
 
 ## 九、PWA 安装与持久化存储（需求 5）
 
@@ -245,7 +259,22 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 
 ---
 
-## 十二、文件清单速查
+## 十二、屏幕底部"抽取历史"条 —— `scripts/components/drawHistory.js` + `styles/drawHistory.css`
+
+**只在抽奖页展示的临时性 UI，数据不进 `AppState`、不进 IndexedDB，纯内存变量，刷新/关闭页面即清空**——这是刻意的设计，不是漏做了持久化：这是"这次上课临时看一眼刚才抽过谁"的辅助展示，不是需要长期保留的数据，所以完全独立于 `AppState` 那一套持久化体系，改动它不需要碰 `state.js`。
+
+- **数据结构**：模块级数组 `records`（最新的在最前面，`unshift` 插入，超过 `MAX_RECORDS=50` 条自动裁掉尾部），每条 `{ name, photoDataUrl, time: Date, color }`。`color` 是抽中那一刻转盘上对应扇区的颜色（`wheel.js` 的 `spin()` 收尾阶段算出 `SECTOR_COLORS[winnerIndex % SECTOR_COLORS.length]` 传进来），让历史条卡片的背景色跟当时转盘扇区的颜色对上，不需要在 `drawHistory.js` 里重复维护一份颜色表。
+- **写入入口**：`window.DrawHistory.add(student, color)`，唯一调用点在 `wheel.js` 的 `finish()` 里，弹中奖弹窗之前。
+- **DOM 挂载点**：`ensureBar()` 首次调用时把 `.draw-history-bar` 直接 `appendChild` 到 `document.body`，**不在任何 `.page` 容器内部**——这是"切换 抽奖/录入/设置 三个页面时这条历史记录本身不丢"的关键：`Navigation.goTo()` 只是切换 `.page` 元素的 `active` class（见 `navigation.js`），不会动 `.page` 容器之外的 DOM，所以只要 `.draw-history-bar` 挂在 `body` 下而不是某个 `.page` 里面，它自然不受页面切换影响。
+- **"只在抽奖页显示"是通过 CSS class 控制显示/隐藏，不是销毁重建**：`applyVisibility()` 根据两个条件算出是否该加上 `.draw-history-bar-hidden`（`display:none`）——① `settings.hideDrawHistory`（设置页勾选框，用户主动关闭，默认 `false`）② 当前 `.page.active` 的 `id` 是不是 `wheel-page`（不是抽奖页就隐藏）。**记录数组本身完全不受这两个条件影响**，只是暂时不显示；切回抽奖页 / 取消勾选隐藏后，`applyVisibility()` 重新计算，之前积累的记录原样显示回来。触发时机两处：`AppState.subscribe(applyVisibility)`（响应设置勾选框变化）+ `app.js` 的 `Navigation.onPageChange(() => DrawHistory.refreshVisibility())`（响应页面切换）。**这是一个需要两边配合才能工作的设计，不要只改其中一处**——比如以后如果加了新的触发隐藏/显示的条件，要么塞进 `applyVisibility()` 内部的判断逻辑，要么额外找一个时机调用 `refreshVisibility()`，两种方式选一种，不要在别的地方直接操作 `.draw-history-bar-hidden` 这个 class。
+- **布局：横向排不下自动换行，最多给两排高度，第三排开始纵向滚动**（`styles/drawHistory.css`）：`.draw-history-list` 是 `display:flex; flex-wrap:wrap`，`max-height: calc(44px * 2 + 0.5rem)`（卡片高 44px，两排 + 一条行间距，正好卡住）配合 `overflow-y:auto; overflow-x:hidden`。**卡片高度写死 44px（`.draw-history-item { height:44px; box-sizing:border-box; }`）是为了让"两排"这个换算成立**——如果以后要改卡片内边距/字号导致实际高度变化，`max-height` 的计算公式要跟着改，两处必须保持一致，否则要么第二排被裁掉一半，要么留白过多。
+- **卡片配色**：背景色用 `color`（内联 `style="background:${bg}"`，`bg` 拿不到时兜底 `var(--bg-color)`），因为背景是运行时才知道的动态色值、没法写进静态 CSS 类。姓名/时间文字统一用白色系（`#fff` / `rgba(255,255,255,0.85)`），因为 `SECTOR_COLORS` 调色板都是中高饱和度颜色，白字对比度稳定；没有照片时的占位头像同理用白字 + 半透明白色背景（`rgba(255,255,255,0.3)`），呼应 `wheel.js` 的 `drawWheel()` 里同款无照片占位逻辑（半透明白底 + 白色首字母）。
+- `body:has(.draw-history-bar:not(.draw-history-bar-hidden)) .container { padding-bottom: ... }`：只有历史条**实际可见**时才给页面内容腾出底部空间，隐藏（勾选关闭 / 不在抽奖页）时这条规则天然不生效，不需要额外写一条"隐藏时恢复默认 padding"的规则。
+- **脚本加载顺序要求**：`drawHistory.js` 内部在模块顶层直接调用了 `AppState.subscribe(...)`，所以 `index.html` 里必须排在 `state.js` **之后**（当前顺序：`shortcutUtil.js` → `state.js` → `drawHistory.js` → ...）。如果不小心把它挪到 `state.js` 前面，`AppState` 还没定义，脚本会直接报错导致后面所有脚本都不执行——**排查"页面完全空白/所有功能失效"这类问题时，先看控制台是不是这种脚本顺序错误**。
+
+---
+
+## 十三、文件清单速查
 
 ```
 index.html                       页面骨架 + 三个 <div class="page">容器 + 所有 <script> 引入顺序
@@ -263,7 +292,9 @@ styles/settings.css              设置页卡片网格、存储状态卡片
 styles/onedrive.css              OneDrive 备份弹窗
 styles/update.css                新版本提示弹窗
 styles/classSwitcher.css         班级切换器下拉面板
+styles/drawHistory.css           屏幕底部"抽取历史"条（见十二节）
 styles/responsive.css            移动端断点适配
+scripts/shortcutUtil.js          键盘快捷键组合的标准化与匹配（见 4.1 节"抽奖快捷键"）
 scripts/state.js                 数据模型（多班级）+ IndexedDB + 权重公式（核心，改需求先看这里）
 scripts/navigation.js            三页面切换
 scripts/updateChecker.js         version.json 比对 + 升级/取消/跳过弹窗
@@ -276,6 +307,7 @@ scripts/components/toast.js      轻提示条
 scripts/components/modal.js      通用确认弹窗
 scripts/components/imageCropper.js  1:1 头像裁剪（纯 Canvas）
 scripts/components/classSwitcher.js 班级切换/新建/重命名/删除组件
+scripts/components/drawHistory.js   屏幕底部"抽取历史"条（见十二节，脚本加载顺序必须在 state.js 之后）
 scripts/pages/wheel.js           抽奖页：画转盘 + 加权抽取 + 旋转动画
 scripts/pages/roster.js          录入页：学生 CRUD + 照片 + TXT 批量导入
 scripts/pages/settings.js        设置页：六个功能卡片
@@ -284,7 +316,7 @@ scripts/app.js                   启动入口，把以上模块串起来
 
 ---
 
-## 十三、已知限制 / 未来可扩展点
+## 十四、已知限制 / 未来可扩展点
 
 - 抽奖默认**有放回**（同一学生可能连续被抽到），如果想要"抽过的人不再参与"，开启「不重复抽取」即可（见第三节"不重复抽取"）——这个已经实现了，**不是**"从转盘上移除"，而是"扇区变灰、候选池排除"，扇区的角度/数量不会因为抽过人而变化，实现上更简单也更不容易出 bug。
 - TXT 批量导入的姓名匹配是**精确字符串匹配**，重名学生会被合并成同一人，导入前的预览弹窗是唯一的纠错机会，没有做"重名消歧"UI。

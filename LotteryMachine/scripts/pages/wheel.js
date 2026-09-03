@@ -152,7 +152,13 @@
         return pool[pool.length - 1];
     }
 
+    // 再次发起抽奖时，若上一次的中奖弹窗还没关闭，先自动关掉，避免多个弹窗叠加
+    function closeExistingWinnerDialog() {
+        document.querySelectorAll('.winner-overlay').forEach((el) => el.remove());
+    }
+
     function showWinnerDialog(student) {
+        closeExistingWinnerDialog();
         const overlay = document.createElement('div');
         overlay.className = 'winner-overlay';
         const photo = student.photoDataUrl
@@ -199,6 +205,8 @@
             return;
         }
 
+        closeExistingWinnerDialog(); // 再次抽奖时，上一次还没关闭的中奖弹窗直接关掉，不等新一轮抽完才关
+
         const { canvas, hub } = getEls();
         const winner = weightedPick(pool);
         const winnerIndex = students.indexOf(winner);
@@ -232,6 +240,7 @@
             spinning = false;
             hub.classList.remove('spinning');
             if (noRepeat) AppState.markDrawn(winner.id); // 触发重绘让中奖扇区变灰，不等待也不影响弹窗展示
+            DrawHistory.add(winner, SECTOR_COLORS[winnerIndex % SECTOR_COLORS.length]); // 历史条卡片颜色跟当时的扇区颜色保持一致
             showWinnerDialog(winner);
         };
         const onEnd = () => finish();

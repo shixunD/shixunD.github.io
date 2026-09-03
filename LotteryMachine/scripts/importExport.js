@@ -26,8 +26,9 @@
         return a.download;
     }
 
+    // 当前多班级格式用 classes 数组存学生；validateSnapshot 也要兼容旧版单班级（顶层 students）的备份
     function validateSnapshot(obj) {
-        return obj && typeof obj === 'object' && Array.isArray(obj.students);
+        return obj && typeof obj === 'object' && (Array.isArray(obj.classes) || Array.isArray(obj.students));
     }
 
     async function importFromFile(file) {
@@ -39,7 +40,7 @@
             throw new Error('文件不是有效的 JSON');
         }
         if (!validateSnapshot(data)) {
-            throw new Error('文件内容不是有效的备份数据（缺少 students 字段）');
+            throw new Error('文件内容不是有效的备份数据（缺少 classes/students 字段）');
         }
         await AppState.replaceState(data);
         return data;

@@ -1,0 +1,94 @@
+/* 屏幕底部的"抽取历史"条：横向排不下自动换行，最多给两排的高度，
+   超出两排的部分靠 .draw-history-list 内部纵向滚动查看，不再横向省略 */
+
+.draw-history-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 800;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    background: var(--card-bg);
+    box-shadow: 0 -2px 10px rgba(35, 41, 70, 0.1);
+    padding: 0.6rem 1.2rem;
+}
+
+.draw-history-bar-hidden {
+    display: none;
+}
+
+.draw-history-title {
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    padding-top: 0.45rem;
+}
+
+.draw-history-list {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0.5rem 0.6rem;
+    /* 44px 卡片高 * 2 排 + 1 条行间距，刚好卡两排；第三排开始出现纵向滚动条 */
+    max-height: calc(44px * 2 + 0.5rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 0.15rem;
+}
+
+.draw-history-empty {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding-top: 0.3rem;
+}
+
+.draw-history-item {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-color);
+    border-radius: 10px;
+    padding: 0.35rem 0.7rem;
+    min-width: 120px;
+}
+
+.draw-history-photo {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--card-bg);
+}
+
+.draw-history-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.draw-history-name {
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.draw-history-time {
+    font-size: 0.7rem;
+}
+
+body:has(.draw-history-bar:not(.draw-history-bar-hidden)) .container {
+    padding-bottom: calc(44px * 2 + 0.5rem + 1.2rem + 1.5rem);
+}

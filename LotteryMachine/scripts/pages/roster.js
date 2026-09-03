@@ -58,7 +58,7 @@
                     <button type="button" class="btn-primary" id="roster-import-txt-btn">📄 TXT 批量导入</button>
                     <button type="button" class="btn-primary" id="roster-add-btn">➕ 添加学生</button>
                     <button type="button" class="btn-primary" id="roster-onedrive-btn">☁️ 打开 OneDrive 备份</button>
-                    <button type="button" class="btn-primary" id="roster-quick-sync-btn">🔄 立即同步</button>
+                    <button type="button" class="btn-primary" id="roster-quick-sync-btn">📤 立即上传</button>
                 </div>
             </div>
             <div class="roster-grid" id="roster-grid">
@@ -119,7 +119,7 @@
     }
 
     async function handleAdd() {
-        await AppState.addStudent({ name: '新同学' });
+        await AppState.addStudent({ name: '新同学', score: 130 });
         Toast.success('已添加');
     }
 
@@ -138,7 +138,7 @@
         input.click();
     }
 
-    // "立即同步"：跳过 OneDrive 弹窗，直接把当前全部班级数据上传成一份新备份；
+    // "立即上传"：跳过 OneDrive 弹窗，直接把当前全部班级数据（含设置）上传成一份新备份；
     // 未登录时改为打开 OneDrive 弹窗引导登录，登录后用户可以在弹窗里手动上传
     async function handleQuickSync() {
         const account = MsalAuth.getAccount();
@@ -150,12 +150,12 @@
         const btn = document.getElementById('roster-quick-sync-btn');
         const originalText = btn.textContent;
         btn.disabled = true;
-        btn.textContent = '同步中...';
+        btn.textContent = '上传中...';
         try {
             await OneDriveApi.uploadBackup(`${ImportExport.timestampName()}.json`, AppState.exportSnapshot());
-            Toast.success('已同步到 OneDrive');
+            Toast.success('已上传到 OneDrive');
         } catch (err) {
-            Toast.error('同步失败: ' + err.message);
+            Toast.error('上传失败: ' + err.message);
         } finally {
             btn.disabled = false;
             btn.textContent = originalText;

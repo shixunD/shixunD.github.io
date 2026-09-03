@@ -40,7 +40,14 @@
                                 <span class="shortcut-key-badge" id="setting-shortcut-display">${Modal.escapeHtml(settings.spinShortcutKey || '未设置')}</span>
                                 <button type="button" class="btn-secondary" id="setting-shortcut-record-btn">🎹 录入键盘快捷键</button>
                             </div>
-                            <div class="setting-help">在「抽奖」页按下这个键等同于点击"开始抽奖"，默认 <code>PageUp</code>（大多数翻页笔/演示遥控器的翻页键）</div>
+                            <div class="setting-help">在「抽奖」页按下这个键（或组合键，如 Ctrl+T）等同于点击"开始抽奖"，默认 <code>PageUp</code>（大多数翻页笔/演示遥控器的翻页键）</div>
+                        </div>
+                        <div class="setting-item">
+                            <label class="checkbox-label-inline">
+                                <input type="checkbox" id="setting-hide-draw-history" ${settings.hideDrawHistory ? 'checked' : ''}>
+                                <span>隐藏底部"抽取历史"条</span>
+                            </label>
+                            <div class="setting-help">抽奖页底部会显示最近抽中的头像/姓名/时间，仅在本次打开页面期间保留（刷新即清空）；勾选后隐藏，默认不开启</div>
                         </div>
                     </div>
 
@@ -135,6 +142,11 @@
 
         bindShortcutRecorder(body);
 
+        body.querySelector('#setting-hide-draw-history').addEventListener('change', (e) => {
+            AppState.updateSettings({ hideDrawHistory: e.target.checked });
+            Toast.success('已保存');
+        });
+
         body.querySelector('#settings-export-btn').addEventListener('click', () => {
             const filename = ImportExport.exportToFile();
             Toast.success(`已导出 ${filename}`);
@@ -186,7 +198,8 @@
         });
     }
 
-    // "录入键盘快捷键"：点击后进入监听状态，等用户按下任意一个键就记录下来存进 settings，
+    // "录入键盘快捷键"：点击后进入监听状态，支持组合键（Ctrl/Alt/Shift + 某个键），
+    // 单独按下修饰键时先不结束录入，继续等待完整组合的最后一下非修饰键；
     // window.__recordingShortcut 是给 app.js 的全局快捷键监听看的标记，避免录入过程中的这次按键被误当成触发抽奖
     function bindShortcutRecorder(body) {
         const btn = body.querySelector('#setting-shortcut-record-btn');
@@ -200,16 +213,19 @@
 
             const onKeydown = async (e) => {
                 e.preventDefault();
+                const combo = ShortcutUtil.formatFromEvent(e);
+                if (!combo) return; // 只按了修饰键，继续等待下一次按键组成完整组合
+
                 document.removeEventListener('keydown', onKeydown, true);
                 window.__recordingShortcut = false;
                 btn.textContent = originalText;
                 btn.disabled = false;
 
-                if (e.key === 'Escape') return; // 取消录入，保留原快捷键
+                if (combo === 'Escape') return; // 取消录入，保留原快捷键
 
-                await AppState.updateSettings({ spinShortcutKey: e.key });
-                display.textContent = e.key;
-                Toast.success(`已设置快捷键：${e.key}`);
+                await AppState.updateSettings({ spinShortcutKey: combo });
+                display.textContent = combo;
+                Toast.success(`已设置快捷键：${combo}`);
             };
             document.addEventListener('keydown', onKeydown, true);
         });
