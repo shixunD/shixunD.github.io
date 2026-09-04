@@ -43,7 +43,9 @@
         // 抽奖音效：旋转期间随机播放 spin 素材（倍速匹配旋转时长）、中奖后随机播放 win 素材（原速播完），默认开启
         soundEffectsEnabled: true,
         // 权重计算公式（字符串），g 代表成绩，支持 + - * / ( ) 四则运算，见下方公式解析器
-        weightFormula: DEFAULT_WEIGHT_FORMULA
+        weightFormula: DEFAULT_WEIGHT_FORMULA,
+        // 转盘叶片上是否显示学生照片（无照片的学生仍显示姓名首字），默认关闭
+        showWheelPhotos: false
     };
 
     const DEFAULT_CLASS_NAME = '默认班级';

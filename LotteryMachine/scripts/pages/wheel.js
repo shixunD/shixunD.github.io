@@ -6,17 +6,31 @@
 
     const SECTOR_COLORS = ['#4a6cf7', '#22c1a4', '#f5a623', '#ef5da8', '#7c5cff', '#2fb8e0', '#ff8b5c', '#5bd1a0'];
     const DRAWN_SECTOR_COLOR = '#c7cbd6'; // "不重复抽取"模式下，已抽过的学生扇区变灰
-    // 中奖扇区两侧各留出的安全边距（占扇区宽度的比例），指针实际停靠点在扇区内随机，但不会精确停在分隔线上
+    // 中奖扇区两侧各留出的安全边距（占扇区宽度的比例），指针实际停靠点在扇区内 [1%, 99%] 范围随机，但不会精确停在分隔线上
     const SECTOR_LANDING_MARGIN_RATIO = 0.01;
-    // 落点分布往两侧拉伸的倍数：k 倍拉伸会让 1-(1-2m)/k 比例的抽奖精确卡死在同一个边界值上（没有随机性了，
-    // m=SECTOR_LANDING_MARGIN_RATIO）；k=1.1、m=0.01 时约 10.9%（两侧各约 5.5%），
-    // 在"往两侧靠"和"仍然看起来随机"之间取了个折中——早期试过 k=2（不考虑 m 时公式简化成 (k-1)/k），
-    // 卡死比例高达 50%，实测效果太夸张，调小到了 1.1
-    const SECTOR_LANDING_STRETCH_FACTOR = 1.1;
 
     let currentRotation = 0; // 累计旋转角度（degree），只增不减，保证动画方向一致
     let spinning = false;
-    let photoImages = new Map(); // studentId -> HTMLImageElement 缓存，避免每帧重新解码 base64
+
+    // 转盘叶片头像缓存：key 是 photoDataUrl 本身（同一张照片复用同一个 Image 对象），
+    // 避免每次 drawWheel（比如窗口 resize、重复渲染）都重新创建 Image 触发闪烁
+    const photoImageCache = new Map();
+
+    // 取（或异步加载）某张照片的 Image 对象；还没加载完成时返回 null，加载完成后自动触发一次重绘
+    function getPhotoImage(dataUrl) {
+        let entry = photoImageCache.get(dataUrl);
+        if (entry) return entry.loaded ? entry.img : null;
+
+        const img = new Image();
+        entry = { img, loaded: false };
+        photoImageCache.set(dataUrl, entry);
+        img.onload = () => {
+            entry.loaded = true;
+            if (document.getElementById('wheel-page').classList.contains('active')) drawWheel();
+        };
+        img.src = dataUrl;
+        return null;
+    }
 
     function getEls() {
         return {
@@ -24,19 +38,6 @@
             canvas: document.getElementById('wheel-canvas'),
             hub: document.getElementById('wheel-hub')
         };
-    }
-
-    function loadPhotoImage(student) {
-        if (!student.photoDataUrl) return null;
-        if (photoImages.has(student.id)) return photoImages.get(student.id);
-        const img = new Image();
-        img.onload = () => {
-            const page = document.getElementById('wheel-page');
-            if (page && page.classList.contains('active') && !spinning) drawWheel();
-        };
-        img.src = student.photoDataUrl;
-        photoImages.set(student.id, img);
-        return img;
     }
 
     function drawWheel() {
@@ -67,8 +68,10 @@
         const seg = (Math.PI * 2) / students.length;
         const startOffset = -Math.PI / 2; // 0号扇区从正上方（指针处）开始，顺时针排列
 
-        const noRepeat = AppState.getState().settings.noRepeatMode;
+        const settings = AppState.getState().settings;
+        const noRepeat = settings.noRepeatMode;
         const drawnIds = noRepeat ? new Set(AppState.getDrawnIds()) : null;
+        const showPhotos = !!settings.showWheelPhotos;
 
         students.forEach((student, i) => {
             const start = startOffset + i * seg;
@@ -94,43 +97,35 @@
             ctx.rotate(midAngle);
             if (isDrawn) ctx.globalAlpha = 0.6; // 已抽过的学生头像/姓名一并调暗，呼应扇区变灰
 
-            // 头像（沿半径方向摆放的小圆形缩略图）
-            const photoR = Math.min(22, radius * 0.14);
-            const photoDist = radius * 0.62;
-            const img = loadPhotoImage(student);
-
-            ctx.save();
-            ctx.translate(photoDist, 0);
-            ctx.rotate(Math.PI / 2); // 让头像贴合切线方向，避免因扇区旋转而歪斜过头
-            ctx.beginPath();
-            ctx.arc(0, 0, photoR, 0, Math.PI * 2);
-            ctx.closePath();
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-            ctx.save();
-            ctx.clip();
-            if (img && img.complete && img.naturalWidth > 0) {
-                ctx.drawImage(img, -photoR, -photoR, photoR * 2, photoR * 2);
-            } else {
-                ctx.fillStyle = 'rgba(255,255,255,0.35)';
-                ctx.fillRect(-photoR, -photoR, photoR * 2, photoR * 2);
-                ctx.fillStyle = '#fff';
-                ctx.font = `bold ${photoR}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText((student.name || '?')[0], 0, 1);
-            }
-            ctx.restore();
-            ctx.restore();
-
-            // 姓名文字（沿半径方向排列）
-            ctx.fillStyle = '#fff';
+            const photoImg = showPhotos && student.photoDataUrl ? getPhotoImage(student.photoDataUrl) : null;
             const fontSize = Math.max(10, Math.min(15, 220 / students.length));
+            ctx.fillStyle = '#fff';
             ctx.font = `600 ${fontSize}px "Segoe UI", "Microsoft YaHei", sans-serif`;
-            ctx.textAlign = 'left';
+            ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const label = student.name.length > 6 ? student.name.slice(0, 6) + '…' : student.name;
-            ctx.fillText(label, radius * 0.78, 0);
+
+            if (photoImg) {
+                // 头像画在扇区外侧、姓名画在头像内侧靠近圆心一点，两者都沿半径方向排列
+                const photoRadius = Math.max(9, Math.min(20, (radius * seg) / 5));
+                const photoCx = radius * 0.78;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(photoCx, 0, photoRadius, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(photoImg, photoCx - photoRadius, -photoRadius, photoRadius * 2, photoRadius * 2);
+                ctx.restore();
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(photoCx, 0, photoRadius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillText(label, radius * 0.45, 0);
+            } else {
+                ctx.fillText(label, radius * 0.65, 0);
+            }
 
             ctx.restore();
         });
@@ -228,17 +223,10 @@
         const winner = weightedPick(pool);
         const winnerIndex = students.indexOf(winner);
         const seg = 360 / students.length;
-        // 落点在中奖扇区内随机取一点，而不是每次都精确停在扇区正中间——固定停中间在视觉上像"设计好的"，
-        // 缺乏真实转盘的随机感。分布上还刻意"往两侧分隔线方向拉"而不是简单均匀分布：把扇区内位置
-        // 看成 [0,1] 的比例 f，用 stretched = 0.5 + k*(f-0.5) 做一次以中点为轴心的 k 倍拉伸——
-        // 原本集中在中间 1/k（比如 k=1.1 时是 90.9%）的采样被拉伸铺满整个 [0,1]，原本落在两侧
-        // 各 (1-1/k)/2（k=1.1 时约 4.5%）的采样则会超出 [0,1] 范围，被 clamp 摁在边界附近
-        // （由 SECTOR_LANDING_MARGIN_RATIO 决定具体摁到离分隔线多近）。**k 越大，被摁死在同一个
-        // 边界值上、彻底失去随机性的比例就越高**（精确比例 = (k-1)/k，见 PROJECT.md 推导），
-        // k=1.1 时约 9.09%（两侧各约 4.5%），在"往两侧靠、增加悬念"和"仍然看起来是随机的"之间取了个折中。
+        // 落点在中奖扇区内 [1%, 99%] 范围均匀随机取一点，而不是每次都精确停在扇区正中间——固定停中间
+        // 在视觉上像"设计好的"，缺乏真实转盘的随机感；也不会精确停在分隔线上（由 SECTOR_LANDING_MARGIN_RATIO 决定边距）。
         const rawFraction = Math.random();
-        const stretchedFraction = 0.5 + SECTOR_LANDING_STRETCH_FACTOR * (rawFraction - 0.5);
-        const clampedFraction = Math.min(1 - SECTOR_LANDING_MARGIN_RATIO, Math.max(SECTOR_LANDING_MARGIN_RATIO, stretchedFraction));
+        const clampedFraction = Math.min(1 - SECTOR_LANDING_MARGIN_RATIO, Math.max(SECTOR_LANDING_MARGIN_RATIO, rawFraction));
         const landingOffset = clampedFraction * seg;
         const winnerLandingAngle = winnerIndex * seg + landingOffset; // 相对 0 号扇区起点（正上方）的顺时针角度
 

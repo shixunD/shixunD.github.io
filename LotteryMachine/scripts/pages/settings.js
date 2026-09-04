@@ -81,6 +81,13 @@
                         </div>
                         <div class="setting-item">
                             <label class="checkbox-label-inline">
+                                <input type="checkbox" id="setting-wheel-photos" ${settings.showWheelPhotos ? 'checked' : ''}>
+                                <span>🖼️ 转盘叶片显示学生照片</span>
+                            </label>
+                            <div class="setting-help">开启后转盘每个扇区会显示该学生的照片（在「录入」页上传），没有照片的学生仍只显示姓名，默认关闭</div>
+                        </div>
+                        <div class="setting-item">
+                            <label class="checkbox-label-inline">
                                 <input type="checkbox" id="setting-hide-draw-history" ${settings.hideDrawHistory ? 'checked' : ''}>
                                 <span>隐藏底部"抽取历史"条</span>
                             </label>
@@ -198,6 +205,11 @@
 
         bindShortcutRecorder(body);
         bindWeightFormula(body);
+
+        body.querySelector('#setting-wheel-photos').addEventListener('change', (e) => {
+            AppState.updateSettings({ showWheelPhotos: e.target.checked });
+            Toast.success('已保存');
+        });
 
         body.querySelector('#setting-hide-draw-history').addEventListener('change', (e) => {
             AppState.updateSettings({ hideDrawHistory: e.target.checked });
