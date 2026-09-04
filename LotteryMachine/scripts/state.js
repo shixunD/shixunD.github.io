@@ -14,12 +14,21 @@
     const STORE_NAME = 'app-state';
     const STATE_KEY = 'main';
 
-    // 权重公式的基准分：weight = max(1, WEIGHT_BASE - score)
+    // 权重公式的基准分：默认公式 weight = max(1, WEIGHT_BASE - score)，WEIGHT_BASE 仅作为默认公式里的常量使用
     const WEIGHT_BASE = 160;
     const MIN_WEIGHT = 1;
+    // 权重公式默认值，g 代表成绩；用户可在设置页自定义（见 evaluateWeightFormula）
+    const DEFAULT_WEIGHT_FORMULA = `${WEIGHT_BASE}-g`;
 
     const DEFAULT_SETTINGS = {
-        spinDurationMs: 2000,
+        // 转盘旋转分两个阶段（见 wheel.js 的 spin()）：
+        // spinFastMs（x）—— 匀速阶段时长；spinFastTurns —— 这 x 毫秒内固定转几圈（支持小数，如 0.5），营造"公平"的既视感；
+        // spinSlowMs（y）—— 减速阶段固定时长，从匀速阶段的转速逐渐匀减速到 0 并精确停在中奖扇区内随机
+        // 选中的一点（落点的随机性见 wheel.js 的 SECTOR_LANDING_* 常量，不靠减速时长的随机性来制造悬念——
+        // 实测发现减速时长忽长忽短反而会让减速曲线陡峭程度跟着变化，看起来像"突然刹车"而不是缓缓停下）
+        spinFastMs: 400,
+        spinFastTurns: 1,
+        spinSlowMs: 2500,
         // 中奖弹窗自动关闭的毫秒数；0 表示不自动关闭，需手动点击"好的"
         winnerAutoCloseMs: 5000,
         // 等权抽取：开启后抽奖时忽略每个学生的权重，所有人概率相等；默认关闭
@@ -30,7 +39,11 @@
         // 等同于点击"开始抽奖"，默认 PageUp 是为了配合翻页笔／演示遥控器（大多数型号翻页键发送的就是 PageUp/PageDown）
         spinShortcutKey: 'PageUp',
         // 隐藏屏幕底部的"抽取历史"条，默认不开启（即默认显示）
-        hideDrawHistory: false
+        hideDrawHistory: false,
+        // 抽奖音效：旋转期间随机播放 spin 素材（倍速匹配旋转时长）、中奖后随机播放 win 素材（原速播完），默认开启
+        soundEffectsEnabled: true,
+        // 权重计算公式（字符串），g 代表成绩，支持 + - * / ( ) 四则运算，见下方公式解析器
+        weightFormula: DEFAULT_WEIGHT_FORMULA
     };
 
     const DEFAULT_CLASS_NAME = '默认班级';
@@ -89,12 +102,149 @@
         });
     }
 
+    // ---- 权重公式解析器：把用户输入的字符串（如 "160-g"、"(150-g)*2"）解析成可求值的表达式 ----
+    // 只支持 + - * / ( ) 四则运算、数字、变量 g（代表成绩），任何其它字符都视为"不支持的数学符号"并抛错。
+    function tokenizeFormula(formula) {
+        const tokens = [];
+        let i = 0;
+        while (i < formula.length) {
+            const ch = formula[i];
+            if (/\s/.test(ch)) { i++; continue; }
+            if (/[0-9.]/.test(ch)) {
+                let j = i;
+                let seenDot = false;
+                while (j < formula.length && (/[0-9]/.test(formula[j]) || (formula[j] === '.' && !seenDot))) {
+                    if (formula[j] === '.') seenDot = true;
+                    j++;
+                }
+                const numStr = formula.slice(i, j);
+                if (numStr === '.' || Number.isNaN(Number(numStr))) {
+                    throw new Error(`无效的数字："${numStr}"`);
+                }
+                tokens.push({ type: 'num', value: Number(numStr) });
+                i = j;
+                continue;
+            }
+            if (ch === 'g' || ch === 'G') { tokens.push({ type: 'var' }); i++; continue; }
+            if ('+-*/()'.includes(ch)) { tokens.push({ type: ch }); i++; continue; }
+            throw new Error(`不支持的数学符号："${ch}"`);
+        }
+        return tokens;
+    }
+
+    // 递归下降解析：expr := term (('+'|'-') term)* ；term := factor (('*'|'/') factor)*
+    // factor := '-' factor | '(' expr ')' | number | 'g'
+    function parseFormulaTokens(tokens) {
+        let pos = 0;
+        const peek = () => tokens[pos];
+
+        function parseExpr() {
+            let node = parseTerm();
+            while (peek() && (peek().type === '+' || peek().type === '-')) {
+                const op = tokens[pos].type;
+                pos++;
+                node = { type: 'binop', op, left: node, right: parseTerm() };
+            }
+            return node;
+        }
+        function parseTerm() {
+            let node = parseFactor();
+            while (peek() && (peek().type === '*' || peek().type === '/')) {
+                const op = tokens[pos].type;
+                pos++;
+                node = { type: 'binop', op, left: node, right: parseFactor() };
+            }
+            return node;
+        }
+        function parseFactor() {
+            const t = peek();
+            if (!t) throw new Error('公式不完整');
+            if (t.type === '-') { pos++; return { type: 'neg', value: parseFactor() }; }
+            if (t.type === '+') { pos++; return parseFactor(); }
+            if (t.type === '(') {
+                pos++;
+                const node = parseExpr();
+                if (!peek() || peek().type !== ')') throw new Error('括号不匹配，缺少 ")"');
+                pos++;
+                return node;
+            }
+            if (t.type === 'num') { pos++; return { type: 'num', value: t.value }; }
+            if (t.type === 'var') { pos++; return { type: 'var' }; }
+            throw new Error('公式格式错误，存在意外的符号');
+        }
+
+        const ast = parseExpr();
+        if (pos !== tokens.length) throw new Error('公式格式错误，存在多余内容');
+        return ast;
+    }
+
+    function evalFormulaAst(node, g) {
+        switch (node.type) {
+            case 'num': return node.value;
+            case 'var': return g;
+            case 'neg': return -evalFormulaAst(node.value, g);
+            case 'binop': {
+                const l = evalFormulaAst(node.left, g);
+                const r = evalFormulaAst(node.right, g);
+                if (node.op === '+') return l + r;
+                if (node.op === '-') return l - r;
+                if (node.op === '*') return l * r;
+                if (node.op === '/') return r === 0 ? NaN : l / r;
+                throw new Error(`未知运算符："${node.op}"`);
+            }
+            default:
+                throw new Error('无法计算该公式');
+        }
+    }
+
+    // 把公式字符串编译成 g -> 数值 的函数；公式非法（含不支持的符号/格式错误）时抛出 Error，message 说明原因
+    function compileWeightFormula(formula) {
+        if (typeof formula !== 'string' || !formula.trim()) throw new Error('公式不能为空');
+        const tokens = tokenizeFormula(formula);
+        if (tokens.length === 0) throw new Error('公式不能为空');
+        const ast = parseFormulaTokens(tokens);
+        return (g) => evalFormulaAst(ast, g);
+    }
+
+    // 供设置页在保存前校验公式是否合法，不影响当前已保存的公式
+    function testWeightFormula(formula) {
+        try {
+            compileWeightFormula(formula)(100);
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, message: e.message };
+        }
+    }
+
     // score -> weight。score 为空/非数字时返回 null（交给调用方决定默认权重）
+    // 实际计算公式取自 settings.weightFormula（用户可自定义，见 updateWeightFormula）；
+    // 公式对当前 score 求值失败（如除以 0）时兜底为 MIN_WEIGHT，而不是让权重变成 NaN/Infinity。
     function scoreToWeight(score) {
         if (score === null || score === undefined || score === '') return null;
         const n = Number(score);
         if (Number.isNaN(n)) return null;
-        return Math.max(MIN_WEIGHT, WEIGHT_BASE - n);
+        let result;
+        try {
+            const formula = (state.settings && state.settings.weightFormula) || DEFAULT_WEIGHT_FORMULA;
+            result = compileWeightFormula(formula)(n);
+        } catch (e) {
+            // 理论上不会发生（保存前已校验），万一发生则退回默认公式，避免权重计算彻底崩溃
+            result = WEIGHT_BASE - n;
+        }
+        if (!Number.isFinite(result)) return MIN_WEIGHT;
+        return Math.max(MIN_WEIGHT, result);
+    }
+
+    // 修改权重公式：校验通过后保存，并重新计算所有"按成绩自动计算权重"（weightMode==='score'）的学生的权重
+    async function updateWeightFormula(formula) {
+        const test = testWeightFormula(formula);
+        if (!test.ok) throw new Error(test.message);
+        state.settings = Object.assign({}, state.settings, { weightFormula: formula });
+        state.classes.forEach((cls) => {
+            cls.students = cls.students.map((s) => (s.weightMode === 'score' ? normalizeStudent(s) : s));
+        });
+        await persist();
+        notify();
     }
 
     function normalizeStudent(raw) {
@@ -449,6 +599,9 @@
     window.AppState = {
         WEIGHT_BASE,
         MIN_WEIGHT,
+        DEFAULT_WEIGHT_FORMULA,
+        testWeightFormula,
+        updateWeightFormula,
         load,
         subscribe,
         getState,

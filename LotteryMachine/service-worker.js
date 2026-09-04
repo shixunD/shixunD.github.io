@@ -1,6 +1,6 @@
 // 抽奖点名机 Service Worker - PWA 离线支持 + network-first 缓存策略
 // CACHE_NAME 每次发版时手动改一下（随便改，只要和上一个不同即可），用于清理旧缓存
-const CACHE_NAME = 'lottery-cache-20260903190000';
+const CACHE_NAME = 'lottery-cache-20260904120000';
 
 const URLS_TO_CACHE = [
     './',
@@ -11,12 +11,15 @@ const URLS_TO_CACHE = [
     './styles/base.css',
     './styles/navbar.css',
     './styles/wheel.css',
+    './styles/winnerEffects.css',
     './styles/roster.css',
     './styles/settings.css',
     './styles/onedrive.css',
     './styles/update.css',
     './styles/classSwitcher.css',
+    './styles/drawHistory.css',
     './styles/responsive.css',
+    './scripts/shortcutUtil.js',
     './scripts/state.js',
     './scripts/navigation.js',
     './scripts/updateChecker.js',
@@ -29,10 +32,29 @@ const URLS_TO_CACHE = [
     './scripts/components/modal.js',
     './scripts/components/imageCropper.js',
     './scripts/components/classSwitcher.js',
+    './scripts/components/drawHistory.js',
+    './scripts/components/winnerEffects.js',
+    './scripts/components/soundEffects.js',
     './scripts/pages/wheel.js',
     './scripts/pages/roster.js',
     './scripts/pages/settings.js',
-    './scripts/app.js'
+    './scripts/app.js',
+    './backgroundmusic/spin/mixkit-arcade-rising-231.wav',
+    './backgroundmusic/spin/mixkit-casino-reward-1980.wav',
+    './backgroundmusic/spin/mixkit-fast-bike-wheel-spin-1614.wav',
+    './backgroundmusic/spin/mixkit-game-engine-hum-2644.wav',
+    './backgroundmusic/spin/mixkit-payout-award-1934.wav',
+    './backgroundmusic/spin/mixkit-slot-machine-win-1928.wav',
+    './backgroundmusic/spin/mixkit-slot-machine-win-alarm-1995.wav',
+    './backgroundmusic/spin/mixkit-spinning-whistle-toy-2647.wav',
+    './backgroundmusic/win/mixkit-animated-small-group-applause-523.wav',
+    './backgroundmusic/win/mixkit-ethereal-fairy-win-sound-2019.wav',
+    './backgroundmusic/win/mixkit-male-voice-cheer-2010.wav',
+    './backgroundmusic/win/mixkit-male-voice-cheer-victory-2011.wav',
+    './backgroundmusic/win/mixkit-small-group-light-applause-517.wav',
+    './backgroundmusic/win/mixkit-small-win-2020.wav',
+    './backgroundmusic/win/mixkit-video-game-win-2016.wav',
+    './backgroundmusic/win/mixkit-wind-chimes-2014.wav'
 ];
 
 self.addEventListener('install', (event) => {

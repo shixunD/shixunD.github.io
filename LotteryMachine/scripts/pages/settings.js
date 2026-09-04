@@ -20,13 +20,31 @@
                 <div class="settings-left-column">
                     <div class="settings-section">
                         <h2>🎯 抽奖设置</h2>
+
+                        <div class="setting-group-title">转盘节奏</div>
                         <div class="setting-item">
-                            <label>转盘旋转时长（毫秒）</label>
-                            <input type="number" id="setting-spin-duration" min="500" max="10000" step="100" value="${settings.spinDurationMs}">
-                            <div class="setting-help">点击"开始抽奖"后转盘旋转多久才停下，默认 2000ms</div>
+                            <label>旋转时长（毫秒）与圈数</label>
+                            <div class="setting-row spin-timing-row">
+                                <div class="spin-timing-field">
+                                    <span class="spin-timing-field-label">匀速时长 x</span>
+                                    <input type="number" id="setting-spin-fast" min="200" max="5000" step="100" value="${settings.spinFastMs}">
+                                </div>
+                                <div class="spin-timing-field spin-timing-field-turns">
+                                    <span class="spin-timing-field-label">圈数</span>
+                                    <input type="number" id="setting-spin-turns" min="0.1" max="20" step="0.1" value="${settings.spinFastTurns}">
+                                </div>
+                                <div class="spin-timing-field">
+                                    <span class="spin-timing-field-label">悬念时长 y</span>
+                                    <input type="number" id="setting-spin-slow" min="200" max="10000" step="100" value="${settings.spinSlowMs}">
+                                </div>
+                            </div>
+                            <div class="setting-help">点击"开始抽奖"后先在 <b>x 毫秒</b>内匀速转指定<b>圈数</b>（表示公平）；接着用固定的 <b>y 毫秒</b>匀减速停下（悬念感来自落点随机落在扇区内的哪个位置，不是减速时长本身）。默认 x=400、圈数=1、y=2500。</div>
                         </div>
+
+                        <div class="setting-divider"></div>
+                        <div class="setting-group-title">中奖提示</div>
                         <div class="setting-item">
-                            <label>中奖弹窗自动关闭（秒）</label>
+                            <label>弹窗自动关闭（秒）</label>
                             <input type="number" id="setting-winner-autoclose" min="0" max="60" step="1" value="${Math.round((settings.winnerAutoCloseMs || 0) / 1000)}" ${settings.winnerAutoCloseMs > 0 ? '' : 'disabled'}>
                             <label class="checkbox-label-inline" style="margin-top:0.4rem;">
                                 <input type="checkbox" id="setting-winner-no-autoclose" ${settings.winnerAutoCloseMs > 0 ? '' : 'checked'}>
@@ -34,6 +52,25 @@
                             </label>
                             <div class="setting-help">中奖后弹窗展示多久自动消失，默认 5 秒</div>
                         </div>
+
+                    </div>
+
+                    <div class="settings-section">
+                        <h2>🧮 权重公式</h2>
+                        <div class="setting-item">
+                            <label>权重计算公式</label>
+                            <input type="text" id="setting-weight-formula" class="formula-input" value="${Modal.escapeHtml(settings.weightFormula || AppState.DEFAULT_WEIGHT_FORMULA)}" placeholder="如 160-g">
+                            <div class="setting-help">g 代表学生成绩，支持 <code>+ - * / ( )</code> 四则运算与括号，如 <code>160-g</code>、<code>(150-g)*2</code>。保存后会立即重新计算所有"按成绩自动计算权重"的学生；输入不支持的符号会提示错误并恢复上次保存的内容。</div>
+                            <div class="settings-btn-row" style="margin-top:0.5rem;">
+                                <button type="button" class="btn-secondary" id="setting-weight-formula-reset">↺ 重置为默认（${Modal.escapeHtml(AppState.DEFAULT_WEIGHT_FORMULA)}）</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-right-column">
+                    <div class="settings-section">
+                        <h2>🎮 操作方式</h2>
                         <div class="setting-item">
                             <label>抽奖快捷键</label>
                             <div class="setting-row" style="align-items:center;">
@@ -48,6 +85,13 @@
                                 <span>隐藏底部"抽取历史"条</span>
                             </label>
                             <div class="setting-help">抽奖页底部会显示最近抽中的头像/姓名/时间，仅在本次打开页面期间保留（刷新即清空）；勾选后隐藏，默认不开启</div>
+                        </div>
+                        <div class="setting-item">
+                            <label class="checkbox-label-inline">
+                                <input type="checkbox" id="setting-sound-effects" ${settings.soundEffectsEnabled !== false ? 'checked' : ''}>
+                                <span>🔊 开启抽奖音效</span>
+                            </label>
+                            <div class="setting-help">旋转期间随机播放一段音效（自动倍速匹配旋转时长），指针停下后随机播放一段中奖音效，默认开启</div>
                         </div>
                     </div>
 
@@ -65,9 +109,7 @@
                         </div>
                         <div class="setting-help">开启后浏览器清理站点数据时不易误删本应用数据；仍建议定期导出或使用 OneDrive 备份。</div>
                     </div>
-                </div>
 
-                <div class="settings-right-column">
                     <div class="settings-section">
                         <h2>💾 数据导入导出</h2>
                         <p class="settings-desc">备份或恢复所有班级的学生名单与设置（不含跳过更新等临时标记）</p>
@@ -112,9 +154,23 @@
     }
 
     function bindEvents(body) {
-        body.querySelector('#setting-spin-duration').addEventListener('change', (e) => {
-            const val = Math.max(500, Number(e.target.value) || 2000);
-            AppState.updateSettings({ spinDurationMs: val });
+        body.querySelector('#setting-spin-fast').addEventListener('change', (e) => {
+            const val = Math.max(200, Number(e.target.value) || 1000);
+            e.target.value = val;
+            AppState.updateSettings({ spinFastMs: val });
+            Toast.success('已保存');
+        });
+        body.querySelector('#setting-spin-turns').addEventListener('change', (e) => {
+            // 支持小数圈数（比如 0.5 圈），不强制取整
+            const val = Math.max(0.1, Number(e.target.value) || 3);
+            e.target.value = val;
+            AppState.updateSettings({ spinFastTurns: val });
+            Toast.success('已保存');
+        });
+        body.querySelector('#setting-spin-slow').addEventListener('change', (e) => {
+            const val = Math.max(200, Number(e.target.value) || 1000);
+            e.target.value = val;
+            AppState.updateSettings({ spinSlowMs: val });
             Toast.success('已保存');
         });
 
@@ -141,9 +197,15 @@
         });
 
         bindShortcutRecorder(body);
+        bindWeightFormula(body);
 
         body.querySelector('#setting-hide-draw-history').addEventListener('change', (e) => {
             AppState.updateSettings({ hideDrawHistory: e.target.checked });
+            Toast.success('已保存');
+        });
+
+        body.querySelector('#setting-sound-effects').addEventListener('change', (e) => {
+            AppState.updateSettings({ soundEffectsEnabled: e.target.checked });
             Toast.success('已保存');
         });
 
@@ -231,6 +293,43 @@
         });
     }
 
+    // 权重公式输入框：保存前用 AppState.testWeightFormula 校验，失败则红色 toast 提示并恢复上次保存的内容；
+    // "重置为默认"按钮直接把公式设回 AppState.DEFAULT_WEIGHT_FORMULA
+    function bindWeightFormula(body) {
+        const input = body.querySelector('#setting-weight-formula');
+        let lastSaved = AppState.getState().settings.weightFormula || AppState.DEFAULT_WEIGHT_FORMULA;
+
+        async function saveFormula(formula) {
+            const val = (formula || '').trim();
+            if (!val) {
+                Toast.error('公式不能为空，已恢复上次保存的内容');
+                input.value = lastSaved;
+                return;
+            }
+            const test = AppState.testWeightFormula(val);
+            if (!test.ok) {
+                Toast.error(`公式包含不支持的数学符号：${test.message}`);
+                input.value = lastSaved;
+                return;
+            }
+            try {
+                await AppState.updateWeightFormula(val);
+                lastSaved = val;
+                input.value = val;
+                Toast.success('已保存，权重已重新计算');
+            } catch (err) {
+                Toast.error('公式包含不支持的数学符号，已恢复上次保存的内容');
+                input.value = lastSaved;
+            }
+        }
+
+        input.addEventListener('change', () => saveFormula(input.value));
+
+        body.querySelector('#setting-weight-formula-reset').addEventListener('click', () => {
+            saveFormula(AppState.DEFAULT_WEIGHT_FORMULA);
+        });
+    }
+
     async function loadStorageStatus() {
         const el = document.getElementById('settings-storage-status');
         if (!el) return;
@@ -251,7 +350,7 @@
         try {
             const res = await fetch('./version.json', { cache: 'no-store' });
             const data = await res.json();
-            el.textContent = data.version || '未知';
+            el.textContent = data.semver ? `v${data.semver}（${data.version || '未知'}）` : (data.version || '未知');
         } catch (e) {
             el.textContent = '获取失败';
         }

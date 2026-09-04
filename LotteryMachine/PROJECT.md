@@ -48,7 +48,9 @@ AppState 内存结构 = {
   ],
   activeClassId: string,   // 当前正在查看/操作的班级 id
   settings: {              // 设置是全局共享的，不分班级
-    spinDurationMs,        // 转盘旋转动画时长，默认 2000
+    spinFastMs,            // 转盘旋转动画"匀速阶段"时长（x），默认 400，见 4.1 节"旋转与中奖逻辑"
+    spinFastTurns,         // 匀速阶段（x 毫秒内）固定转的圈数，默认 1，可在设置页调整，支持小数（如 0.5）
+    spinSlowMs,            // 转盘旋转动画"减速阶段"固定时长（y），默认 2500，不随机（悬念感来自落点随机，见下）
     winnerAutoCloseMs,     // 中奖弹窗自动关闭毫秒数，默认 5000，0=不自动关闭
     equalWeightMode,       // 等权抽取开关，默认 false
     noRepeatMode,          // 不重复抽取开关，默认 false
@@ -74,9 +76,15 @@ AppState 内存结构 = {
 
 ### 权重公式
 ```js
-weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_WEIGHT = 1
+weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MIN_WEIGHT = 1
 ```
-即 `scoreToWeight(score)`。**这是唯一计算权重的地方**，如果以后要改基准分，只需要改 `state.js` 顶部的 `WEIGHT_BASE` 常量。
+即 `scoreToWeight(score)`，实现在 `state.js`。**权重公式现在是可在设置页自定义的字符串**（`settings.weightFormula`，默认 `WEIGHT_BASE-g` = `'160-g'`），不再是写死的常量：
+- `g` 代表成绩，公式支持 `+ - * / ( )` 四则运算和括号（如 `(150-g)*2`），由 `state.js` 内置的一个小型递归下降解析器（`tokenizeFormula` → `parseFormulaTokens` → `evalFormulaAst`，统称 `compileWeightFormula`）解析求值，**没有用 `eval()`/`Function()`**（避免把任意 JS 代码执行权限交给用户输入）。
+- `AppState.testWeightFormula(formula)` 返回 `{ok:true}` 或 `{ok:false, message}`，供设置页在保存前校验；`AppState.updateWeightFormula(formula)` 校验通过后保存并**立即重新计算所有 `weightMode==='score'` 的学生的权重**（遍历 `state.classes` 逐个 `normalizeStudent`），不需要用户手动刷新才能看到新权重生效。
+- `AppState.DEFAULT_WEIGHT_FORMULA` = `'160-g'`，设置页"重置为默认"按钮直接调用 `updateWeightFormula(AppState.DEFAULT_WEIGHT_FORMULA)`。
+- 对某个具体成绩求值时结果非有限数（比如公式里出现除以 0）会兜底成 `MIN_WEIGHT`，不会让权重变成 `NaN`/`Infinity`；这和"公式语法本身不合法"是两回事——语法错误在保存前就被 `testWeightFormula` 拦下，不会写入 `settings`。
+- `weightMode === 'manual'` 时完全不受这个公式影响，见下一条。
+- **如果以后要改默认基准分**，改 `state.js` 顶部的 `WEIGHT_BASE` 常量即可（`DEFAULT_WEIGHT_FORMULA` 由它拼出来）；**如果要改公式语法支持范围**（比如加乘方、加其它变量），改 `tokenizeFormula`/`parseFormulaTokens`/`evalFormulaAst` 这三个函数，三者必须保持语法定义一致。
 - `weightMode === 'manual'` 时不调用此公式，直接使用用户输入的 `weight` 值（必须 > 0，否则回退为 `MIN_WEIGHT`）。
 - 抽奖概率 = `student.weight / 所有学生 weight 之和`（`AppState.getTotalWeight()`），**有放回**抽取（不会因为抽中过就排除，符合需求里"每次被抽到的概率固定"的描述）。
 - **等权抽取**（`settings.equalWeightMode`，默认 `false`）：抽奖页顶部工具栏右侧有个"等权抽取"勾选框，勾选后 `pages/wheel.js` 的 `weightedPick()` 会**完全跳过权重**，直接从候选池里等概率随机选一个（`Math.floor(Math.random() * pool.length)`），不管每个人的 `weight` 是多少。这个开关只影响"选中谁"，不影响 `weight` 字段本身的存储值——取消勾选后立刻恢复按权重抽取。转盘视觉上的扇区一直都是等分的（不随权重变化扇区大小），所以勾选与否不会改变转盘长相，只改变背后的中奖概率。
@@ -114,13 +122,24 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 - **旋转与中奖逻辑（`spin()`，这是最容易看错的部分）**：
   1. 先算好候选池 `pool = getDrawPool(students)`；不重复模式下如果 `pool.length === 0`（全部抽完）直接 toast 提示并 `return`，不会真的转。
   2. `weightedPick(pool)`：先检查 `settings.equalWeightMode`——**勾选"等权抽取"时直接跳过权重**，`Math.floor(Math.random() * pool.length)` 从候选池等概率随机选一个；否则走加权随机：生成 `[0, 候选池总权重)` 的随机数，依次减去每个候选人的 weight，减到 ≤0 时的那个学生就是中奖者。**中奖结果在动画开始前就已经确定**，转盘旋转只是视觉效果，不是"转到哪个算哪个"。
-  3. `winnerIndex = students.indexOf(winner)` —— 注意这里用的是**完整学生列表**里的下标（不是候选池里的下标），因为扇区位置是按完整列表画的。扇区 0 从正上方（指针位置）开始顺时针排列，第 i 个扇区中心角度 = `i*seg + seg/2`（`seg = 360/学生数`）。
-  4. 要让中奖扇区中心转到正上方，需要旋转 `desiredFinalAngle = (360 - winnerMidAngle % 360) % 360` 度（相对于扇区当前 0 点的角度）。
-  5. 因为 CSS `transform: rotate()` 是绝对角度而不是增量，代码用模块级变量 `currentRotation`（只增不减，记录 canvas 元素已经转过的总角度）来算出下一次要设置的绝对角度：先算出从当前角度到目标角度还差多少度（`delta`，取值 `[0,360)`），再加上 `EXTRA_SPINS * 360`（额外转几整圈，纯视觉效果，默认 6 圈），得到 `nextRotation = currentRotation + EXTRA_SPINS*360 + delta`。
-  6. 用 CSS `transition`（时长取自 `settings.spinDurationMs`）驱动 `canvas.style.transform = rotate(nextRotation deg)`，正常靠监听 `transitionend` 事件收尾。**同时挂了一个 `setTimeout(finish, durationMs + 300)` 兜底**：极端情况下（比如把旋转时长调得很短、或动画被打断）浏览器有时不会派发 `transitionend`，没有兜底的话 `spinning` 标志会永久卡 `true`，转盘再也点不动，必须刷新页面才能恢复——这是实测发现过的真实问题，`finish()` 内部用 `finished` 标志保证 `transitionend` 和兜底定时器谁先触发都只真正收尾一次。收尾时如果开启了"不重复抽取"，先 `AppState.markDrawn(winner.id)`（会触发重绘让扇区立刻变灰），再弹出中奖弹窗（`showWinnerDialog`）。**弹窗自动关闭**：读取 `settings.winnerAutoCloseMs`（设置页可调，默认 5000ms，0 表示禁用自动关闭需手动点"好的"），大于 0 时用 `setTimeout` 定时移除弹窗；用户手动关闭时会 `clearTimeout` 取消这个定时器。**再次发起抽奖时自动关闭上一个还没关的弹窗**：`spin()` 一进来就调用 `closeExistingWinnerDialog()`（`document.querySelectorAll('.winner-overlay').forEach(el => el.remove())`），`showWinnerDialog()` 内部也会先调用一次保险；这是因为中奖弹窗展示期间转盘本身并没有被禁用（`spinning` 在弹窗弹出前就已经复位成 `false`），如果不这么处理，连续快速点"开始抽奖"或触发快捷键会导致多个 `.winner-overlay` 层叠在页面上。
-  - 如果以后要改成"转盘扇区大小按权重比例画"而不是"等分"，需要同时改 `drawWheel()` 里的扇区角度计算和 `spin()` 里的 `winnerMidAngle` 计算逻辑，两处必须保持一致。
+  3. `winnerIndex = students.indexOf(winner)` —— 注意这里用的是**完整学生列表**里的下标（不是候选池里的下标），因为扇区位置是按完整列表画的。扇区 0 从正上方（指针位置）开始顺时针排列，第 i 个扇区覆盖角度范围 `[i*seg, (i+1)*seg)`（`seg = 360/学生数`）。
+  4. **落点不固定在扇区正中间，而是在扇区内按"偏向两侧边界"的分布随机取一点**——`winnerLandingAngle = winnerIndex*seg + landingOffset`。`landingOffset` 的计算分两步：① 取一个 `[0,1)` 的原始随机比例 `rawFraction = Math.random()`；② 以 0.5 为轴心做 `SECTOR_LANDING_STRETCH_FACTOR`（常量 `= 1.1`）倍拉伸：`stretchedFraction = 0.5 + k*(rawFraction-0.5)`（`k=1.1`），再 clamp 到 `[SECTOR_LANDING_MARGIN_RATIO, 1-SECTOR_LANDING_MARGIN_RATIO]`（常量 `SECTOR_LANDING_MARGIN_RATIO = 0.01`，两侧各留 1% 的安全边距，只是为了不精确停在分隔线上，不是为了避开边缘）；`landingOffset = clampedFraction * seg`。**这个拉伸变换是刻意设计的、不是简单均匀分布**，效果是指针停在"看起来快滑到隔壁扇区"的边缘位置的概率略高于均匀分布，比单纯均匀分布更有悬念/刺激感（产品需求明确要的效果）。
+     - **拉伸倍数 `k` 是有代价的，不能无限调大**：`k` 倍拉伸会让 `rawFraction` 落在两侧某个区间的采样被拉到 `[0,1]` 范围之外，然后被 clamp **摁死在同一个边界值上**——也就是说，无论这次原始的 `rawFraction` 具体是多少，只要落在这个区间里，最终结果都完全相同（`SECTOR_LANDING_MARGIN_RATIO` 对应的那个固定值），**这部分抽奖其实已经没有随机性了**。精确比例是 `1 - (1-2m)/k`（`m = SECTOR_LANDING_MARGIN_RATIO`；如果不考虑边距、简化成 `m=0`，公式退化成更好记的 `(k-1)/k`，但 `m` 不为 0 时这个简化版本会低估实际卡死比例，**踩过一次坑**：一开始按 `(k-1)/k` 估算 `k=1.1` 应该约 9.09% 卡死，实测却是约 10.9%，就是因为漏算了 `m=0.01` 这个边距的贡献）。**本项目踩过的一个真实教训**：一开始选了 `k=2`，实测下来"随机"落点效果比预期极端得多，超过一半的抽奖肉眼看是同一个位置，反而不像真随机；后来把 `k` 调小到 `1.1`（精确卡死比例 `1-(1-0.02)/1.1 ≈ 10.9%`，两侧各约 5.5%），在"往两侧靠"和"仍然像是真随机"之间取得更好的平衡。**以后如果要再调 `k` 或 `m`，用 `1-(1-2m)/k` 这个精确公式估算卡死比例，不要用简化版 `(k-1)/k`，也不要凭感觉直接改数字。**
+     - 要让 `winnerLandingAngle` 转到正上方，需要旋转 `desiredFinalAngle = (360 - winnerLandingAngle % 360) % 360` 度（相对于扇区当前 0 点的角度）。**这整套"随机落点"设计是从"永远精确停在扇区正中间"改过来的**：固定停中间虽然实现简单，但观众多看几次会发现"指针每次都精确对齐某条线"，反而显得"像是设计好的、不够真实"；不管落点具体在哪，中奖结果都依然是抽奖开始前就用 `weightedPick()` 按权重精确算好的，**指针最终停在这个学生扇区内的哪个具体位置是随机的，不影响谁中奖、也不会让指针跑出这个学生的扇区**（这一点是权重抽奖机制成立的前提，详见下方"如何调和权重与真随机手感"的说明）。
+  5. **旋转动画分两个阶段**（`settings.spinFastMs`=x、`settings.spinFastTurns`（x 毫秒内转几圈，默认 1，**支持小数**如 `0.5`）、`settings.spinSlowMs`=y 均可在设置页调整，默认 x=400/圈数=1/y=2500）——**这是从"单段固定时长缓动"改过来的新设计，动机：固定时长转出去，观众很快能猜到大概停在哪，缺乏紧张感**：
+     - **阶段一（匀速）**：固定 `x` 毫秒内转 `fastTurns` 圈（`fastDistance = fastTurns*360`，`fastTurns` 可以是小数，`fastDistance` 因此不一定是 360 的整数倍），角速度 `fastVelocity = fastDistance/x`，**跟中奖者是谁完全无关**，纯粹为了"转起来"的仪式感和"看起来公平"（不管抽到谁，这一段观感一样）。**因为 `fastDistance` 允许不是 360 的整数倍**，代码用模块级变量 `currentRotation`（只增不减，记录 canvas 元素已经转过的总角度）先算出"阶段一结束那一刻"的绝对角度 `currentRotation + fastDistance` 再取 mod 360（`afterFastMod`），然后才据此算出阶段二需要走的 `delta = ((desiredFinalAngle - afterFastMod) % 360 + 360) % 360`——**这里如果偷懒直接用阶段一开始前的 `currentRotation` 算 delta（旧版整数圈时代的写法），圈数一旦允许小数就会算错**，因为阶段一本身会带来一个不是 360 整数倍的 mod-360 偏移，必须把这个偏移也算进去。
+     - **阶段二（匀减速）**：`slowMs` 就是设置里的 `y`，**固定值，不随机**，从阶段一结束时的速度开始匀减速到 0，精确停在中奖扇区。**这里曾经让 `slowMs` 每次都在 `[y/2, y]` 内随机取一个值，后来改回固定——真实踩过的坑**：要走的距离（`decelDistance`）基本不变的情况下，如果时长被随机砍到只剩一半，起支速度就要翻倍去追，减速曲线会陡峭得多，视觉上像"急刹车"而不是缓缓停下，用户反馈这种忽快忽慢的感觉不像真实转盘、反而更假；固定 `y` 之后减速节奏稳定可预期，悬念感改由"落点在扇区内随机偏向两侧"（上一条）来提供，不需要靠减速时长的随机性叠加。计算上依然有个小麻烦要解决：要同时满足"精确落在目标角度"和"两阶段衔接处速度尽量连续"这两个条件（对匀减速运动，速度、时长、距离三者中固定任意两个，第三个就确定了，不能三个都自由指定）——解法是**允许"阶段二实际走的角度"里包含若干整圈**（跟旧版固定 `EXTRA_SPINS` 整圈的设计思路一致，只是现在整圈数是动态算出来的）：先算出"如果阶段二起始速度恰好等于阶段一速度、固定的 `slowMs` 理论上应该走多远"（`idealDecelDistance = fastVelocity * slowMs / 2`，梯形/三角形面积公式），再选一个整数 `extraTurns = max(0, round((idealDecelDistance - delta) / 360))`，让"阶段二实际角度" `decelDistance = delta + extraTurns*360` 尽量贴近这个理想值，从而反推出的 `decelStartVelocity = 2*decelDistance/slowMs` 和阶段一末速度 `fastVelocity` 足够接近，两阶段衔接处肉眼看不出明显的速度突变。`nextRotation = currentRotation + fastDistance + decelDistance` 就是这次旋转最终要停到的绝对角度。
+  6. **用 `requestAnimationFrame` 逐帧计算旋转角度直接赋值 `canvas.style.transform`**，不再用 CSS `transition`：`elapsed <= fastMs` 时角度 `= fastVelocity * elapsed`（匀速直线运动）；`elapsed > fastMs` 时令 `τ = elapsed - fastMs`，角度 `= fastDistance + decelStartVelocity*τ - (decelStartVelocity/(2*slowMs))*τ²`（匀减速运动的位移公式，`τ=slowMs` 时速度精确降到 0、位移精确等于 `decelDistance`）；`elapsed >= fastMs+slowMs` 时调用 `finish()` 收尾。旧版本用 CSS `transition` + 监听 `transitionend` 事件收尾，需要额外挂一个 `setTimeout` 兜底（因为极端情况下浏览器有时不会派发 `transitionend`）；改用 rAF 后不再依赖 `transitionend` 这个具体 DOM 事件，**但 `setTimeout` 兜底本身并没有删掉，而是换了一个同样真实的理由继续保留**：**实测发现**标签页被切到后台/最小化时，浏览器可能整个暂停 `requestAnimationFrame` 回调（不只是降频，是完全不再触发），如果 `finish()` 只从 rAF 循环内部调用，转盘会在这种情况下永久卡在"旋转中"、`开始抽奖` 再也点不动——这跟旧版 `transitionend` 不触发是同一类"收尾依赖了一个可能不触发的信号"的问题，只是触发条件从"CSS 事件不触发"变成了"rAF 不触发"。`setTimeout` 在后台标签页里会被降频但不会被完全暂停，所以现在是 `frame()` 里 `elapsed>=totalMs` 和 `setTimeout(finish, totalMs+500)` 两条路径都能调用 `finish()`，`finished` 标志保证只有一条真正生效（跟旧版处理 `transitionend`/兜底定时器竞态的写法一致）；这也意味着如果动画期间标签页被切走，用户切回来时可能会看到转盘"瞬间跳到"最终角度而不是重新播放动画——这是有意的降级行为（宁可跳一下，也不要卡死）。收尾时如果开启了"不重复抽取"，先 `AppState.markDrawn(winner.id)`（会触发重绘让扇区立刻变灰），再弹出中奖弹窗（`showWinnerDialog`）。**弹窗自动关闭**：读取 `settings.winnerAutoCloseMs`（设置页可调，默认 5000ms，0 表示禁用自动关闭需手动点"好的"），大于 0 时用 `setTimeout` 定时移除弹窗；用户手动关闭时会 `clearTimeout` 取消这个定时器。**再次发起抽奖时自动关闭上一个还没关的弹窗**：`spin()` 一进来就调用 `closeExistingWinnerDialog()`（`document.querySelectorAll('.winner-overlay').forEach(el => el.remove())`），`showWinnerDialog()` 内部也会先调用一次保险；这是因为中奖弹窗展示期间转盘本身并没有被禁用（`spinning` 在弹窗弹出前就已经复位成 `false`），如果不这么处理，连续快速点"开始抽奖"或触发快捷键会导致多个 `.winner-overlay` 层叠在页面上。
+  - **如何调和"权重必须精确"和"动画必须看起来真随机"**：这两者表面上冲突——如果让物理引擎完全自由决定落点（给个初速度、一个摩擦系数，让它自己转到停），那停在哪个扇区就只取决于扇区的角度宽度，跟权重毫无关系（除非扇区大小按权重画，但本项目故意选择"扇区永远等分"，见本节最后一条）。这里的解法是**"预定结果 + 反推轨迹"，不是自由物理**：① 谁中奖，用 `weightedPick()` 在动画开始前按权重精确算好，这一步不能有任何物理随机性；② 减速阶段时长 `slowMs`、③ 扇区内具体落点 `landingOffset`，这两步是**真随机**（`Math.random()` 现算，每次都不同）。有了这三个输入之后，`extraTurns`/`decelStartVelocity` 是**反推**出来的——用真实的匀速/匀减速运动公式，解出"满足①②③这些边界条件的唯一物理轨迹"，而不是让物理自己跑出一个结果。换句话说：位移公式是真的，但边界条件是先给定的，动画只负责让过程看起来随机、不负责决定结果。这跟很多线下抽奖摇珠机的逻辑类似——滚珠翻腾的物理过程随机好看，但真正决定开奖号码的往往是另一套提前定好的机制。
+  - 如果以后要改成"转盘扇区大小按权重比例画"而不是"等分"，需要同时改 `drawWheel()` 里的扇区角度计算和 `spin()` 里的 `winnerLandingAngle` 计算逻辑，两处必须保持一致。
+  - 如果以后要改两阶段动画的具体曲线（比如加一个"匀速→加速→减速"三段式），改 `spin()` 里 `frame()` 函数内的分段公式即可，`fastDistance`/`decelDistance`/`decelStartVelocity` 这几个量的推导过程不需要跟着变，只要保证 `frame()` 在 `elapsed = fastMs+slowMs` 时刻算出的角度精确等于 `nextRotation - startRotation` 就行。
 - **抽奖快捷键（配合翻页笔，支持组合键）**：`WheelPage` 额外导出一个 `triggerShortcutSpin()`（做了个空判断——`#wheel-hub` 都还没渲染出来就不执行，比如学生名单为空的时候），供 `app.js` 的全局按键监听调用。真正的监听逻辑在 `app.js` 的 `bindSpinShortcut()`：`document` 上挂 `keydown`，命中条件是——① `window.__recordingShortcut` 不是 `true`（设置页正在录入新快捷键时跳过，见第 4.3 节）② 当前激活页面是 `#wheel-page` ③ `ShortcutUtil.matches(e, settings.spinShortcutKey)` 为真；命中后 `e.preventDefault()`（防止 `PageUp` 之类的键触发浏览器自身翻页/滚动）再调用 `WheelPage.triggerShortcutSpin()`，内部直接复用 `spin()`，`<2人`、候选池为空、正在旋转中这些保护逻辑全部自动继承，不需要重复判断。默认快捷键是 `PageUp`，因为市面上大多数翻页笔/演示遥控器的"下一页"键发送的就是这个键。**组合键支持见 `scripts/shortcutUtil.js`（`window.ShortcutUtil`）**：`formatFromEvent(e)` 把一次 `KeyboardEvent` 标准化成 `"Ctrl+Shift+T"` / `"PageUp"` 这样的字符串（单独按下 `Control`/`Shift`/`Alt`/`Meta` 时返回 `null`，因为组合键必须以一个非修饰键结束）；`matches(e, combo)` 拿这个标准化结果去和保存的 `settings.spinShortcutKey` 做字符串比较。这个模块被 `app.js`（触发判断）和 `settings.js`（录入时生成 combo）两处共用，**改快捷键匹配逻辑时两边都要看**，且 `index.html` 里 `shortcutUtil.js` 必须排在用到它的脚本之前。
 - **抽中后写入底部"抽取历史"条**：`spin()` 的 `finish()` 收尾阶段，弹中奖弹窗之前会调用 `DrawHistory.add(winner, SECTOR_COLORS[winnerIndex % SECTOR_COLORS.length])`，把当时的扇区颜色也传过去，让历史条卡片和转盘视觉对应。详见第十二节。
+- **中奖庆祝动效**（`scripts/components/winnerEffects.js` + `styles/winnerEffects.css`）：`showWinnerDialog()` 把 `.winner-overlay` 挂到 `document.body` 之后立即调用 `WinnerEffects.play(overlay)`，往 overlay 里再插入一层 `.winner-fx-layer`（`position:absolute; inset:0; pointer-events:none`，盖满整个遮罩层但不挡点击），跟着弹窗一起淡入、一起在 `close()` 时被 `overlay.remove()` 整体移除，不需要单独清理定时器/动画。
+  - **10 种效果**（`EFFECTS` 数组，每次中奖 `Math.floor(Math.random()*10)` 随机选一种）：撒花、冠军奖杯、举手欢呼、烟花、气球、彩带、星光闪烁、鼓掌、派对礼炮、皇冠。**这 10 种不是 10 份互相独立的动画代码**，而是复用 5 种"运动方式"（`motion`：`fall` 从顶部落下、`rise` 从底部弹跳冲上去、`float` 从底部缓缓飘起、`twinkle` 原地反复闪烁、`burst` 从一个起点向外炸开）+ 1 种一次性的 `pop`（大图标在中心弹出，专给"冠军奖杯"用，同时叠加一圈 `burst` 小星星）——不同效果只是给同一套运动方式换 emoji 组合和参数（数量、扩散半径、起点等），这是"确实会重复的动作模式复用"，不是过度抽象。
+  - 每种运动方式对应 `styles/winnerEffects.css` 里一组 CSS `@keyframes`（`winnerFxFall`/`winnerFxRise`/`winnerFxFloat`/`winnerFxTwinkle`/`winnerFxBurst`/`winnerFxHeroPop`），JS 只负责给每个粒子（`<span class="winner-fx-particle winner-fx-{motion}">`）算好并写入一组 CSS 自定义属性（如 `--x`/`--drift`/`--rot`/`--tx`/`--ty`/`--delay`/`--duration`），实际动画完全交给 CSS 跑，JS 不逐帧操作 DOM（跟 `wheel.js` 的 `spin()` 用 `requestAnimationFrame` 逐帧算角度是两种不同的实现思路——这里每个粒子的运动轨迹是纯函数式的位移公式，CSS `animation` 天然胜任，没必要自己写 rAF 循环）。
+  - `burst` 运动方式支持两种起点（`origin`）：`'center'`（烟花、鼓掌，从弹窗中心向四周炸开）和 `'corners'`（派对礼炮，奇数序号粒子从屏幕左下角往右上方炸、偶数序号从右下角往左上方炸，两侧对称呼应真实礼炮效果）。
+  - **如果以后要加新效果**：大概率只需要在 `EFFECTS` 数组里加一条新配方（选一个已有 `motion` + 换 emoji/参数），不需要碰 CSS；只有当确实需要一种全新的运动轨迹时才需要同时加新的 CSS `@keyframes` 和对应的 `else if` 分支（`buildLayer()` 内）。
 
 ### 4.2 录入页 —— `scripts/pages/roster.js` + `styles/roster.css`
 - `render()`：渲染工具栏（统计信息 + "📄 TXT 批量导入" / "➕ 添加学生" / "☁️ 打开 OneDrive 备份" / "📤 立即上传"**四个按钮，统一用 `.btn-primary`**——早期这四个按钮颜色不一致，用户反馈"格格不入"后统一成同一个颜色）+ 学生卡片网格。
@@ -139,7 +158,7 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 
 ### 4.3 设置页 —— `scripts/pages/settings.js` + `styles/settings.css`
 六个卡片区块，`render()` 里整体拼 HTML 再统一 `bindEvents()`。**布局是两栏**（`.settings-container` 用 `display:flex`）：
-- **左栏**（`.settings-left-column`，`flex:1 1 320px; max-width:380px`，内部纵向堆叠）：① 抽奖设置（`spinDurationMs` + `winnerAutoCloseMs` 输入框 + 快捷键录入，见下）② 安装与存储（`bindInstallButton()` 绑定 PWA 安装，见下；`loadStorageStatus()` 显示持久化存储状态）。这两块相对"经常要调"，放左边独立一栏。
+- **左栏**（`.settings-left-column`，`flex:1 1 320px; max-width:380px`，内部纵向堆叠）：① 抽奖设置（`spinFastMs`/`spinFastTurns`/`spinSlowMs` 三个并排输入框 + `winnerAutoCloseMs` 输入框 + 快捷键录入，卡片内部用 `.setting-group-title` + `.setting-divider` 分成"转盘节奏 / 中奖提示 / 操作方式"三个小分组，避免几块内容堆成一大坨看起来乱，见下）② 权重公式（`bindWeightFormula()`，文本输入框 + "重置为默认"按钮，`change` 事件时用 `AppState.testWeightFormula()` 校验，失败则 `Toast.error` 红色提示并把输入框恢复成 `lastSaved`，成功则 `AppState.updateWeightFormula()` 保存并重算权重，见第三节"权重公式"）③ 安装与存储（`bindInstallButton()` 绑定 PWA 安装，见下；`loadStorageStatus()` 显示持久化存储状态）。这几块相对"经常要调"，放左边独立一栏。
 - **右栏**（`.settings-right-column`，`display:grid; grid-template-columns: repeat(2, 1fr)`，两列两行）：③ 数据导入导出（`ImportExport.exportToFile()` / `ImportExport.importFromFile()`）④ OneDrive 云备份（`OneDriveApi.open()`）⑤ 版本信息（`loadVersionInfo()` 拉取 `version.json`；"检查更新"按钮手动触发 `UpdateChecker.check()`；"📖 产品说明"是个 `<a href="./Handbook/index.html">`，新标签页打开使用手册，见第十节。**这里故意写成 `index.html` 而不是 `./Handbook/`**：早期用目录路径时，在某些静态托管环境下点击会先经过一个中转页需要二次点击才能真正进入，写死文件名可以绕开对"目录自动补 index.html"这个行为的依赖，更稳。）⑥ 危险区域（`AppState.clearStudents()`，二次确认）。这四块内容量不一，**用 `.settings-section { height:100%; display:flex; flex-direction:column; }` + grid 默认的 `align-items:stretch` 让同一行的两张卡片自动等高**，不需要手动计算高度。
 - **抽奖快捷键录入（支持组合键）**（`bindShortcutRecorder()`，"抽奖设置"卡片里，`settings.spinShortcutKey` 默认 `'PageUp'`）：点击"🎹 录入键盘快捷键"后，按钮文字变成"请按下要设置的按键...（Esc 取消）"并禁用，同时把全局标记 `window.__recordingShortcut` 设为 `true`；然后在 `document` 上（`capture: true`）挂一个 `keydown` 监听，每次按键先用 `ShortcutUtil.formatFromEvent(e)` 标准化——**如果只是单独按下了 `Ctrl`/`Alt`/`Shift`/`Meta` 会返回 `null`，此时监听器不摘除，继续等待用户按下组合的最后一个非修饰键**；拿到非空的 combo 字符串后才真正结束录入：`combo === 'Escape'` 时不改动（取消录入，保留原值），否则存进 `settings.spinShortcutKey`、更新 `#setting-shortcut-display` 显示，同时把 `window.__recordingShortcut` 复位为 `false`、按钮恢复原状。**`window.__recordingShortcut` 这个全局标记的作用**：告诉 `app.js` 里真正触发抽奖的那个全局快捷键监听器"现在正在录入新快捷键，这次按键不要当成触发抽奖来处理"，避免录入过程中意外拉动了转盘（虽然实际场景下设置页和抽奖页不会同时激活，理论上不太可能冲突，但留着这层保护更稳妥）。
 - **隐藏"抽取历史"条**：同一张"抽奖设置"卡片里还有一个勾选框（`#setting-hide-draw-history`），对应 `settings.hideDrawHistory`（默认 `false`，即默认显示），勾选后调用 `AppState.updateSettings({hideDrawHistory:true})`；具体怎么隐藏见第十二节 `DrawHistory` 的 `applyVisibility()`。
@@ -155,6 +174,7 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 | `modal.js` | `window.Modal.{confirm, escapeHtml}` | `confirm({title,text,confirmText,cancelText,danger})` 返回 `Promise<boolean>`，点遮罩/按 Esc 视为取消。`escapeHtml` 在所有把用户输入拼进 `innerHTML` 的地方都要用，防止 XSS（比如学生姓名） |
 | `imageCropper.js` | `window.ImageCropper.open(file)` | 纯 Canvas 实现的 1:1 裁剪器，无第三方库。内部：先按"覆盖填满"（`Math.max` 缩放比）画出图片，用户拖拽改 `offsetX/offsetY`、滑动条改 `zoom`，`clampOffset()` 防止拖出边界露白；确认时把 320×320 的预览画布再缩放绘制到 `OUTPUT_SIZE=320` 的输出画布，导出 `image/jpeg` quality 0.88 的 dataURL |
 | `drawHistory.js` | `window.DrawHistory.add(student, color)` | 屏幕底部"抽取历史"条，详见第十二节 |
+| `winnerEffects.js` | `window.WinnerEffects.play(overlayEl)` | 中奖弹窗的随机庆祝动效，详见第 4.1 节末尾"中奖庆祝动效" |
 
 `scripts/shortcutUtil.js`（`window.ShortcutUtil`，不在 `components/` 目录下，因为它不渲染任何 UI，纯粹是键盘事件处理的小工具）：`formatFromEvent(e)` / `matches(e, combo)`，详见第 4.1 节"抽奖快捷键"。
 
@@ -164,19 +184,21 @@ weight = Math.max(MIN_WEIGHT, WEIGHT_BASE - score)   // WEIGHT_BASE = 160, MIN_W
 
 **这是最容易被后续修改遗漏的部分，务必读完。**
 
-- `version.json`（仓库根目录）内容只有一个字段：`{"version": "一个字符串，通常是 ISO 时间戳"}`。
-- **⚠️ 每次往 GitHub Pages 发布新版本时，必须手动把 `version.json` 里的 `version` 改成新值**（改成当前时间即可，任何和上次不同的字符串都行）。这一步没有自动化，是本项目更新提示机制生效的前提。同时建议顺手把 `service-worker.js` 顶部的 `CACHE_NAME` 也改一个新值（否则依赖 SW 走 network-first 策略也能工作，但改一下能更彻底地清理旧缓存）。
-- 逻辑（`UpdateChecker.check()`，`app.js` 启动时调用一次，设置页"检查更新"按钮也会手动调用）：
-  1. `fetch('./version.json', {cache:'no-store'})` 拿远端最新版本号（`no-store` 绕过浏览器缓存，否则可能读到旧文件）。
+- `version.json`（仓库根目录）内容三个字段：`{"version": "ISO 时间戳，驱动更新检测的判重", "semver": "人类可读的语义化版本号，如 1.2.0，展示用，不参与判重逻辑", "changelog": [{"semver","date","items":[...]}, ...] }`。**`version`/`semver` 两个字段职责分开，不要合并成一个**：`version`（时间戳）唯一职责是"和上次是否不同"，只要精确到秒就天然不会撞车（见下）；`semver` 唯一职责是给人看"这是第几个版本"，语义化版本号本身不保证单调递增可比较（`"1.10.0"` 和 `"1.9.0"` 做字符串比较会得出错误结论），所以更新检测逻辑**只认 `version` 字段，永远不要用 `semver` 做判重或新旧比较**。`changelog` 是**按版本从新到旧排列**的数组，供更新弹窗展示"What's New"（只取前 3 条，见下）。
+- **⚠️ 每次往 GitHub Pages 发布新版本时，必须手动做四件事**：
+  1. 把 `version.json` 的 `version` 改成新的精确时间戳（执行 `date -Iseconds`，如 `2026-09-03T09:46:38+08:00`，**不能手打一个整点/大概时间**——**真实踩过的坑**：早期习惯手打整点时间如 `19:00:00` 当占位符，同一天内改两次版本容易撞成完全相同的字符串，更新检测机制靠字符串"不同"判断有没有新版，一撞车第二次发布对用户来说等于没发生，弹窗不会触发；取精确到秒的真实时间可以从根本上避免）。
+  2. 把 `version.json` 的 `semver` 按语义化版本规则递增（纯 bug 修复 → patch 如 `1.1.1`；新增向后兼容的功能 → minor 如 `1.2.0`；破坏性变更/大改版 → major 如 `2.0.0`），并在 `UPDATE.md` 顶部加一条对应记录（版本号 + 日期 + 变更点）。**`version.json` 的 `semver` 必须始终等于 `UPDATE.md` 最新一条的版本号**，两处不同步会让人分不清到底哪个是真的当前版本。
+  3. 在 `version.json` 的 `changelog` 数组**最前面**插入一条 `{semver, date, items}`（`items` 和 `UPDATE.md` 这条记录的要点保持一致，措辞可以更精简，面向用户而不是面向开发者）——`changelog` 数组本身不需要裁剪旧记录（弹窗只读前 3 条），但新记录必须插在最前面，顺序错了弹窗展示的"最新版本"就会是错的。
+  4. 顺手把 `service-worker.js` 顶部的 `CACHE_NAME` 也改一个新值（否则依赖 SW 走 network-first 策略也能工作，但改一下能更彻底地清理旧缓存）。
+  这几步都没有自动化，是本项目更新提示机制和版本追踪能力生效的前提，发版前照着做，不要漏掉。
+- **更新机制是强制型的，没有"跳过"/"取消"选项**（早期版本是软性提示，用户可以点"取消"或勾选"本版本不再提示"，后来改成强制，因为软性提示会导致部分用户长期停留在旧版本、遇到已修复的 bug 还来反馈）。逻辑（`UpdateChecker.check()`，`app.js` 启动时调用一次，设置页"检查更新"按钮也会手动调用）：
+  1. `fetch('./version.json', {cache:'no-store'})` 拿远端最新的 `{version, semver, changelog}`（`no-store` 绕过浏览器缓存，否则可能读到旧文件）。
   2. 和 `localStorage['lottery.updateMeta.lastSeenVersion']` 比较：
-     - 首次访问（`lastSeenVersion` 是 `null`）：直接记录，不打扰用户。
+     - 首次访问（`lastSeenVersion` 是 `null`）：直接记录，不打扰用户（不是"跳过"，纯粹是新用户不需要看"更新"提示）。
      - 相同：不提示。
-     - 不同 且 不等于 `localStorage['lottery.updateMeta.skippedVersion']`：弹出 `update.css` 样式的对话框。
-  3. 对话框三个操作：
-     - **立即升级**：把 `lastSeenVersion` 更新为新版本号 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`。
-     - **取消**（不勾选跳过）：什么都不存，下次打开页面还会再弹一次。
-     - **取消 + 勾选"本版本不再提示"**：把新版本号写进 `skippedVersion`，之后只要 `version.json` 没有变成比它更新的值就不会再弹（下次真正发新版才会重新提示）。
-- `service-worker.js` 的 `fetch` 事件处理器用的是 **network-first**：在线时永远优先请求网络最新资源并顺便更新缓存，离线才回退缓存。这从根源上减少"改了代码但用户看到旧版本"的情况；`version.json` 弹窗是在此之上**用户可感知的提示层**，两者互补，不要误以为二选一。
+     - 不同：弹出 `update.css` 样式的强制对话框，**没有任何关闭方式**（无遮罩点击关闭、无 Esc 监听、无取消按钮）——文案是"You have successfully updated to v{semver}!!!"（因为 Service Worker 的 network-first 策略下新资源其实已经在后台拿到了，这个弹窗是"确认收到"而不是"要不要更新"）+ "What's New" 展示 `changelog` 前 3 条 + 唯一按钮"Click here to finish update"。
+  3. 点击"Click here to finish update"：把 `lastSeenVersion` 更新为新版本号 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`，刷新后页面真正跑起新版本代码。
+- `service-worker.js` 的 `fetch` 事件处理器用的是 **network-first**：在线时永远优先请求网络最新资源并顺便更新缓存，离线才回退缓存。这从根源上减少"改了代码但用户看到旧版本"的情况；`version.json` 弹窗是在此之上**用户可感知、且强制确认的提示层**，两者互补，不要误以为二选一。
 
 ---
 
@@ -287,6 +309,7 @@ Handbook/index.html              面向教师用户的产品使用手册（独�
 styles/base.css                  CSS 变量、reset、通用按钮/表单/模态框/滚动条
 styles/navbar.css                顶部导航栏
 styles/wheel.css                 转盘、指针、中奖弹窗
+styles/winnerEffects.css         中奖弹窗随机庆祝动效（见 4.1 节末尾）
 styles/roster.css                学生卡片网格、裁剪弹窗、TXT 导入预览
 styles/settings.css              设置页卡片网格、存储状态卡片
 styles/onedrive.css              OneDrive 备份弹窗
@@ -308,6 +331,7 @@ scripts/components/modal.js      通用确认弹窗
 scripts/components/imageCropper.js  1:1 头像裁剪（纯 Canvas）
 scripts/components/classSwitcher.js 班级切换/新建/重命名/删除组件
 scripts/components/drawHistory.js   屏幕底部"抽取历史"条（见十二节，脚本加载顺序必须在 state.js 之后）
+scripts/components/winnerEffects.js 中奖弹窗随机庆祝动效（见 4.1 节末尾）
 scripts/pages/wheel.js           抽奖页：画转盘 + 加权抽取 + 旋转动画
 scripts/pages/roster.js          录入页：学生 CRUD + 照片 + TXT 批量导入
 scripts/pages/settings.js        设置页：六个功能卡片

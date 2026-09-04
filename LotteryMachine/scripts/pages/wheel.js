@@ -6,7 +6,13 @@
 
     const SECTOR_COLORS = ['#4a6cf7', '#22c1a4', '#f5a623', '#ef5da8', '#7c5cff', '#2fb8e0', '#ff8b5c', '#5bd1a0'];
     const DRAWN_SECTOR_COLOR = '#c7cbd6'; // "不重复抽取"模式下，已抽过的学生扇区变灰
-    const EXTRA_SPINS = 6; // 停止前额外转的整圈数，让动画更有仪式感
+    // 中奖扇区两侧各留出的安全边距（占扇区宽度的比例），指针实际停靠点在扇区内随机，但不会精确停在分隔线上
+    const SECTOR_LANDING_MARGIN_RATIO = 0.01;
+    // 落点分布往两侧拉伸的倍数：k 倍拉伸会让 1-(1-2m)/k 比例的抽奖精确卡死在同一个边界值上（没有随机性了，
+    // m=SECTOR_LANDING_MARGIN_RATIO）；k=1.1、m=0.01 时约 10.9%（两侧各约 5.5%），
+    // 在"往两侧靠"和"仍然看起来随机"之间取了个折中——早期试过 k=2（不考虑 m 时公式简化成 (k-1)/k），
+    // 卡死比例高达 50%，实测效果太夸张，调小到了 1.1
+    const SECTOR_LANDING_STRETCH_FACTOR = 1.1;
 
     let currentRotation = 0; // 累计旋转角度（degree），只增不减，保证动画方向一致
     let spinning = false;
@@ -183,6 +189,7 @@
             if (e.target === overlay || e.target.closest('[data-action="close"]')) close();
         });
         document.body.appendChild(overlay);
+        WinnerEffects.play(overlay); // 每次中奖随机触发一种庆祝动效（撒花/奖杯/欢呼等），见 winnerEffects.js
 
         const autoCloseMs = AppState.getState().settings.winnerAutoCloseMs;
         if (autoCloseMs > 0) {
@@ -190,6 +197,16 @@
         }
     }
 
+    // 旋转动画分两个阶段（时长/圈数由 settings.spinFastMs / spinFastTurns / spinSlowMs 控制，可在设置页调整）：
+    //   阶段一（匀速）：x 毫秒内匀速转固定圈数，营造"公平"的既视感，与中奖者无关。
+    //   阶段二（匀减速）：固定用 y 毫秒，从阶段一的转速开始匀速降低到 0，最终精确停在中奖扇区内
+    //   随机选中的一点（不是固定停在扇区正中间，避免每次都停中间显得像"设计好的"）——
+    //   减速阶段实际要走的角度是 (中奖所需角度 + k 整圈)，k 取让减速起始速度尽量贴近阶段一转速的那个整数，
+    //   避免两阶段衔接处出现肉眼可见的速度突变（推导见 PROJECT.md 第四节"旋转与中奖逻辑"）。
+    //   曾经试过让 y 是"时长上限"、实际时长在 [y/2,y] 内随机取——用户反馈这样反而容易有"突然停下"
+    //   的观感：因为 decelStartVelocity = 2*decelDistance/slowMs，要走的距离差不多，时长却可能被
+    //   随机砍到只剩一半，起始速度就要翻倍去追，减速曲线陡峭得多，看起来像急刹车而不是缓缓停下，
+    //   于是改回固定用 y 毫秒，减速节奏才稳定可预期。
     function spin() {
         if (spinning) return;
         const students = AppState.getStudents();
@@ -211,41 +228,92 @@
         const winner = weightedPick(pool);
         const winnerIndex = students.indexOf(winner);
         const seg = 360 / students.length;
-        const winnerMidAngle = winnerIndex * seg + seg / 2; // 相对 0 号扇区起点（正上方）的顺时针角度
+        // 落点在中奖扇区内随机取一点，而不是每次都精确停在扇区正中间——固定停中间在视觉上像"设计好的"，
+        // 缺乏真实转盘的随机感。分布上还刻意"往两侧分隔线方向拉"而不是简单均匀分布：把扇区内位置
+        // 看成 [0,1] 的比例 f，用 stretched = 0.5 + k*(f-0.5) 做一次以中点为轴心的 k 倍拉伸——
+        // 原本集中在中间 1/k（比如 k=1.1 时是 90.9%）的采样被拉伸铺满整个 [0,1]，原本落在两侧
+        // 各 (1-1/k)/2（k=1.1 时约 4.5%）的采样则会超出 [0,1] 范围，被 clamp 摁在边界附近
+        // （由 SECTOR_LANDING_MARGIN_RATIO 决定具体摁到离分隔线多近）。**k 越大，被摁死在同一个
+        // 边界值上、彻底失去随机性的比例就越高**（精确比例 = (k-1)/k，见 PROJECT.md 推导），
+        // k=1.1 时约 9.09%（两侧各约 4.5%），在"往两侧靠、增加悬念"和"仍然看起来是随机的"之间取了个折中。
+        const rawFraction = Math.random();
+        const stretchedFraction = 0.5 + SECTOR_LANDING_STRETCH_FACTOR * (rawFraction - 0.5);
+        const clampedFraction = Math.min(1 - SECTOR_LANDING_MARGIN_RATIO, Math.max(SECTOR_LANDING_MARGIN_RATIO, stretchedFraction));
+        const landingOffset = clampedFraction * seg;
+        const winnerLandingAngle = winnerIndex * seg + landingOffset; // 相对 0 号扇区起点（正上方）的顺时针角度
 
-        // 目标：转到某个角度后，中奖扇区中心恰好落在正上方（指针处）
-        const desiredFinalAngle = (360 - (winnerMidAngle % 360)) % 360;
-        const currentMod = ((currentRotation % 360) + 360) % 360;
-        let delta = ((desiredFinalAngle - currentMod) % 360 + 360) % 360;
+        // 目标：转到某个角度后，中奖扇区内刚才随机选中的那一点恰好落在正上方（指针处）
+        const desiredFinalAngle = (360 - (winnerLandingAngle % 360)) % 360;
 
-        const durationMs = (AppState.getState().settings.spinDurationMs) || 2000;
-        const nextRotation = currentRotation + EXTRA_SPINS * 360 + delta;
+        const settings = AppState.getState().settings;
+        const fastMs = Math.max(100, settings.spinFastMs || 1000); // x：匀速阶段时长
+        // x 毫秒内固定转几圈，可在设置页调整，支持小数（比如 0.5 圈）；不再强制取整
+        const fastTurns = Math.max(0.1, Number(settings.spinFastTurns) || 3);
+        const slowMs = Math.max(100, settings.spinSlowMs || 1000); // y：减速阶段固定时长，不再随机取值
+
+        const fastDistance = fastTurns * 360; // 阶段一固定走的角度
+        // fastTurns 支持小数后，fastDistance 不再保证是 360 的整数倍，阶段一结束时的 mod-360 位置
+        // 相比阶段一开始前会有偏移，所以 delta 必须相对"阶段一结束后的角度"来算，不能再用阶段一开始前的角度
+        const afterFastMod = ((currentRotation + fastDistance) % 360 + 360) % 360;
+        const delta = ((desiredFinalAngle - afterFastMod) % 360 + 360) % 360;
+        const fastVelocity = fastDistance / fastMs; // 阶段一角速度（度/毫秒）
+        const idealDecelDistance = fastVelocity * slowMs / 2; // 若减速阶段起始速度恰好等于阶段一速度，理论上应走的角度
+        // 在 delta 的基础上加 k 个整圈，让减速阶段实际角度尽量贴近 idealDecelDistance（保证速度衔接平滑）
+        const extraTurns = Math.max(0, Math.round((idealDecelDistance - delta) / 360));
+        const decelDistance = delta + extraTurns * 360; // 减速阶段实际要走的角度
+        const decelStartVelocity = (2 * decelDistance) / slowMs; // 减速阶段起始角速度，从此匀减速到 0
+
+        const startRotation = currentRotation;
+        const nextRotation = startRotation + fastDistance + decelDistance;
+        const totalMs = fastMs + slowMs;
 
         spinning = true;
         hub.classList.add('spinning');
+        canvas.style.transition = 'none'; // 改用 requestAnimationFrame 逐帧驱动，不依赖 CSS transition
+        SoundEffects.playSpin(totalMs); // spin 音效随机选一个，倍速拉伸/压缩到刚好等于本次旋转总时长
 
-        canvas.style.transition = `transform ${durationMs}ms cubic-bezier(0.12,0.67,0.1,0.99)`;
-        canvas.style.transform = `rotate(${nextRotation}deg)`;
-
-        // 正常收尾路径：transitionend 触发时执行一次
-        // 兜底路径：极短时长/被打断等极端情况下浏览器有时不会派发 transitionend，
-        // 用一个略长于动画时长的 setTimeout 兜底，避免 spinning 卡死导致转盘再也点不动
+        const startTime = performance.now();
+        let rafId = null;
         let finished = false;
-        const finish = () => {
+
+        // 兜底：标签页被切到后台/最小化时，浏览器可能整个暂停 requestAnimationFrame 回调
+        // （不只是降频，而是完全不再触发），如果 finish() 只从 rAF 循环里调用，转盘会永久卡在
+        // "旋转中"，`开始抽奖`再也点不动——这正是旧版 CSS transition + transitionend 方案曾经踩过的
+        // 同一类坑（见 PROJECT.md），只是触发条件从"transitionend 不触发"变成了"rAF 不触发"。
+        // setTimeout 在后台标签页里会被降频但不会被完全暂停，用它做安全网可以保证无论如何都会收尾。
+        function finish() {
             if (finished) return;
             finished = true;
-            canvas.removeEventListener('transitionend', onEnd);
+            if (rafId) cancelAnimationFrame(rafId);
             clearTimeout(fallbackTimer);
             currentRotation = nextRotation;
+            canvas.style.transform = `rotate(${nextRotation}deg)`;
             spinning = false;
             hub.classList.remove('spinning');
+            SoundEffects.stopSpin(); // 倍速是按理论时长估算的，实际收尾时兜底停掉，避免拖尾
+            SoundEffects.playWin(); // 指针停下、中奖者确定后播放，随机选一个，原速播完
             if (noRepeat) AppState.markDrawn(winner.id); // 触发重绘让中奖扇区变灰，不等待也不影响弹窗展示
             DrawHistory.add(winner, SECTOR_COLORS[winnerIndex % SECTOR_COLORS.length]); // 历史条卡片颜色跟当时的扇区颜色保持一致
             showWinnerDialog(winner);
-        };
-        const onEnd = () => finish();
-        canvas.addEventListener('transitionend', onEnd);
-        const fallbackTimer = setTimeout(finish, durationMs + 300);
+        }
+        const fallbackTimer = setTimeout(finish, totalMs + 500);
+
+        function frame(now) {
+            const elapsed = now - startTime;
+            if (elapsed >= totalMs) { finish(); return; }
+
+            let angle;
+            if (elapsed <= fastMs) {
+                angle = fastVelocity * elapsed;
+            } else {
+                const tau = elapsed - fastMs; // 减速阶段已经过去的毫秒数
+                angle = fastDistance + decelStartVelocity * tau - (decelStartVelocity / (2 * slowMs)) * tau * tau;
+            }
+            canvas.style.transform = `rotate(${startRotation + angle}deg)`;
+            rafId = requestAnimationFrame(frame);
+        }
+
+        rafId = requestAnimationFrame(frame);
     }
 
     function render() {

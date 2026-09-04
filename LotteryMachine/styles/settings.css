@@ -44,6 +44,35 @@
 .setting-item { margin-bottom: 0.9rem; }
 .setting-item:last-child { margin-bottom: 0; }
 
+/* 设置卡片内的小分组标题/分隔线，把内容拆成"转盘节奏/中奖提示/操作方式"这类子区块，避免长长一整块看起来乱 */
+.setting-group-title {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.55rem;
+}
+.setting-divider {
+    border-top: 1px solid var(--border-color);
+    margin: 1rem 0 0.9rem;
+}
+
+/* 转盘"匀速圈 x / 悬念圈 y"两个数字输入并排展示 */
+.spin-timing-row { gap: 0.9rem; }
+.spin-timing-field {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.spin-timing-field-label {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+/* "圈数"是整数、位数少，给窄一点的宽度，别跟两侧的毫秒输入框抢一样的空间 */
+.spin-timing-field-turns { flex: 0 0 64px; }
+
 .shortcut-key-badge {
     display: inline-block;
     background: var(--bg-color);
