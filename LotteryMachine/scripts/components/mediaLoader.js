@@ -114,10 +114,31 @@
         }
     }
 
+    // 首次访问时 app.js 里 register() 和 MediaLoader.run() 是背靠背调用、没有互相等待的——
+    // 这一刻 Service Worker 还没激活成为这个页面的 controller，下面 fetch(src) 不会被
+    // service-worker.js 的 fetch 事件拦截，也就不会被写进 Cache Storage（cache.put 那步完全没跑到）。
+    // 结果就是：第一次进入把文件下完了、蒙版正常消失，但这些字节其实没有真正缓存下来；
+    // 下一次刷新时 SW 才真正接管，这时候是 cache miss，只能重新走一遍完整下载——
+    // 这正是"加载完一个刷新又重新加载、要进好几次才彻底完成"的根因。
+    // 这里在真正开始下载前，等 SW 变成这个页面的 controller（激活后会触发 controllerchange），
+    // 让 fetch(src) 从第一次就能被拦截、缓存，避免"看起来加载完了但其实没缓存"的假完成。
+    // 加超时兜底：不支持 SW/被浏览器策略挡住时不能让蒙版卡死，超时后照常走网络下载（不缓存，但能用）。
+    function waitForServiceWorkerControl(timeoutMs) {
+        if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) {
+            return Promise.resolve();
+        }
+        return Promise.race([
+            new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true })),
+            new Promise((resolve) => setTimeout(resolve, timeoutMs))
+        ]);
+    }
+
     async function run() {
         const { overlay, skip } = els();
         if (!overlay) return; // 没有这个蒙版容器（比如页面结构被改过），直接跳过，不影响主流程
         if (!FILES.length) { dismiss(); return; }
+
+        await waitForServiceWorkerControl(5000);
 
         const hardTimer = setTimeout(() => dismiss('部分音效素材加载超时，先带你进入应用'), HARD_TIMEOUT_MS);
         const skipTimer = setTimeout(() => {

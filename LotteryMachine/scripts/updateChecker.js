@@ -81,7 +81,7 @@
         overlay.innerHTML = `
             <div class="update-dialog">
                 <div class="update-icon">🎉</div>
-                <div class="update-title">You have successfully updated${semver ? ` to v${Modal.escapeHtml(semver)}` : ''}!!!</div>
+                <div class="update-title">We have successfully updated${semver ? ` to v${Modal.escapeHtml(semver)}` : ''}!!!</div>
                 <div class="update-whatsnew-title">What's New</div>
                 <div class="update-changelog">${renderChangelog(changelog)}</div>
                 <div class="update-actions">
