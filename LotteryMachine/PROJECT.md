@@ -197,6 +197,13 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 
 ## 六、更新检测机制（需求 1）—— `scripts/updateChecker.js` + `/deploy-tag.json` + `version.json`
 
+> **常见误解澄清：弹不弹窗完全不需要改 `version.json`。** 判重只看 `/deploy-tag.json` 变没变
+> （大仓库任何一次 push 都会让它变），跟 `LotteryMachine/version.json` 有没有同步更新完全无关——
+> 就算这次改动完全忘了动 `version.json`，只要大仓库有新 push，用户依然会看到更新弹窗，只是弹窗里
+> "What's New" 展示的还是上一条旧记录（不会报错，也不会因此不弹）。反过来，**只改 `version.json`
+> 不 push 到大仓库，`/deploy-tag.json` 没变，也不会弹窗**——`version.json` 从始至终只是"弹窗里展示
+> 什么文字"，不是"要不要弹窗"的开关。
+
 **部署方式**：这个项目实际是作为子目录挂在 `shixunD.github.io` 这个大仓库里（Cloudflare 控制台直接连了这个 GitHub 仓库，`wrangler.jsonc` 的 `assets.directory` 指向仓库根目录），**push 到 `main` 分支后 Cloudflare 会自动重新构建部署整个仓库，服务器端内容"是否最新"完全不需要人管**（日常开发流程：在这个独立文件夹里改，改完手动复制整个文件夹去覆盖大仓库里的 `LotteryMachine/` 子目录，再由大仓库那边 push）。下面这套机制解决的是另一个问题：**已经打开过页面/已安装 PWA 的用户，怎么知道服务器上其实已经有新内容了**——尤其是现在 `service-worker.js` 已经改成全部资源 cache-first（见十一节），不主动检测的话用户会一直用着本地缓存，感知不到任何更新。
 
 - **判重信号是 `/deploy-tag.json`（大仓库根目录，注意不是 `LotteryMachine/version.json`）**，这个文件不由本项目维护，是大仓库在 Cloudflare 的 Build 命令里每次 push 后自动生成的（commit SHA + 构建时间），**任何一次 push 到大仓库都会让它的内容变化，不需要任何人手动同步任何字段**——这就是为什么"改没改 `version.json`"不再是判重条件：以前维护过一个专门的 `version`（ISO 时间戳）字段给判重用，每次发版都要记得手动改，真实踩过的坑是容易忘记同步改、或者同一天内改两次版本手打的时间戳撞成一样的字符串导致弹窗不触发；现在完全自动化，代价是"任何一次 push 到大仓库"（哪怕改的是 `shixunD.github.io` 里别的子项目，跟 LotteryMachine 无关）都会让 LotteryMachine 的用户看到一次更新提示——目前的开发习惯是"改完 LotteryMachine 就顺手复制过去 push"，这个粒度对现在的工作流来说是可接受的。
@@ -215,6 +222,7 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
        - **"Maybe Later"**：直接关掉弹窗，**不写 `lastSeenTag`**——不清缓存也不刷新，旧版本继续跑。因为 `lastSeenTag` 没变，下次打开应用时 tag 依然和它不一致，会照样再弹一次，相当于"这次先不管，下次打开再问我"。
        - **"Skip This Version"**：把 `lastSeenTag` 更新为这次的指纹，但**不清缓存/不刷新**——旧版本继续跑，这个具体版本以后不会再提示，要等大仓库下一次真的有新 push（tag 再变一次）才会重新弹出。
      三个按钮共用同一份 `tag`，区别只在"要不要 `setLastSeen`"和"要不要 `applyUpdate()`+刷新"这两件事上分别怎么组合。
+- **`check()` 接受 `{force:true}`**：设置页"🔄 检查更新"按钮用的是这个模式，跳过上面第 2 步里"首次访问直接记录"和"tag 相同就不提示"这两条判重逻辑，只要能拿到 `tag` 就无条件走一遍"tag 变化后开启网页"本该发生的流程（拉最新 `version.json` + 弹更新弹窗）——**这是有意为之**：用户主动点这个按钮就是想立刻看到"这个版本更新了什么"，如果因为 tag 恰好没变就静默无反应，会显得按钮像坏的一样。`app.js` 启动时的自动检测（`UpdateChecker.check()`，不传 `force`）依然保留原来的判重逻辑，不会每次打开都弹。`check()` 返回 `{ok, shown}`：`ok:false` 表示没拿到 `tag`（本地开发没有 `/deploy-tag.json`、或离线），按钮的点击回调据此弹一条 `Toast.error` 告诉用户"未检测到部署信息，无法检查更新"，而不是默默什么都不发生。
 - **大仓库那边需要配置的 Cloudflare Build 命令**（不在本项目仓库里，是 Cloudflare 控制台的项目设置）：Worker 项目 → Settings → Build，设置 Build command 在每次 push 构建时生成 `deploy-tag.json` 到仓库根目录，用 Cloudflare Workers Builds 自动注入的 `WORKERS_CI_COMMIT_SHA` 环境变量，例如：
   ```
   echo "{\"sha\":\"$WORKERS_CI_COMMIT_SHA\",\"builtAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > deploy-tag.json

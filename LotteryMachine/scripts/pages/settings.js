@@ -256,7 +256,10 @@
 
         body.querySelector('#settings-check-update-btn').addEventListener('click', async () => {
             Toast.info('正在检查更新...');
-            await UpdateChecker.check();
+            const result = await UpdateChecker.check({ force: true });
+            if (!result.ok) {
+                Toast.error('未检测到部署信息（本地开发环境或暂时离线），无法检查更新');
+            }
         });
 
         body.querySelector('#settings-clear-btn').addEventListener('click', async () => {

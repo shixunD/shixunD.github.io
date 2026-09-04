@@ -133,20 +133,30 @@
         }
     }
 
-    async function check() {
+    // opts.force：跳过"首次访问直接记录"和"tag 没变就不弹"这两条判重逻辑，无条件走一遍
+    // "tag 变化后开启网页"本该发生的流程（拉最新 changelog + 弹更新弹窗）——用于设置页
+    // "🔄 检查更新"按钮：用户主动点击时应该立刻看到当前版本的更新内容，而不是因为 tag
+    // 恰好没变就悄悄什么反应都没有。
+    // 返回 { ok, shown }：ok=false 表示没拿到 tag（本地开发/离线），调用方可以据此提示用户；
+    // shown 表示这次有没有真的弹出弹窗。
+    async function check(opts) {
+        const force = !!(opts && opts.force);
         const tag = await fetchTag();
-        if (!tag) return; // 拿不到 deploy-tag.json（本地开发/离线/还没配置），跳过这次检测
+        if (!tag) return { ok: false, shown: false }; // 拿不到 deploy-tag.json（本地开发/离线/还没配置），跳过这次检测
 
         const lastSeen = getLastSeen();
-        if (lastSeen === null) {
-            // 首次访问：直接记录，不弹窗打扰
-            setLastSeen(tag);
-            return;
+        if (!force) {
+            if (lastSeen === null) {
+                // 首次访问：直接记录，不弹窗打扰
+                setLastSeen(tag);
+                return { ok: true, shown: false };
+            }
+            if (tag === lastSeen) return { ok: true, shown: false };
         }
-        if (tag === lastSeen) return;
 
         const remote = await fetchChangelog();
         showDialog(tag, remote && remote.semver, remote && remote.changelog);
+        return { ok: true, shown: true };
     }
 
     window.UpdateChecker = { check };
