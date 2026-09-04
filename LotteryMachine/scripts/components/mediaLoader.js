@@ -1,4 +1,4 @@
-// mediaLoader.js —— 启动蒙版：下载/命中缓存全部音效素材前，遮住整个页面不让用户操作
+// mediaLoader.js —— 启动蒙版：全部音效素材确认写入缓存之前，遮住整个页面不让用户操作
 // 全局命名空间：window.MediaLoader
 //
 // 为什么需要这一层，而不是只靠 soundEffects.js 里的后台预加载（warmUp）：后台预加载不会阻塞用户
@@ -6,37 +6,37 @@
 // （见 PROJECT.md 抽奖音效小节的踩坑记录）。这里用一个强制蒙版把"能不能开始用"和"素材是否就绪"绑死，
 // 从产品体验上彻底避免这个时序问题——代价是首次/缓存失效后的启动会多等一下，用进度条把这个等待过程
 // 显式呈现出来，而不是让用户在不知情的情况下点"抽奖"却听不到完整音效。
+//
+// **蒙版消失的唯一条件是：清单里每一个文件都已经确认躺在 Cache Storage 里。** 没有"到点强制放行"
+// 的固定超时——那是真实踩过的坑：16 个 wav 合计十几 MB，真实网络下经常超过原来的 15 秒硬超时，
+// 一到点蒙版就把进度条拉到 100% 然后消失，其实文件还在后台下；用户这时候刷新，正在下载的请求全部
+// 被中断，只有已经写完缓存的那几个留下来，下次进来就从 50% 左右重新走——表现就是"显示 100% 了
+// 过一会儿又从一半开始、要进好几次才真正下完"。现在只保留两个逃生口：网络长时间零进度时提示，
+// 以及用户自己点"跳过等待"。
 
 (function () {
     'use strict';
 
     // 必须和 service-worker.js 里的 CACHE_NAME 保持一致——这里不经过 SW 拦截，直接用 Cache API
     // 读写同一个缓存桶（Cache Storage 在 window/SW 两侧是同一份数据，不需要 SW 参与也能读写）。
-    // 这样做的原因见下面 run() 里的说明：不能依赖"SW 是否已经接管这个页面"这种时序不确定的条件。
     const CACHE_NAME = 'lottery-cache-v1';
 
-    // 素材实际下载走 fetch()，命中过缓存的文件直接从 Cache Storage 读，不用真的发网络请求——
-    // 所以老用户重新打开时这个蒙版通常只会一闪而过，不是每次都要等真下载。
-    //
-    // **这里没有硬编码文件数量或路径**，全部从 SoundEffects.SPIN_FILES/WIN_FILES 这两个数组读——
-    // 以后往那两个数组里加新素材（同时把文件放进 backgroundmusic/spin 或 win 目录），这里、
-    // 下面的进度计算、Promise.all 都不需要跟着改一行代码，新文件会自动被算进总进度、下载完才放行。
-    const FILES = [].concat(
-        (window.SoundEffects && SoundEffects.SPIN_FILES) || [],
-        (window.SoundEffects && SoundEffects.WIN_FILES) || []
-    );
+    // **这里没有硬编码文件数量或路径**：清单和每个文件的字节数都来自 backgroundmusic/manifest.json
+    // （通过 SoundEffects.loadFileList() 读取，见 soundEffects.js 顶部关于"为什么不手写数组"的踩坑记录）。
+    // 往 backgroundmusic/spin 或 win 目录加/删素材后只要跑一次 node scripts/generateMediaManifest.js，
+    // 这里的进度计算、完整性校验都不需要跟着改一行代码，新文件会自动被算进总进度、下载完才放行。
 
-    // 单个文件下载失败时的重试次数（1 次首发 + 最多 2 次重试 = 最多 3 次尝试）：网络抖动这种瞬时故障
-    // 重试基本就能过，"确保全部正确加载"不能只靠一次 fetch 失败就放弃——但也不能无限重试，
-    // 真正离线/资源不存在时还是要交给下面的 HARD_TIMEOUT_MS 兜底放行，不能让重试本身变成新的卡死点。
+    // 单个文件一轮里的重试次数；一轮跑完还有文件没进缓存的话，外层会隔 ROUND_RETRY_DELAY_MS 再来一轮，
+    // 直到全部就绪或用户主动跳过——"确保全部正确加载"不能靠有限次数就放弃。
     const MAX_ATTEMPTS_PER_FILE = 3;
-    const RETRY_BACKOFF_MS = 400; // 每次重试间隔线性递增（400ms、800ms），不做指数级是因为本来就只重试 2 次
+    const RETRY_BACKOFF_MS = 400;
+    const ROUND_RETRY_DELAY_MS = 2000;
 
-    // 素材加载失败/网络异常时的安全网：不能让用户永远卡在蒙版后面进不去（客服噩梦），
-    // 超过这个时长强制放行，同时给一条降级提示
-    const HARD_TIMEOUT_MS = 15000;
-    // 加载较慢时才出现"跳过等待"链接，正常几百毫秒内完成不会看到这个入口，不干扰大多数用户
-    const SKIP_LINK_DELAY_MS = 4000;
+    // 连续这么久一个字节都没收到，判定网络不通/被卡住：不自动放行，只把提示文案和"跳过"入口亮出来，
+    // 让用户自己决定；网络一恢复、字节继续到达，文案会自动改回正常
+    const STALL_TIMEOUT_MS = 20000;
+    // 加载较慢时才出现"跳过等待"链接，正常几秒内完成不会看到这个入口，不干扰大多数用户
+    const SKIP_LINK_DELAY_MS = 8000;
 
     function els() {
         return {
@@ -48,156 +48,227 @@
         };
     }
 
-    function setProgress(ratio) {
+    function formatMB(bytes) {
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function setProgress(loadedBytes, totalBytes) {
         const { fill, percent } = els();
-        const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+        const ratio = totalBytes > 0 ? Math.max(0, Math.min(1, loadedBytes / totalBytes)) : 0;
+        const pct = Math.floor(ratio * 100); // 向下取整：没真正全部完成之前绝不显示 100%
         if (fill) fill.style.width = pct + '%';
-        if (percent) percent.textContent = pct + '%';
+        if (percent) {
+            percent.textContent = totalBytes > 0
+                ? pct + '%（' + formatMB(loadedBytes) + ' / ' + formatMB(totalBytes) + '）'
+                : pct + '%';
+        }
+    }
+
+    function setText(message) {
+        const { text } = els();
+        if (text) text.textContent = message;
     }
 
     let dismissed = false;
     function dismiss(message) {
         if (dismissed) return;
         dismissed = true;
-        const { overlay, text } = els();
+        const { overlay, fill, percent } = els();
         if (!overlay) return;
-        if (message && text) text.textContent = message;
-        setProgress(1);
+        if (message) setText(message);
+        if (fill) fill.style.width = '100%';
+        if (percent) percent.textContent = '100%';
         setTimeout(() => {
             overlay.classList.add('media-loader-hidden');
             setTimeout(() => overlay.remove(), 400); // 等淡出动画播完再从 DOM 里移除，避免闪烁
-        }, message ? 400 : 0); // 有降级提示时留一点时间让用户看清文案再消失
+        }, message ? 400 : 0); // 有提示文案时留一点时间让用户看清再消失
     }
 
-    // 进度条以前的问题：总字节数 knownTotalSum 是"边下边发现"的——16 个文件的 fetch() 并不是真的
-    // 同时开工，浏览器对同一个源的并发连接数有上限（常见 6 条），前几个文件的 Content-Length 先
-    // 揭晓、下完、分母只有它们几个，比例冲到 100%；剩下的文件轮到连接空出来才开始，分母突然变大，
-    // 比例又掉回去——表现就是"看着到 100% 了，过一会儿又从 50% 开始"。
-    // 解法：先用一轮 HEAD（或直接读缓存里已有文件的大小）把全部文件的大小问清楚、算出一个固定不变
-    // 的总字节数，再开始真正下载正文——分母定死之后，进度只会单调往前走，不会再回退。
-    async function probeFile(cache, src) {
+    // 缓存里已有的文件优先读响应头里的 Content-Length（不用把十几 MB 的 blob 全读进内存），
+    // 没有的再退化成读 blob.size
+    async function cachedSize(cache, src) {
         const cached = await cache.match(src);
-        if (cached) {
-            const blob = await cached.clone().blob();
-            return { size: blob.size, cached: true };
-        }
+        if (!cached) return null;
+        const len = Number(cached.headers.get('content-length')) || 0;
+        if (len > 0) return len;
+        const blob = await cached.clone().blob();
+        return blob.size;
+    }
+
+    // 进度条分母必须在开始下载之前就定死：浏览器对同一个源的并发连接数有上限（常见 6 条），
+    // 十几个文件不会真的同时开工，如果边下边把响应头到达的文件大小累加进分母，前几个文件下完时
+    // 分母只有它们几个、比例冲到 100%，剩下的文件轮到连接才开始，分母突然变大、比例又掉回去。
+    // manifest 里已经记录了每个文件的字节数，直接拿来当分母；manifest 里没写大小的（理论上不会有）
+    // 才退化成发一次 HEAD 去问。HEAD 不会被 service-worker.js 拦截（它只处理 GET），是真实的轻量请求。
+    //
+    // "已缓存"的判定跟 service-worker.js 的 smartClearCache() 用同一套标准：缓存里有、而且字节数
+    // 和 manifest 一致才算；大小对不上（文件被替换过、或上次下载中途被刷新掐断留下的残缺条目）
+    // 一律当没缓存，重新下载覆盖。
+    async function probeFile(cache, src, expectedSize) {
+        const size = await cachedSize(cache, src);
+        if (size !== null && (!expectedSize || size === expectedSize)) return { size, cached: true };
+        if (expectedSize) return { size: expectedSize, cached: false };
         try {
             const res = await fetch(src, { method: 'HEAD', cache: 'no-store' });
             return { size: Number(res.headers.get('content-length')) || 0, cached: false };
         } catch (e) {
-            return { size: 0, cached: false }; // 探测失败不阻塞：下面下载阶段自己还会重试
+            return { size: 0, cached: false }; // 探测失败不阻塞：下载阶段自己会重试
         }
     }
 
-    // 单个文件的下载：用 ReadableStream 逐块读取正文，把已读字节数汇报给 onBytes 回调，用来驱动
-    // 进度条；下载成功后显式 cache.put() 写入 Cache Storage 并 await 写完，不依赖 service-worker.js
-    // 的 fetch 事件去顺带缓存——那条路径里 SW 是 fire-and-forget 地在后台写缓存（没有 await 就把
-    // 响应还给页面），如果页面这边紧接着就点"开始抽奖"，Audio 元素发起的请求可能会正好卡在"缓存还
-    // 没写完"的那个窗口期，命中不了缓存，只能现场再走一次网络——这正是"第一次点抽奖有几秒延迟，要
-    // 刷新几次才正常"的根因。这里把写缓存这一步收回到蒙版自己手上并且真正等它写完，才能保证蒙版
-    // 消失的那一刻，全部素材已经确确实实躺在 Cache Storage 里，之后任何请求都是秒读。
-    // 失败（网络错误、读取中途断流）会重试到 MAX_ATTEMPTS_PER_FILE 次，重试前把这个文件已经算进
-    // 总进度的字节数退回去，避免"重试重新数了一遍"导致百分比超过 100% 或者卡在一个偏大的数字上不动。
+    // 单个文件的下载：逐块读取正文汇报进度，读完后显式 await cache.put() 写进 Cache Storage——
+    // 不依赖 service-worker.js 的 fetch 事件顺带缓存，那条路径是 fire-and-forget（没 await 就把
+    // 响应还给页面），页面这边看到"下完了"时缓存可能还没写完，紧接着点"开始抽奖"会命中不了缓存。
+    // 返回 true 表示已确认写入缓存；false 表示这轮失败（网络错误/中途断流），由外层决定再来一轮。
+    // 4xx（文件根本不存在）单独返回 'missing'：这种重试多少次都没用，不能让它把所有用户永远堵在蒙版后面。
     async function loadOneFile(cache, src, onBytes) {
         for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_FILE; attempt++) {
+            if (attempt > 1) await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * (attempt - 1)));
             let response;
             try {
                 response = await fetch(src, { cache: 'no-store' });
             } catch (e) {
-                if (attempt < MAX_ATTEMPTS_PER_FILE) {
-                    await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * attempt));
-                    continue;
-                }
-                console.warn('[MediaLoader] 素材加载失败，已放弃重试:', src, e);
-                onBytes(0);
-                return;
+                continue;
             }
-            if (!response.ok) {
-                onBytes(0);
-                return; // 404 等：不重试，跳过这个文件，不阻塞其它文件继续加载
+            if (response.status >= 400 && response.status < 500) {
+                console.warn('[MediaLoader] 素材不存在（' + response.status + '）:', src);
+                return 'missing';
             }
+            if (!response.ok) continue;
+
             // 先 clone 一份专门喂给 cache.put，原始 response 留给下面的 reader 读进度——两份读的是
             // 同一个底层流的独立副本，互不影响
             const toCache = response.clone();
-            if (!response.body) {
-                await response.arrayBuffer().catch(() => {});
-                await cache.put(src, toCache).catch((e) => console.warn('[MediaLoader] 写入缓存失败:', src, e));
-                onBytes(0);
-                return;
-            }
-            let thisAttemptBytes = 0; // 这次尝试已经读到、已经报给 onBytes 的字节数，中途失败要整体退回去
+            let thisAttemptBytes = 0; // 这次尝试已报给 onBytes 的字节数，中途失败要整体退回去，避免污染总进度
             try {
-                const reader = response.body.getReader();
-                for (;;) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    thisAttemptBytes += value.byteLength;
-                    onBytes(value.byteLength);
+                if (response.body) {
+                    const reader = response.body.getReader();
+                    for (;;) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        thisAttemptBytes += value.byteLength;
+                        onBytes(value.byteLength);
+                    }
+                } else {
+                    await response.arrayBuffer();
                 }
-                await cache.put(src, toCache).catch((e) => console.warn('[MediaLoader] 写入缓存失败:', src, e));
-                return; // 正常读完、缓存写完，成功
+                await cache.put(src, toCache);
+                return true;
             } catch (e) {
-                onBytes(-thisAttemptBytes); // 把这次没读完就中断的字节数退回去，避免污染总进度（重试会从头算）
-                if (attempt < MAX_ATTEMPTS_PER_FILE) {
-                    await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * attempt));
-                    continue;
-                }
-                console.warn('[MediaLoader] 素材读取中途失败，已放弃重试:', src, e);
-                return;
+                onBytes(-thisAttemptBytes);
+                console.warn('[MediaLoader] 素材下载/写缓存失败，将重试:', src, e);
             }
         }
+        return false;
     }
 
     async function run() {
         const { overlay, skip } = els();
         if (!overlay) return; // 没有这个蒙版容器（比如页面结构被改过），直接跳过，不影响主流程
-        if (!FILES.length) { dismiss(); return; }
 
-        const hardTimer = setTimeout(() => dismiss('部分音效素材加载超时，先带你进入应用'), HARD_TIMEOUT_MS);
         const skipTimer = setTimeout(() => {
             if (skip) skip.classList.add('media-loader-skip-visible');
         }, SKIP_LINK_DELAY_MS);
-        if (skip) skip.addEventListener('click', () => dismiss('已跳过等待'), { once: true });
+        if (skip) skip.addEventListener('click', () => dismiss('已跳过等待，音效可能要稍后才能正常播放'), { once: true });
+
+        // 先拿清单：没有清单就不知道要下什么，只能放行（离线且从没缓存过的极端情况）
+        const sizes = window.SoundEffects && typeof SoundEffects.loadFileList === 'function'
+            ? await SoundEffects.loadFileList()
+            : null;
+        if (!sizes) { dismiss('音效清单加载失败，先带你进入应用'); return; }
+        const FILES = Object.keys(sizes);
+        if (!FILES.length) { dismiss(); return; }
 
         const cache = await caches.open(CACHE_NAME);
 
-        // 第一阶段：探清每个文件的大小（缓存里已有的直接读 blob.size，不用发请求；没有的发一次
-        // HEAD），算出固定的总字节数，避免下面下载阶段进度条来回跳
-        const probes = await Promise.all(FILES.map((src) => probeFile(cache, src)));
+        // 第一阶段：确定每个文件的大小和是否已在缓存里，算出固定不变的总字节数
+        const probes = await Promise.all(FILES.map((src) => probeFile(cache, src, sizes[src])));
         const totalBytes = probes.reduce((a, p) => a + p.size, 0);
-        const loaded = new Array(FILES.length).fill(0);
+        const loaded = probes.map((p) => (p.cached ? p.size : 0));
+        const status = probes.map((p) => (p.cached ? true : false)); // true=已在缓存, false=待下载, 'missing'=服务器上不存在
+        const mismatches = new Array(FILES.length).fill(0);
 
+        // 零进度看门狗：每收到一块字节就重置；连续 STALL_TIMEOUT_MS 没动静才提示（不放行）
+        let stallTimer = null;
+        let stalled = false;
+        function armStallTimer() {
+            clearTimeout(stallTimer);
+            stallTimer = setTimeout(() => {
+                stalled = true;
+                setText('网络似乎不太通畅，仍在等待素材下载…');
+                if (skip) skip.classList.add('media-loader-skip-visible');
+            }, STALL_TIMEOUT_MS);
+        }
         function recompute() {
-            if (totalBytes > 0) {
-                setProgress(loaded.reduce((a, b) => a + b, 0) / totalBytes);
+            setProgress(loaded.reduce((a, b) => a + b, 0), totalBytes);
+        }
+        function onBytes(i, chunkBytes) {
+            loaded[i] += chunkBytes;
+            recompute();
+            if (chunkBytes > 0) {
+                if (stalled) { stalled = false; setText('正在加载媒体文件…'); }
+                armStallTimer();
             }
         }
 
-        // 已经在缓存里的文件不用再下载，直接把它的大小记成"已加载"，进度条立刻体现出来
-        probes.forEach((p, i) => {
-            if (p.cached) { loaded[i] = p.size; }
-        });
         recompute();
+        armStallTimer();
 
-        try {
-            await Promise.all(FILES.map((src, i) => {
-                if (probes[i].cached) return Promise.resolve(); // 已缓存，跳过下载
-                return loadOneFile(cache, src, (chunkBytes) => { loaded[i] += chunkBytes; recompute(); });
+        // 第二阶段：一轮一轮地下载，直到清单里每个文件都确认在缓存里（或被判定为服务器上不存在）
+        for (;;) {
+            if (dismissed) return; // 用户点了"跳过"，后面的轮次没必要再跑
+            const pending = [];
+            FILES.forEach((src, i) => { if (status[i] === false) pending.push(i); });
+            if (!pending.length) break;
+
+            await Promise.all(pending.map(async (i) => {
+                loaded[i] = 0;
+                const result = await loadOneFile(cache, FILES[i], (bytes) => onBytes(i, bytes));
+                if (result === true) {
+                    // 下载完再对一次账：缓存里的字节数必须和 manifest 一致，否则当没下成功、下一轮重来
+                    // （防止残缺/被截断的响应被当成完整文件放行）
+                    const size = await cachedSize(cache, FILES[i]);
+                    const expected = sizes[FILES[i]];
+                    if (size === null || (expected && size !== expected && mismatches[i] < 1)) {
+                        // 只重下一次：第二次还是同样对不上，说明是 manifest 忘了重新生成（清单里的
+                        // 大小过期），而不是下载残缺，这时接受下载到的完整文件，不能无限重下把用户堵死
+                        mismatches[i]++;
+                        console.warn('[MediaLoader] 缓存大小与清单不符，将重新下载:', FILES[i], size, expected);
+                        await cache.delete(FILES[i]).catch(() => {});
+                        loaded[i] = 0;
+                        status[i] = false;
+                    } else {
+                        loaded[i] = size;
+                        status[i] = true;
+                    }
+                } else if (result === 'missing') {
+                    status[i] = 'missing';
+                    loaded[i] = probes[i].size; // 不存在的文件从待办里划掉，不让进度条永远差一截
+                } else {
+                    status[i] = false; // 这轮没成功，下一轮再来
+                }
+                recompute();
             }));
-        } catch (e) {
-            // Promise.all 理论上不会走到这里（loadOneFile 内部已经吞掉了单文件失败），保留兜底以防万一
+
+            const stillPending = status.some((s) => s === false);
+            if (stillPending && !dismissed) {
+                setText('部分素材下载失败，正在重试…');
+                await new Promise((r) => setTimeout(r, ROUND_RETRY_DELAY_MS));
+            }
         }
 
-        // 到这里全部文件要么命中缓存、要么下载并写缓存完毕（await 过 cache.put），后台音效预热
-        // （读时长用于播放倍速计算）放在这之后触发，保证它发起的 new Audio(src) 请求命中的都是
-        // 已经写好的缓存、瞬间可用，不会再跟这里的下载抢带宽，也不会自己触发一次未缓存的网络请求
-        if (window.SoundEffects && typeof SoundEffects.warmUp === 'function') {
-            SoundEffects.warmUp(FILES);
-        }
-
-        clearTimeout(hardTimer);
+        clearTimeout(stallTimer);
         clearTimeout(skipTimer);
-        dismiss();
+
+        // 到这里清单里每个文件要么已确认在缓存里、要么服务器上确实没有。后台音效预热（读时长用于
+        // 播放倍速计算）放在这之后触发，保证它发起的 new Audio(src) 请求命中的都是已写好的缓存、
+        // 瞬间可用，不会再跟这里的下载抢带宽，也不会自己触发一次未缓存的网络请求
+        if (window.SoundEffects && typeof SoundEffects.warmUp === 'function') {
+            SoundEffects.warmUp(FILES.filter((src, i) => status[i] === true));
+        }
+
+        const missingCount = status.filter((s) => s === 'missing').length;
+        dismiss(missingCount ? missingCount + ' 个音效素材在服务器上不存在，已跳过' : undefined);
     }
 
     window.MediaLoader = { run };

@@ -4,27 +4,42 @@
 (function () {
     'use strict';
 
-    // 素材来自 backgroundmusic/spin、backgroundmusic/win 两个文件夹，抽奖/中奖各随机选一个播放
-    const SPIN_FILES = [
-        './backgroundmusic/spin/mixkit-arcade-rising-231.wav',
-        './backgroundmusic/spin/mixkit-casino-reward-1980.wav',
-        './backgroundmusic/spin/mixkit-fast-bike-wheel-spin-1614.wav',
-        './backgroundmusic/spin/mixkit-game-engine-hum-2644.wav',
-        './backgroundmusic/spin/mixkit-payout-award-1934.wav',
-        './backgroundmusic/spin/mixkit-slot-machine-win-1928.wav',
-        './backgroundmusic/spin/mixkit-slot-machine-win-alarm-1995.wav',
-        './backgroundmusic/spin/mixkit-spinning-whistle-toy-2647.wav'
-    ];
-    const WIN_FILES = [
-        './backgroundmusic/win/mixkit-animated-small-group-applause-523.wav',
-        './backgroundmusic/win/mixkit-ethereal-fairy-win-sound-2019.wav',
-        './backgroundmusic/win/mixkit-male-voice-cheer-2010.wav',
-        './backgroundmusic/win/mixkit-male-voice-cheer-victory-2011.wav',
-        './backgroundmusic/win/mixkit-small-group-light-applause-517.wav',
-        './backgroundmusic/win/mixkit-small-win-2020.wav',
-        './backgroundmusic/win/mixkit-video-game-win-2016.wav',
-        './backgroundmusic/win/mixkit-wind-chimes-2014.wav'
-    ];
+    // 素材来自 backgroundmusic/spin、backgroundmusic/win 两个文件夹，抽奖/中奖各随机选一个播放。
+    // **清单不在这里硬编码，唯一来源是 backgroundmusic/manifest.json**（由 scripts/generateMediaManifest.js
+    // 扫描两个文件夹生成，key 形如 "backgroundmusic/win/xxx.wav"，值是字节数）。这是真实踩过的坑：
+    // 以前这里手写两个数组，往 win/ 文件夹里新加了 3 个 wav 并重新生成了 manifest，却忘了同步改
+    // 这里的数组——结果启动蒙版把"清单里的 16 个"下完就显示 100% 放行，文件夹里另外 3 个从来没被
+    // 下载、也从来没被播放过，看起来就是"没有把文件夹里的音频全部加载完"。改成两边都读同一份
+    // manifest 之后，加/删素材只需要放文件 + 跑一次生成脚本，不会再出现两处清单对不上的情况。
+    // 两个数组在 loadFileList() 里原地填充（不重新赋值），外部拿到的引用始终有效。
+    const MANIFEST_URL = './backgroundmusic/manifest.json';
+    const SPIN_FILES = [];
+    const WIN_FILES = [];
+
+    // 返回 { "./backgroundmusic/spin/xxx.wav": 字节数, ... }（key 已经转成本模块使用的相对路径形式）；
+    // 加载失败（离线且缓存里也没有）返回 null，此时两个数组保持为空，播放函数会静默不出声，不会报错
+    async function loadFileList() {
+        let manifest;
+        try {
+            const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
+            if (!res.ok) return null;
+            manifest = await res.json();
+        } catch (e) {
+            console.warn('[SoundEffects] 音效清单加载失败:', e);
+            return null;
+        }
+        SPIN_FILES.length = 0;
+        WIN_FILES.length = 0;
+        const sizes = {};
+        Object.keys(manifest).sort().forEach((key) => {
+            const src = './' + key;
+            if (key.startsWith('backgroundmusic/spin/')) SPIN_FILES.push(src);
+            else if (key.startsWith('backgroundmusic/win/')) WIN_FILES.push(src);
+            else return;
+            sizes[src] = Number(manifest[key]) || 0;
+        });
+        return sizes;
+    }
 
     // 浏览器 playbackRate 的实际可用范围比标称的 [0.0625, 16] 更窄才稳妥（超出后部分浏览器会静音或报错），
     // 音效素材时长与旋转时长差距不会太离谱，这个区间足够覆盖，同时避免变速到无法辨识
@@ -120,8 +135,8 @@
         audio.play().catch(() => { /* 自动播放被拦截时静默失败 */ });
     }
 
-    // SPIN_FILES/WIN_FILES 一并导出：mediaLoader.js 的启动蒙版需要拿到完整素材清单去逐个下载/等待，
-    // 不想在两个文件里各维护一份重复的路径列表。warmUp 也导出，供 mediaLoader.js 在全部素材缓存
-    // 完毕之后调用（原因见 warmUp 定义处的注释）
-    window.SoundEffects = { playSpin, stopSpin, playWin, warmUp, SPIN_FILES, WIN_FILES };
+    // loadFileList/SPIN_FILES/WIN_FILES 一并导出：mediaLoader.js 的启动蒙版先调 loadFileList() 拿到
+    // 完整清单和字节数，再逐个下载/校验；warmUp 也导出，供 mediaLoader.js 在全部素材缓存完毕之后
+    // 调用（原因见 warmUp 定义处的注释）
+    window.SoundEffects = { playSpin, stopSpin, playWin, warmUp, loadFileList, SPIN_FILES, WIN_FILES };
 })();

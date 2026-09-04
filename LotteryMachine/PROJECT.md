@@ -174,14 +174,14 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 | `imageCropper.js` | `window.ImageCropper.open(file)` | 纯 Canvas 实现的 1:1 裁剪器，无第三方库。内部：先按"覆盖填满"（`Math.max` 缩放比）画出图片，用户拖拽改 `offsetX/offsetY`、滑动条改 `zoom`，`clampOffset()` 防止拖出边界露白；确认时把 320×320 的预览画布再缩放绘制到 `OUTPUT_SIZE=320` 的输出画布，导出 `image/jpeg` quality 0.88 的 dataURL |
 | `drawHistory.js` | `window.DrawHistory.add(student, color)` | 屏幕底部"抽取历史"条，详见第十二节 |
 | `winnerEffects.js` | `window.WinnerEffects.play(overlayEl)` | 中奖弹窗的随机庆祝动效，详见第 4.1 节末尾"中奖庆祝动效" |
-| `soundEffects.js` | `window.SoundEffects.{playSpin,stopSpin,playWin,warmUp,SPIN_FILES,WIN_FILES}` | 抽奖音效，详见 4.1 节"旋转与中奖逻辑" |
+| `soundEffects.js` | `window.SoundEffects.{playSpin,stopSpin,playWin,warmUp,loadFileList,SPIN_FILES,WIN_FILES}` | 抽奖音效，详见 4.1 节"旋转与中奖逻辑" |
 | `mediaLoader.js` | `window.MediaLoader.run()` | 启动蒙版：阻塞式等音效素材就绪，详见下方"启动蒙版" |
 
 `scripts/shortcutUtil.js`（`window.ShortcutUtil`，不在 `components/` 目录下，因为它不渲染任何 UI，纯粹是键盘事件处理的小工具）：`formatFromEvent(e)` / `matches(e, combo)`，详见第 4.1 节"抽奖快捷键"。
 
 ### 五.1 抽奖音效（`soundEffects.js`）
 
-- `SPIN_FILES`/`WIN_FILES` 是两份素材路径清单（`backgroundmusic/spin/`、`backgroundmusic/win/`，各 8 个 `.wav`），`playSpin(durationMs)` 随机选一个 spin 素材，用 `playbackRate` 倍速拉伸/压缩到刚好等于本次转盘旋转总时长；`playWin()` 随机选一个 win 素材原速播完。两个数组一并从 `window.SoundEffects` 导出，是因为 `mediaLoader.js` 需要拿到同一份清单去逐个预加载，不想在两个文件里各维护一份重复列表。
+- `SPIN_FILES`/`WIN_FILES` 是两份素材路径清单（`backgroundmusic/spin/`、`backgroundmusic/win/` 下的 `.wav`），`playSpin(durationMs)` 随机选一个 spin 素材，用 `playbackRate` 倍速拉伸/压缩到刚好等于本次转盘旋转总时长；`playWin()` 随机选一个 win 素材原速播完。**这两个数组不是手写的，由 `loadFileList()` 在启动时读 `backgroundmusic/manifest.json` 原地填充**（按 key 前缀分到 spin/win，返回 `{相对路径: 字节数}` 给 `mediaLoader.js` 用）。**这是真实踩过的坑**：以前数组手写在代码里，往 `win/` 加了 3 个 wav 并重新生成了 manifest 却忘了同步改数组，结果启动蒙版把"数组里的 16 个"下完就显示 100% 放行，文件夹里另外 3 个从来没被下载和播放——用户看到的就是"没有把文件夹里的音频全部加载完"。现在加/删素材只需要放文件 + 跑一次 `node scripts/generateMediaManifest.js`，播放清单、下载清单、进度条分母、更新时的缓存核对全部自动跟上。
 - **`playSpin` 用"必须播完的绝对时刻"（`deadline = performance.now() + durationMs`）而不是固定的 `durationMs` 来算倍速**——**这是真实踩过的坑**：素材体积普遍 700KB～1.6MB，如果每次点"开始抽奖"才现 `new Audio()` 现下载，首次播放某个文件时要等一次网络请求，等待期间转盘已经在转，原来按"旋转总时长"算倍速会导致播放起点晚了、但播放长度没跟着缩短，到 `finish()` 里 `stopSpin()` 强制停止那一刻音效必然还没放完——**"延迟"和"播放不完整"其实是同一个根因**。改成按"距离 deadline 还剩多久"重新算倍速后，不管音效实际几点开始播都能精确播完。
 - `warmUp(files)` 用 `preload='auto'` 静默过一遍全部素材，记下真实时长到 `durationCacheMs`；引用存进 `preloadedAudioPool` 数组防止被当垃圾提前回收。**不在模块加载时自动调用**——改成导出给 `mediaLoader.js` 在自己确认全部素材已经写入 Cache Storage 之后再调（见下方"启动蒙版"）。这是真实踩过的坑：以前是模块一加载就自动 `warmUp()`，跟蒙版的下载同时抢带宽/连接数，还可能在缓存还没写完时就现发一次网络请求，表现为"第一次点开始抽奖音效延迟几秒、要刷新几次才恢复正常"。
 
@@ -191,10 +191,10 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 
 - **为什么只靠 `warmUp()` 后台预加载不够**：预加载不阻塞用户操作，如果用户手速快、在素材还没下载完时就点了"开始抽奖"，`playSpin` 的 deadline 修复能保证"不被截断"，但音效可能被压缩到远超 `MAX_RATE`（`=4`）导致听感失真，甚至完全来不及加载。产品需求是"进入应用时看到明确的加载蒙版+进度条，下载完成前不能操作"，于是加了这一层强制蒙版，把"能不能开始用"和"素材是否就绪"绑死。
 - **蒙版 DOM 写成 `index.html` 里的静态 HTML，不是等 JS 跑起来再插入**：这样它在其它任何内容渲染之前就已经显示出来，不会有"先看到一瞬间的空白/主界面再被蒙版盖上"的闪烁。`app.js` 的 `init()` 里 `MediaLoader.run()` **不 `await`**——蒙版本身用 `position:fixed` 挡住了全部交互，没必要因为等它而拖慢下面 `AppState.load()`/页面渲染，蒙版消失时应用其实已经在背后渲染好了。
-- **进度计算分两阶段，不是边下边算**：第一阶段先对 `SPIN_FILES`+`WIN_FILES` 里每个文件"探测大小"——已经在 Cache Storage 里的直接读 `blob.size`，不在的发一次 `HEAD` 请求拿 `Content-Length`——把这些大小加总成一个**固定不变**的 `totalBytes`，再进入第二阶段真正下载正文（`response.body.getReader()` 逐块读，每读到一块累加 `loaded[i]`），`loadedSum/totalBytes` 就是当前总体百分比。
+- **进度计算分两阶段，不是边下边算**：第一阶段先 `SoundEffects.loadFileList()` 读 manifest 拿到全部文件和字节数，加总成一个**固定不变**的 `totalBytes`（manifest 里没写大小的才退化成发一次 `HEAD`），同时判定每个文件"是否已缓存"——标准和 SW 的 `smartClearCache()` 一致：缓存里有**且字节数等于 manifest 记录**才算，大小对不上（文件被替换、或上次下载被刷新掐断）当没缓存重下；再进入第二阶段真正下载正文（`response.body.getReader()` 逐块读，每读到一块累加 `loaded[i]`），`loadedSum/totalBytes` 就是当前总体百分比，百分号旁边同时显示"已下载 MB / 总 MB"。下载完还会再对一次账（缓存大小 ≠ manifest 则删掉重下，但只重下一次——第二次还对不上说明是 manifest 忘了重新生成，接受下载到的完整文件，不能无限重下把用户堵死）。
   **这是真实踩过的坑**：以前是边 `fetch()` 边把响应头到达的文件大小累加进分母（`knownTotalSum`），但浏览器对同一个源的并发连接数有上限（常见 6 条），16 个文件不会真的同时开工——前几个文件的大小先揭晓、下完，分母只有它们几个，比例冲到 100%；剩下的文件轮到连接空出来才开始，分母突然变大，比例又掉回去，表现就是"进度条冲到 100% 又从一半重新走"。先把分母定死再下载，进度只会单调往前走。
   **缓存也不再依赖 `service-worker.js` 的 `fetch` 事件顺带写入**：`mediaLoader.js` 自己 `caches.open()` 同一个 `CACHE_NAME`，下载完显式 `await cache.put()` 写完才算这个文件完成。原因：SW 里那条路径是 fire-and-forget（没 `await` 就把响应还给页面），如果页面这边下载完立刻点"开始抽奖"，Audio 请求可能正好卡在"缓存还没写完"的窗口期，命中不了缓存又得现场再下一次——这也是"要刷新几次才正常"的另一个根因。改成蒙版自己 `await` 写完缓存后才消失，能保证蒙版消失那一刻全部素材确实已经在 Cache Storage 里。老用户重新打开时（缓存都命中）蒙版通常只会一闪而过，不是每次都要等真下载。
-- **安全网**：`HARD_TIMEOUT_MS=15000` 强制放行并降级提示（避免网络异常时用户永远卡在蒙版后面进不去，这是真实会发生的客服问题）；`SKIP_LINK_DELAY_MS=4000` 之后才出现"跳过等待"链接，正常几百毫秒内完成的情况下用户根本看不到这个入口，不干扰大多数人。单个文件下载失败（`fetch` 抛错）只会跳过那个文件、不阻塞其它文件继续加载，不会让整个蒙版卡死。
+- **蒙版消失的唯一条件是清单里每个文件都确认在缓存里，没有"到点强制放行"的固定超时**。**这是真实踩过的坑**：以前有 `HARD_TIMEOUT_MS=15000` 到点强制放行并把进度条拉到 100%——但 19 个 wav 合计 13 MB，真实网络下经常超过 15 秒，蒙版一消失用户以为下完了，其实还在后台下；这时刷新，正在下的请求全被中断，只有已写完缓存的几个留下来，下次进来从 50% 左右重新走，表现就是"显示 100% 了过一会儿又从一半开始、要进好几次才真正下完"。现在的逃生口只有两个：① `STALL_TIMEOUT_MS=20000` 连续零字节到达才把文案改成"网络似乎不太通畅"并亮出"跳过等待"（不自动放行，字节恢复到达会自动改回）；② `SKIP_LINK_DELAY_MS=8000` 之后出现的"跳过等待"链接，由用户自己决定。单个文件失败会一轮一轮重试（每轮 3 次尝试，轮间隔 2 秒）直到成功或用户跳过；只有 4xx（服务器上确实没有这个文件）才不重试，直接从待办里划掉并在蒙版消失时提示，不能让一个丢失的文件把所有用户永远堵在蒙版后面。
 - 蒙版层级 `z-index:10000`，比第七节列出的所有浮层（含 `update.css` 的 `9999`）都高——加载中不应该被任何弹窗（包括更新提示）盖住。
 
 ---
@@ -317,7 +317,7 @@ function siteRootUrl() { return `${window.location.origin}/`; }
   1. 先 `fetch('./backgroundmusic/manifest.json', {cache:'no-store'})` 拿这次部署时最新的"文件名 → 字节数"清单（这个 manifest 本身必须绕过缓存，否则拿到的是上次部署的旧清单，核对结果不可信）。
   2. 遍历 Cache Storage 里已缓存的每个音效文件：manifest 里找不到这个文件（被删除/改名）→ 删掉；找得到但字节数对不上（内容换了）→ 删掉强制重新下载；名字和字节数都对得上 → **什么都不做，保留缓存，不重新下载**。
   3. manifest 本身 fetch 失败（离线/文件不存在）时保守兜底：所有音效文件按老逻辑一律清掉——拿不到 manifest 没法判断"是不是没变"，清掉重新下载才安全，不会因为判断不了而误保留一份可能已经过期的音效。
-  - **`backgroundmusic/manifest.json` 由 `scripts/generateMediaManifest.js`（Node 脚本）手动生成，不是自动跑的**——跟 `icon-192.png` 的生成方式（见第九节）一个模式：往 `backgroundmusic/spin/` 或 `backgroundmusic/win/` 增删/替换了任何 `.wav` 文件之后，本地跑一次 `node scripts/generateMediaManifest.js` 重新生成这个文件，再跟着改动一起复制到大仓库 push。**忘了跑这一步不会报错或播放失败**——最坏情况下 SW 认不出新文件对应的旧记录，按"大小不一致"处理去重新下载，是安全的降级，只是没真正省到流量。
+  - **`backgroundmusic/manifest.json` 由 `scripts/generateMediaManifest.js`（Node 脚本）手动生成，不是自动跑的**——跟 `icon-192.png` 的生成方式（见第九节）一个模式：往 `backgroundmusic/spin/` 或 `backgroundmusic/win/` 增删/替换了任何 `.wav` 文件之后，本地跑一次 `node scripts/generateMediaManifest.js` 重新生成这个文件，再跟着改动一起复制到大仓库 push。**这份 manifest 现在同时是 `soundEffects.js`/`mediaLoader.js` 的唯一素材清单（见五.1 节），忘了跑的后果是新加的文件不会被下载也不会被播放**（清单里没有它，不报错、静默缺失）；替换了同名文件但没更新大小，启动蒙版会发现缓存大小和清单不符而多重下一次后接受，不会卡死。
 
 ---
 
