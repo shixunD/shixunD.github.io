@@ -27,9 +27,24 @@
     <link rel="stylesheet" href="styles/classSwitcher.css">
     <link rel="stylesheet" href="styles/drawHistory.css">
     <link rel="stylesheet" href="styles/responsive.css">
+    <link rel="stylesheet" href="styles/mediaLoader.css">
 </head>
 
 <body>
+    <!-- 启动蒙版：写成静态 HTML（不是等 JS 跑起来再插入），保证它在其它内容之前就先显示出来，
+         不会有"先看到一瞬间的空白/主界面再被蒙版盖住"的闪烁。逻辑见 scripts/components/mediaLoader.js -->
+    <div class="media-loader-overlay" id="media-loader-overlay">
+        <div class="media-loader-box">
+            <div class="media-loader-spinner"></div>
+            <div class="media-loader-text" id="media-loader-text">正在加载媒体文件…</div>
+            <div class="media-loader-progress-track">
+                <div class="media-loader-progress-fill" id="media-loader-progress-fill"></div>
+            </div>
+            <div class="media-loader-percent" id="media-loader-percent">0%</div>
+            <span class="media-loader-skip" id="media-loader-skip">加载较慢？点击跳过等待</span>
+        </div>
+    </div>
+
     <nav class="navbar">
         <div class="nav-brand-container">
             <div class="nav-brand" id="nav-brand-home-btn" title="访问 Shixun 的主页">
@@ -74,6 +89,7 @@
     <script src="scripts/components/imageCropper.js"></script>
     <script src="scripts/components/winnerEffects.js"></script>
     <script src="scripts/components/soundEffects.js"></script>
+    <script src="scripts/components/mediaLoader.js"></script>
 
     <script src="scripts/shortcutUtil.js"></script>
     <script src="scripts/state.js"></script>

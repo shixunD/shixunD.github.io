@@ -59,6 +59,7 @@
     async function init() {
         registerServiceWorker();
         bindSiteCredit();
+        MediaLoader.run(); // 不 await：蒙版本身已经挡住了交互，不需要拖慢下面的数据加载/页面渲染
         await MsalAuth.init();
 
         await AppState.load();

@@ -117,5 +117,7 @@
         audio.play().catch(() => { /* 自动播放被拦截时静默失败 */ });
     }
 
-    window.SoundEffects = { playSpin, stopSpin, playWin };
+    // SPIN_FILES/WIN_FILES 一并导出：mediaLoader.js 的启动蒙版需要拿到完整素材清单去逐个下载/等待，
+    // 不想在两个文件里各维护一份重复的路径列表
+    window.SoundEffects = { playSpin, stopSpin, playWin, SPIN_FILES, WIN_FILES };
 })();

@@ -174,8 +174,24 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 | `imageCropper.js` | `window.ImageCropper.open(file)` | 纯 Canvas 实现的 1:1 裁剪器，无第三方库。内部：先按"覆盖填满"（`Math.max` 缩放比）画出图片，用户拖拽改 `offsetX/offsetY`、滑动条改 `zoom`，`clampOffset()` 防止拖出边界露白；确认时把 320×320 的预览画布再缩放绘制到 `OUTPUT_SIZE=320` 的输出画布，导出 `image/jpeg` quality 0.88 的 dataURL |
 | `drawHistory.js` | `window.DrawHistory.add(student, color)` | 屏幕底部"抽取历史"条，详见第十二节 |
 | `winnerEffects.js` | `window.WinnerEffects.play(overlayEl)` | 中奖弹窗的随机庆祝动效，详见第 4.1 节末尾"中奖庆祝动效" |
+| `soundEffects.js` | `window.SoundEffects.{playSpin,stopSpin,playWin,SPIN_FILES,WIN_FILES}` | 抽奖音效，详见 4.1 节"旋转与中奖逻辑" |
+| `mediaLoader.js` | `window.MediaLoader.run()` | 启动蒙版：阻塞式等音效素材就绪，详见下方"启动蒙版" |
 
 `scripts/shortcutUtil.js`（`window.ShortcutUtil`，不在 `components/` 目录下，因为它不渲染任何 UI，纯粹是键盘事件处理的小工具）：`formatFromEvent(e)` / `matches(e, combo)`，详见第 4.1 节"抽奖快捷键"。
+
+### 五.1 抽奖音效（`soundEffects.js`）
+
+- `SPIN_FILES`/`WIN_FILES` 是两份素材路径清单（`backgroundmusic/spin/`、`backgroundmusic/win/`，各 8 个 `.wav`），`playSpin(durationMs)` 随机选一个 spin 素材，用 `playbackRate` 倍速拉伸/压缩到刚好等于本次转盘旋转总时长；`playWin()` 随机选一个 win 素材原速播完。两个数组一并从 `window.SoundEffects` 导出，是因为 `mediaLoader.js` 需要拿到同一份清单去逐个预加载，不想在两个文件里各维护一份重复列表。
+- **`playSpin` 用"必须播完的绝对时刻"（`deadline = performance.now() + durationMs`）而不是固定的 `durationMs` 来算倍速**——**这是真实踩过的坑**：素材体积普遍 700KB～1.6MB，如果每次点"开始抽奖"才现 `new Audio()` 现下载，首次播放某个文件时要等一次网络请求，等待期间转盘已经在转，原来按"旋转总时长"算倍速会导致播放起点晚了、但播放长度没跟着缩短，到 `finish()` 里 `stopSpin()` 强制停止那一刻音效必然还没放完——**"延迟"和"播放不完整"其实是同一个根因**。改成按"距离 deadline 还剩多久"重新算倍速后，不管音效实际几点开始播都能精确播完。
+- `warmUp(files)` 在模块加载时（应用一打开）就用 `preload='auto'` 静默过一遍全部素材，记下真实时长到 `durationCacheMs`；引用存进 `preloadedAudioPool` 数组防止被当垃圾提前回收。这一步只是"让浏览器提前知道时长、顺手命中一次缓存"，**不保证素材已经完整下载完**——真正保证"点开始抽奖时素材已经就绪"的是下面的启动蒙版。
+
+### 五.2 启动蒙版（`mediaLoader.js` + `styles/mediaLoader.css`）
+
+- **为什么只靠 `warmUp()` 后台预加载不够**：预加载不阻塞用户操作，如果用户手速快、在素材还没下载完时就点了"开始抽奖"，`playSpin` 的 deadline 修复能保证"不被截断"，但音效可能被压缩到远超 `MAX_RATE`（`=4`）导致听感失真，甚至完全来不及加载。产品需求是"进入应用时看到明确的加载蒙版+进度条，下载完成前不能操作"，于是加了这一层强制蒙版，把"能不能开始用"和"素材是否就绪"绑死。
+- **蒙版 DOM 写成 `index.html` 里的静态 HTML，不是等 JS 跑起来再插入**：这样它在其它任何内容渲染之前就已经显示出来，不会有"先看到一瞬间的空白/主界面再被蒙版盖上"的闪烁。`app.js` 的 `init()` 里 `MediaLoader.run()` **不 `await`**——蒙版本身用 `position:fixed` 挡住了全部交互，没必要因为等它而拖慢下面 `AppState.load()`/页面渲染，蒙版消失时应用其实已经在背后渲染好了。
+- **进度计算**：对 `SPIN_FILES`+`WIN_FILES` 里每个文件调 `fetch(src)`——`fetch()` 的 Promise 只要响应头到达（含 `Content-Length`）就会 resolve，不需要等整个 body 下载完，可以很快拿到每个文件的总大小并累加成 `knownTotalSum`；再用 `response.body.getReader()` 逐块读取正文，每读到一块累加 `loaded[i]`，`loadedSum/knownTotalSum` 就是当前的总体百分比。这些 `fetch()` 请求会被 `service-worker.js` 的 `fetch` 事件拦截，音效走的是 cache-first 策略（见第十一节），**已经缓存过的文件直接从 Cache Storage 秒读**，所以老用户重新打开时蒙版通常只会一闪而过，不是每次都要等真下载。
+- **安全网**：`HARD_TIMEOUT_MS=15000` 强制放行并降级提示（避免网络异常时用户永远卡在蒙版后面进不去，这是真实会发生的客服问题）；`SKIP_LINK_DELAY_MS=4000` 之后才出现"跳过等待"链接，正常几百毫秒内完成的情况下用户根本看不到这个入口，不干扰大多数人。单个文件下载失败（`fetch` 抛错）只会跳过那个文件、不阻塞其它文件继续加载，不会让整个蒙版卡死。
+- 蒙版层级 `z-index:10000`，比第七节列出的所有浮层（含 `update.css` 的 `9999`）都高——加载中不应该被任何弹窗（包括更新提示）盖住。
 
 ---
 
@@ -231,7 +247,7 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 
 **UI 状态机**（`OneDriveApi.render()`）：未登录显示登录按钮；已登录显示用户信息 + 退出 + 上传输入框（默认值 `ImportExport.timestampName()`）+ 上传按钮 + 历史列表 + 翻页按钮。每条历史记录有"恢复"（下载 JSON → 校验 → 二次确认 → `AppState.replaceState()`）和"删除"（Graph DELETE，二次确认）两个操作。
 
-**弹窗层级（z-index）**：`.onedrive-overlay` 是 `7000`，"恢复备份"点击后弹出的二次确认走的是通用组件 `Modal.confirm()`（`.modal-overlay`）。**`.modal-overlay` 的 z-index 必须比 `.onedrive-overlay` 更高**（`styles/base.css`，当前是 `7500`）——早期两个都各自设置、没考虑过谁盖谁，`.modal-overlay` 曾经是 `5000`，比 OneDrive 弹窗的 `7000` 还低，导致在 OneDrive 弹窗内点"恢复"时，二次确认框会被挡在 OneDrive 弹窗**下面**，用户点不到确认按钮，是一个实测存在过的真实 bug。以后新增任何"可能叠在其他弹窗之上"的浮层，都要显式对比一下涉及到的 z-index 数值，不要假设"后创建的元素自然显示在上层"（因为它们都是 `position: fixed`，层叠顺序只看 `z-index`，和 DOM 创建先后无关）。当前几个浮层的 z-index 一览（按数值从小到大排列）：`.draw-history-bar` 800（屏幕最下方的常驻条，故意给最低值，不需要盖住任何东西）< `.navbar` 1000 < `.classSwitcher` 下拉面板 2000 < `.winner-overlay` 中奖弹窗 6000 < `.onedrive-overlay` OneDrive 备份弹窗 7000 < `.modal-overlay` 通用确认框 7500（必须比它可能从中被触发的所有弹窗都高，比如 OneDrive 弹窗里点"恢复"弹出的二次确认）< `update.css` 里的新版本提示 9999（全局唯一、不和其它弹窗共存，所以给了最高值，不受这条规则约束）。
+**弹窗层级（z-index）**：`.onedrive-overlay` 是 `7000`，"恢复备份"点击后弹出的二次确认走的是通用组件 `Modal.confirm()`（`.modal-overlay`）。**`.modal-overlay` 的 z-index 必须比 `.onedrive-overlay` 更高**（`styles/base.css`，当前是 `7500`）——早期两个都各自设置、没考虑过谁盖谁，`.modal-overlay` 曾经是 `5000`，比 OneDrive 弹窗的 `7000` 还低，导致在 OneDrive 弹窗内点"恢复"时，二次确认框会被挡在 OneDrive 弹窗**下面**，用户点不到确认按钮，是一个实测存在过的真实 bug。以后新增任何"可能叠在其他弹窗之上"的浮层，都要显式对比一下涉及到的 z-index 数值，不要假设"后创建的元素自然显示在上层"（因为它们都是 `position: fixed`，层叠顺序只看 `z-index`，和 DOM 创建先后无关）。当前几个浮层的 z-index 一览（按数值从小到大排列）：`.draw-history-bar` 800（屏幕最下方的常驻条，故意给最低值，不需要盖住任何东西）< `.navbar` 1000 < `.classSwitcher` 下拉面板 2000 < `.winner-overlay` 中奖弹窗 6000 < `.onedrive-overlay` OneDrive 备份弹窗 7000 < `.modal-overlay` 通用确认框 7500（必须比它可能从中被触发的所有弹窗都高，比如 OneDrive 弹窗里点"恢复"弹出的二次确认）< `update.css` 里的新版本提示 9999 < `.media-loader-overlay` 启动蒙版 10000（应用刚打开、素材还没就绪时的最高优先级，见五.2 节，不应该被任何弹窗盖住，所以给了目前最高值）。
 
 ---
 
@@ -273,9 +289,11 @@ function siteRootUrl() { return `${window.location.origin}/`; }
 ## 十一、Service Worker（`service-worker.js`）
 
 - 缓存名 `CACHE_NAME`：**每次发版都应该改成新字符串**（配合 `version.json` 一起改，见第六节）。
-- `install`：预缓存 `URLS_TO_CACHE` 里列出的所有静态资源（**新增/改名文件后要记得把路径加进这个列表**，否则该文件不会被离线缓存，虽然 network-first 策略下在线时不受影响，但离线时会缺失），然后 `skipWaiting()`。
+- `install`：预缓存 `URLS_TO_CACHE` 里列出的所有静态资源（**新增/改名文件后要记得把路径加进这个列表**，否则该文件不会被离线缓存，虽然 network-first 策略下在线时不受影响，但离线时会缺失），然后 `skipWaiting()`。**`backgroundmusic/` 下的音效文件故意没放进这个列表**——见下方"音效走 cache-first"小节，原因和真实踩过的并发下载坑都在那。
 - `activate`：删除所有不等于当前 `CACHE_NAME` 的旧缓存，`clients.claim()` 立即接管所有已打开的页面。
-- `fetch`：只处理同源 GET 请求，network-first（在线优先拿最新，顺便更新缓存；离线才回退缓存）。**关键细节：请求时必须显式加 `{ cache: 'no-store' }`**（`fetch(event.request.url, { cache: 'no-store' })`，不能直接 `fetch(event.request)`）。原因是实测发现的一个真实坑：普通 `fetch(event.request)` 仍然会遵守浏览器自身的 HTTP 磁盘缓存语义——如果服务器（比如 GitHub Pages 默认的 `Cache-Control`）返回的资源还在新鲜期内，`fetch()` 会直接把磁盘缓存里的旧内容当作"网络响应"返回，SW 却误以为自己拿到了最新版本，"network-first" 名不副实，用户还是会看到旧版本。用 URL 字符串（而不是直接传 `event.request`）发起请求，是因为导航请求（`mode: 'navigate'`）等特殊模式的 `Request` 对象如果被 `new Request(event.request, {...})` 这样重新构造会直接报错，传 URL 字符串可以绕开这个限制。**改这段逻辑时不要图省事把 `cache: 'no-store'` 删掉**，否则更新检测机制会在某些托管环境下悄悄失效。
+- `fetch`：**按路径拆成两套策略**，不是所有请求都走同一套：
+  - `backgroundmusic/` 下的音效文件走 **cache-first**：`caches.match()` 命中就直接返回、完全不发网络请求；未命中（新文件/缓存被清过）才 `fetch()` 一次并写入缓存。这些文件体积大（700KB～1.6MB）又几乎不变，不适合像代码文件那样每次都重新拉取一遍，详见五.2 节"启动蒙版"。**`backgroundmusic/` 不能同时出现在 `URLS_TO_CACHE` 里**——`install` 阶段的 `cache.addAll()` 如果也去抓这批文件，会跟 `mediaLoader.js` 页面启动时发起的 fetch 同时各打一遍请求，16 个文件变成 32 个并发下载，抢占有限的并发连接数；**这是真实复现过的问题**：本地单线程调试服务器下会导致启动蒙版长时间卡在 0% 不动，即使在正常并发能力更强的托管环境下也是纯浪费流量。音效最终依然会被缓存——`mediaLoader.js` 发起的 fetch 本身就会经过下面这条 cache-first 分支，缓存未命中时自动写入。
+  - 其余同源 GET 请求（代码/样式/HTML/`version.json` 等）维持 **network-first**（在线优先拿最新，顺便更新缓存；离线才回退缓存）。**关键细节：请求时必须显式加 `{ cache: 'no-store' }`**（`fetch(event.request.url, { cache: 'no-store' })`，不能直接 `fetch(event.request)`）。原因是实测发现的一个真实坑：普通 `fetch(event.request)` 仍然会遵守浏览器自身的 HTTP 磁盘缓存语义——如果服务器（比如 GitHub Pages 默认的 `Cache-Control`）返回的资源还在新鲜期内，`fetch()` 会直接把磁盘缓存里的旧内容当作"网络响应"返回，SW 却误以为自己拿到了最新版本，"network-first" 名不副实，用户还是会看到旧版本。用 URL 字符串（而不是直接传 `event.request`）发起请求，是因为导航请求（`mode: 'navigate'`）等特殊模式的 `Request` 对象如果被 `new Request(event.request, {...})` 这样重新构造会直接报错，传 URL 字符串可以绕开这个限制。**改这段逻辑时不要图省事把 `cache: 'no-store'` 删掉**，否则更新检测机制会在某些托管环境下悄悄失效。
 - `message`：响应 `SKIP_WAITING`（立即激活新 SW）和 `CLEAR_CACHE`（清空所有缓存），由 `updateChecker.js` 在用户点"立即升级"时发送。
 
 ---
@@ -316,6 +334,7 @@ styles/update.css                新版本提示弹窗
 styles/classSwitcher.css         班级切换器下拉面板
 styles/drawHistory.css           屏幕底部"抽取历史"条（见十二节）
 styles/responsive.css            移动端断点适配
+styles/mediaLoader.css           启动蒙版（见五.2 节）
 scripts/shortcutUtil.js          键盘快捷键组合的标准化与匹配（见 4.1 节"抽奖快捷键"）
 scripts/state.js                 数据模型（多班级）+ IndexedDB + 权重公式（核心，改需求先看这里）
 scripts/navigation.js            三页面切换
@@ -331,6 +350,8 @@ scripts/components/imageCropper.js  1:1 头像裁剪（纯 Canvas）
 scripts/components/classSwitcher.js 班级切换/新建/重命名/删除组件
 scripts/components/drawHistory.js   屏幕底部"抽取历史"条（见十二节，脚本加载顺序必须在 state.js 之后）
 scripts/components/winnerEffects.js 中奖弹窗随机庆祝动效（见 4.1 节末尾）
+scripts/components/soundEffects.js  抽奖音效：spin 倍速匹配旋转时长 + win 原速播放（见五.1 节）
+scripts/components/mediaLoader.js   启动蒙版：阻塞式等音效素材就绪（见五.2 节）
 scripts/pages/wheel.js           抽奖页：画转盘 + 加权抽取 + 旋转动画
 scripts/pages/roster.js          录入页：学生 CRUD + 照片 + TXT 批量导入
 scripts/pages/settings.js        设置页：六个功能卡片
