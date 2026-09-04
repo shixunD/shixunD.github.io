@@ -48,6 +48,31 @@
 
     const DEFAULT_CLASS_NAME = '默认班级';
 
+    // 首次进入应用（IndexedDB 中还没有任何数据）时自动创建的示例班级：DEMO 班 + 50 个模拟学生，默认 130 分
+    const DEMO_CLASS_NAME = 'DEMO';
+    const DEMO_STUDENT_SCORE = 130;
+    const DEMO_STUDENT_NAMES = [
+        '王思远', '李雨桐', '张浩然', '刘欣怡', '陈子轩',
+        '杨梓涵', '黄一诺', '赵梓萱', '周皓轩', '吴梦瑶',
+        '徐俊杰', '孙悦然', '朱宇航', '马晨曦', '胡雨萱',
+        '郭子墨', '林思妍', '何宇轩', '高艺涵', '梁诗涵',
+        '谢明轩', '宋佳怡', '唐子豪', '许若曦', '韩雨泽',
+        '冯欣妍', '邓皓宇', '曹雨欣', '彭俊熙', '曾梓彤',
+        '肖宇宸', '田雨萌', '董思远', '袁梓涵', '潘晨阳',
+        '蒋若汐', '蔡子涵', '余思颖', '杜浩宇', '叶欣然',
+        '苏子腾', '魏雨桐', '程皓轩', '吕思宇', '丁梓睿',
+        '沈欣悦', '任子墨', '姚雨萱', '卢梓萌', '姜宇泽'
+    ];
+
+    function makeDemoClass() {
+        const students = DEMO_STUDENT_NAMES.map((name) => normalizeStudent({
+            name,
+            score: DEMO_STUDENT_SCORE,
+            weightMode: 'score'
+        }));
+        return { id: uuid(), name: DEMO_CLASS_NAME, students, drawnStudentIds: [] };
+    }
+
     // 内存中的当前状态
     let state = {
         classes: [],
@@ -302,7 +327,7 @@
             state.classes = migrated.classes;
             state.activeClassId = migrated.activeClassId;
         } else {
-            const cls = makeEmptyClass('班级 1');
+            const cls = makeDemoClass();
             state.classes = [cls];
             state.activeClassId = cls.id;
         }

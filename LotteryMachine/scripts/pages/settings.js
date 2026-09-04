@@ -134,7 +134,7 @@
                         </div>
                         <div class="settings-btn-row" style="margin-top:0.8rem;">
                             <button type="button" class="btn-secondary" id="settings-check-update-btn">🔄 检查更新</button>
-                            <a class="btn-secondary" href="./Handbook/index.html" target="_blank" rel="noopener">📖 产品说明</a>
+                            <a class="btn-secondary" href="./Handbook/" target="_blank" rel="noopener">📖 产品说明</a>
                         </div>
                     </div>
 
