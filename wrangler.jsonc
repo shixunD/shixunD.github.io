@@ -7,7 +7,7 @@
   },
   "assets": {
     "directory": ".",
-    "html_handling": "none"
+    "html_handling": "auto-trailing-slash"
   },
   "compatibility_flags": [
     "nodejs_compat"
