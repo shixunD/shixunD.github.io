@@ -45,6 +45,11 @@
     const durationCacheMs = new Map(); // src -> 时长（毫秒）
     const preloadedAudioPool = [];
 
+    // 不在这里模块加载时就自动调用——那时候 mediaLoader.js 还没跑完，Cache Storage 里啥也没有，
+    // 这里发起的 new Audio(src) 请求会在没有缓存可命中的情况下自己现发一次网络请求，跟 mediaLoader
+    // 正在做的下载抢带宽/连接数，还会让"第一次点抽奖"用到的时长信息来自一次仓促的加载。改成由
+    // mediaLoader.js 在自己确认全部素材已经写入缓存之后再调这个函数（见该文件 run() 末尾），
+    // 这时候这里的请求命中的都是缓存，是瞬时的。
     function warmUp(files) {
         files.forEach((src) => {
             const probe = new Audio();
@@ -56,8 +61,6 @@
             preloadedAudioPool.push(probe);
         });
     }
-    warmUp(SPIN_FILES);
-    warmUp(WIN_FILES);
 
     function pickRandom(list) {
         return list[Math.floor(Math.random() * list.length)];
@@ -118,6 +121,7 @@
     }
 
     // SPIN_FILES/WIN_FILES 一并导出：mediaLoader.js 的启动蒙版需要拿到完整素材清单去逐个下载/等待，
-    // 不想在两个文件里各维护一份重复的路径列表
-    window.SoundEffects = { playSpin, stopSpin, playWin, SPIN_FILES, WIN_FILES };
+    // 不想在两个文件里各维护一份重复的路径列表。warmUp 也导出，供 mediaLoader.js 在全部素材缓存
+    // 完毕之后调用（原因见 warmUp 定义处的注释）
+    window.SoundEffects = { playSpin, stopSpin, playWin, warmUp, SPIN_FILES, WIN_FILES };
 })();
