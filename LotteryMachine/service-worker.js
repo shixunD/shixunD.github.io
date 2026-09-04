@@ -1,7 +1,9 @@
 // 抽奖点名机 Service Worker - PWA 离线支持，全部资源统一走 cache-first
 // CACHE_NAME 不需要每次发版手动改了——判重和"要不要拉新资源"完全交给 updateChecker.js
 // （比较 deploy-tag.json 的内容，见该文件顶部注释），用户点"完成更新"时会显式发 CLEAR_CACHE
-// 消息清空所有缓存桶，不依赖 CACHE_NAME 变化来触发清理。这个值固定不变即可。
+// 消息，不依赖 CACHE_NAME 变化来触发清理。这个值固定不变即可。
+// 注意 CLEAR_CACHE 不是无脑清空整个缓存桶——音效素材（backgroundmusic/）走按"文件名+字节数"
+// 核对 manifest 的选择性清理，没变过的音效不会被清掉、也就不会被重新下载，见 smartClearCache()。
 const CACHE_NAME = 'lottery-cache-v1';
 
 const URLS_TO_CACHE = [
@@ -140,13 +142,65 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
+// backgroundmusic/ 下的音效文件体积远大于 js/css/html（几十 KB 到 1MB+），大部分发版根本没碰过
+// 音效素材，"完成更新"时如果照旧无脑清空整个缓存桶，会导致这批用户根本没变过的大文件也被强制
+// 重新下载一遍，纯粹浪费流量。所以音效走独立的"按名字+大小核对"逻辑，其它文件（js/css/html/图标等，
+// 单个体积小，改没改都无所谓重新拉一次）依然维持"直接清掉，下次 cache miss 自动重新下载"的老逻辑。
+const MEDIA_PATH_SEGMENT = '/backgroundmusic/';
+const MEDIA_MANIFEST_URL = './backgroundmusic/manifest.json';
+
+// 把请求 URL 换算成 manifest.json 里用的 key（"backgroundmusic/xxx/yyy.wav"，与
+// generateMediaManifest.js 生成的 key 拼法保持一致）
+function mediaKeyFromUrl(url) {
+    const idx = url.pathname.indexOf(MEDIA_PATH_SEGMENT);
+    if (idx === -1) return null;
+    return 'backgroundmusic/' + decodeURIComponent(url.pathname.slice(idx + MEDIA_PATH_SEGMENT.length));
+}
+
+async function smartClearCache() {
+    const cache = await caches.open(CACHE_NAME);
+    const requests = await cache.keys();
+
+    // manifest 本身必须绕过缓存直接拿网络最新版本，否则拿到的还是上一次部署时的旧清单，
+    // 核对出来的结果就完全不可信了
+    let manifest = null;
+    try {
+        const res = await fetch(MEDIA_MANIFEST_URL, { cache: 'no-store' });
+        if (res.ok) manifest = await res.json();
+    } catch (e) {
+        manifest = null; // 拿不到 manifest（离线/文件不存在）：走下面的保守兜底，音效按老逻辑清掉
+    }
+
+    await Promise.all(requests.map(async (req) => {
+        const url = new URL(req.url);
+        const mediaKey = mediaKeyFromUrl(url);
+
+        if (mediaKey === null) {
+            await cache.delete(req); // 非音效文件：维持老逻辑，直接清掉，下次 cache miss 自动重新下载
+            return;
+        }
+
+        if (!manifest || !(mediaKey in manifest)) {
+            // manifest 拿不到，或者这个文件已经不在 manifest 里了（被删除/改名）：
+            // 保守起见清掉——拿不到 manifest 时没法判断"是不是没变"，清掉重新下载才安全
+            await cache.delete(req);
+            return;
+        }
+
+        const cachedRes = await cache.match(req);
+        const cachedBlob = await cachedRes.clone().blob();
+        if (cachedBlob.size !== manifest[mediaKey]) {
+            await cache.delete(req); // 大小对不上，说明内容换了，删掉强制重新下载
+        }
+        // 名字和大小都对得上：什么都不做，保留这份缓存，不重新下载
+    }));
+}
+
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
     if (event.data && event.data.type === 'CLEAR_CACHE') {
-        event.waitUntil(
-            caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))))
-        );
+        event.waitUntil(smartClearCache());
     }
 });

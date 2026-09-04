@@ -81,10 +81,15 @@
 
 .update-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.6rem;
     justify-content: center;
 }
 
 .update-actions .btn-primary {
-    flex: 1;
+    flex: 1 1 100%;
+}
+
+.update-actions .btn-secondary {
+    flex: 1 1 auto;
 }

@@ -205,13 +205,16 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
   2. 在 `changelog` 数组**最前面**插入一条 `{semver, date, items}`（`items` 和 `UPDATE.md` 这条记录的要点保持一致，措辞可以更精简，面向用户而不是面向开发者）——`changelog` 数组本身不需要裁剪旧记录（弹窗只读前 3 条），但新记录必须插在最前面，顺序错了弹窗展示的"最新版本"就会是错的。
   **这一步跟"用户会不会收到更新弹窗"已经脱钩**——弹不弹窗只看 `deploy-tag.json` 变没变（自动），`semver`/`changelog` 只影响弹窗里展示的文字内容，就算忘了改，弹窗依然会弹，只是 What's New 显示的还是上一条记录（`showDialog` 标题在拿不到 `semver` 时会退化成"You have successfully updated!!!"，不显示版本号，不会报错或显示"undefined"）。
   `service-worker.js` 的 `CACHE_NAME` **不需要**跟着每次发版改——见该文件顶部注释。
-- **更新机制是强制型的，没有"跳过"/"取消"选项**（早期版本是软性提示，用户可以点"取消"或勾选"本版本不再提示"，后来改成强制，因为软性提示会导致部分用户长期停留在旧版本、遇到已修复的 bug 还来反馈）。逻辑（`UpdateChecker.check()`，`app.js` 启动时调用一次，设置页"检查更新"按钮也会手动调用）：
+- **更新弹窗有三个出口**（早期版本是纯强制型，没有"跳过"/"取消"，后来发现有些用户就是想先忙完手头的抽奖再更新，加回了两个"先不更新"的选项，但依然没有遮罩点击关闭/Esc 关闭——必须点弹窗里的按钮）。逻辑（`UpdateChecker.check()`，`app.js` 启动时调用一次，设置页"检查更新"按钮也会手动调用）：
   1. `fetch('/deploy-tag.json', {cache:'no-store'})`（绝对路径，因为这个文件在大仓库根目录，LotteryMachine 部署后是子目录，相对路径找不到它；`no-store` 绕过浏览器缓存）拿这次部署的指纹（原始文本，不需要解析）。**本地单独跑 LotteryMachine 调试时这个文件不存在，`fetch` 会 404/失败，`check()` 直接跳过检测，不报错也不影响其它功能**——这是有意的降级行为，不是 bug。
   2. 和 `localStorage['lottery.updateMeta.lastSeenTag']` 比较：
      - 首次访问（`lastSeenTag` 是 `null`）：直接记录，不打扰用户（不是"跳过"，纯粹是新用户不需要看"更新"提示）。
      - 相同：不提示。
-     - 不同：额外 `fetch('./version.json')` 拿 `{semver, changelog}`（仅用于展示，失败也不影响弹窗本身弹出），弹出 `update.css` 样式的强制对话框，**没有任何关闭方式**（无遮罩点击关闭、无 Esc 监听、无取消按钮）——"What's New" 展示 `changelog` 前 3 条 + 唯一按钮"Click here to finish update"。
-  3. 点击"Click here to finish update"：把 `lastSeenTag` 更新为这次的指纹 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`，刷新后所有资源 cache miss，重新从网络拉取最新版本。
+     - 不同：额外 `fetch('./version.json')` 拿 `{semver, changelog}`（仅用于展示，失败也不影响弹窗本身弹出），弹出 `update.css` 样式的对话框——"What's New" 展示 `changelog` 前 3 条 + 三个按钮：
+       - **"Click here to finish update"**（主按钮）：把 `lastSeenTag` 更新为这次的指纹 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`，刷新后所有非音效资源 cache miss 重新从网络拉取，音效素材按"文件名+大小"核对决定要不要重新下载（见第十一节 `smartClearCache()`）。
+       - **"Maybe Later"**：直接关掉弹窗，**不写 `lastSeenTag`**——不清缓存也不刷新，旧版本继续跑。因为 `lastSeenTag` 没变，下次打开应用时 tag 依然和它不一致，会照样再弹一次，相当于"这次先不管，下次打开再问我"。
+       - **"Skip This Version"**：把 `lastSeenTag` 更新为这次的指纹，但**不清缓存/不刷新**——旧版本继续跑，这个具体版本以后不会再提示，要等大仓库下一次真的有新 push（tag 再变一次）才会重新弹出。
+     三个按钮共用同一份 `tag`，区别只在"要不要 `setLastSeen`"和"要不要 `applyUpdate()`+刷新"这两件事上分别怎么组合。
 - **大仓库那边需要配置的 Cloudflare Build 命令**（不在本项目仓库里，是 Cloudflare 控制台的项目设置）：Worker 项目 → Settings → Build，设置 Build command 在每次 push 构建时生成 `deploy-tag.json` 到仓库根目录，用 Cloudflare Workers Builds 自动注入的 `WORKERS_CI_COMMIT_SHA` 环境变量，例如：
   ```
   echo "{\"sha\":\"$WORKERS_CI_COMMIT_SHA\",\"builtAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > deploy-tag.json
@@ -292,12 +295,17 @@ function siteRootUrl() { return `${window.location.origin}/`; }
 ## 十一、Service Worker（`service-worker.js`）
 
 - **注册时必须带 `{ updateViaCache: 'none' }`**（`app.js` 的 `registerServiceWorker()`）：`navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })`。**这是真实踩过的一个大坑，而且比上面几个缓存坑更隐蔽**——不加这个选项，`register()` 拉取 `service-worker.js` 这个文件本身时依然会遵守浏览器自己的 HTTP 磁盘缓存：如果这个 URL 之前被普通方式请求过（哪怕只是浏览器按启发式规则缓存过一次），后续的注册/更新检查可能会一直执行缓存住的旧版 SW 脚本，代码里已经改过的 `install`/`fetch` 逻辑完全不会生效，**且没有任何报错**——表现就是"怎么改 `service-worker.js` 都跟没改一样"，本地开发时用同一个端口反复调试几个小时后非常容易踩到，一开始很容易误判成"缓存清理逻辑写错了"，其实是 SW 脚本自己都没更新。`'none'` 强制每次注册/更新检查都绕过 HTTP 缓存去重新拉取 SW 脚本本身（对它的 `importScripts` 依赖同样生效，虽然本项目没用到）。
-- 缓存名 `CACHE_NAME`：**不需要每次发版改**——判重和"要不要拉新资源"完全交给 `updateChecker.js`（比较 `/deploy-tag.json`，见第六节），用户点"完成更新"时会显式发 `CLEAR_CACHE` 消息清空所有缓存桶，不依赖 `CACHE_NAME` 变化来触发清理，固定值即可。
+- 缓存名 `CACHE_NAME`：**不需要每次发版改**——判重和"要不要拉新资源"完全交给 `updateChecker.js`（比较 `/deploy-tag.json`，见第六节），用户点"完成更新"时会显式发 `CLEAR_CACHE` 消息，不依赖 `CACHE_NAME` 变化来触发清理，固定值即可。
 - `install`：**不用 `cache.addAll(URLS_TO_CACHE)` 的便捷写法**，改成自己实现的 `precacheAll()`——逐个 `fetch(url, {cache:'no-store'})` 再手动 `cache.put()`。**这是真实踩过的一个很隐蔽的坑**：`cache.addAll()` 内部发起的请求不会绕过浏览器自身的 HTTP 磁盘缓存——如果某个文件之前被普通方式请求过、还在浏览器 HTTP 缓存的新鲜期内，`addAll()` 会直接把浏览器缓存里的旧内容当成"这次预缓存该存的内容"写进 Cache Storage；预缓存阶段本该拿到这次改动后的最新代码，结果存进去的是改动前的旧版本，之后全部资源又都走 cache-first，就会一直用着这份旧代码——现象和"改了文件但完全没生效"一模一样，排查起来极容易被误判成"SW 没更新"或"改的文件路径不对"，实际上文件内容和路径都是对的，只是预缓存那一刻悄悄拿错了源。**新增/改名文件后要记得把路径加进 `URLS_TO_CACHE` 这个列表**，否则该文件离线时无法访问，在线时不受影响——cache-first 策略下第一次请求会自动 `fetch` 并补进缓存。**`backgroundmusic/` 下的音效文件故意没放进这个列表**——见下方说明，原因和真实复现过的并发下载坑都在那。
 - `activate`：删除所有不等于当前 `CACHE_NAME` 的旧缓存，`clients.claim()` 立即接管所有已打开的页面。
 - `fetch`：**全部同源 GET 请求统一走 cache-first**，不再区分文件类型/路径——`caches.match()` 命中就直接返回、完全不发网络请求；未命中（新文件/缓存被清过）才 `fetch(url, {cache:'no-store'})` 一次并写入缓存（这里的 `cache:'no-store'` 跟 `install` 阶段是同一个坑，不能省）。**这是从"音效 cache-first + 其它资源 network-first 两套并存"简化过来的**：旧方案下代码/样式/HTML 每次打开页面都要发一次网络请求确认有没有更新，哪怕内容根本没变；现在既然 `updateChecker.js` 已经能通过 `/deploy-tag.json` 主动、可靠地检测到"有没有新部署"（见第六节），就不再需要靠 network-first 兜底"顺便"发现新版本了——检测到变化时会显式 `CLEAR_CACHE` + 刷新，平时没有新部署时全部资源都直接读缓存，比 network-first 更快、更省流量。**`backgroundmusic/` 依然不能出现在 `URLS_TO_CACHE` 里**——`install` 阶段如果也去抓这批文件，会跟 `mediaLoader.js` 页面启动时发起的 fetch 同时各打一遍请求，16 个文件变成 32 个并发下载，抢占有限的并发连接数；**这是真实复现过的问题**：本地单线程调试服务器下会导致启动蒙版长时间卡在 0% 不动，即使在正常并发能力更强的托管环境下也是纯浪费流量。音效最终依然会被缓存——`mediaLoader.js` 发起的 fetch 本身就会经过这条 cache-first 逻辑，缓存未命中时自动写入。
   - **`/deploy-tag.json` 是唯一的例外，必须永远绕过缓存**：`fetch` 事件处理器一进来就单独判断 `url.pathname === '/deploy-tag.json'`，命中就直接 `fetch(event.request.url, {cache:'no-store'})` 返回、完全不查缓存也不写缓存，`return` 掉，不走下面统一的 cache-first 逻辑。**这是真实踩过的一个逻辑坑，不是随手加的特殊情况**：`/deploy-tag.json` 本身就是 `updateChecker.js` 用来判断"有没有新部署"的判重信号，如果也走 cache-first，它会在第一次被请求时就被写进 Cache Storage，之后每次判重请求读到的都是那份"第一次缓存下来"的旧内容——判重逻辑本身用一个会被缓存的信号源来判断"要不要清缓存"，永远检测不到后续的真实变化，整个更新机制会从第二次部署开始彻底失效。以后如果要新增别的"判重用的信号文件"，都要照这个模式单独摘出来强制走网络，不能被卷进统一的 cache-first 分支里。
-- `message`：响应 `SKIP_WAITING`（立即激活新 SW）和 `CLEAR_CACHE`（清空所有缓存），由 `updateChecker.js` 在用户点"完成更新"时发送。
+- `message`：响应 `SKIP_WAITING`（立即激活新 SW）和 `CLEAR_CACHE`，由 `updateChecker.js` 在用户点"完成更新"时发送。
+- **`CLEAR_CACHE` 不是无脑清空整个缓存桶——音效素材走"文件名+字节数核对"的选择性清理**（`smartClearCache()`）：js/css/html/图标这些单个体积小的文件，改没改都无所谓重新拉一次，维持老逻辑直接从缓存删掉，下次 cache miss 自动重新下载；但 `backgroundmusic/` 下的音效文件体积大（几十 KB 到 1MB+），大部分发版根本没碰过音效，一律清掉重新下载纯属浪费流量，所以单独处理：
+  1. 先 `fetch('./backgroundmusic/manifest.json', {cache:'no-store'})` 拿这次部署时最新的"文件名 → 字节数"清单（这个 manifest 本身必须绕过缓存，否则拿到的是上次部署的旧清单，核对结果不可信）。
+  2. 遍历 Cache Storage 里已缓存的每个音效文件：manifest 里找不到这个文件（被删除/改名）→ 删掉；找得到但字节数对不上（内容换了）→ 删掉强制重新下载；名字和字节数都对得上 → **什么都不做，保留缓存，不重新下载**。
+  3. manifest 本身 fetch 失败（离线/文件不存在）时保守兜底：所有音效文件按老逻辑一律清掉——拿不到 manifest 没法判断"是不是没变"，清掉重新下载才安全，不会因为判断不了而误保留一份可能已经过期的音效。
+  - **`backgroundmusic/manifest.json` 由 `scripts/generateMediaManifest.js`（Node 脚本）手动生成，不是自动跑的**——跟 `icon-192.png` 的生成方式（见第九节）一个模式：往 `backgroundmusic/spin/` 或 `backgroundmusic/win/` 增删/替换了任何 `.wav` 文件之后，本地跑一次 `node scripts/generateMediaManifest.js` 重新生成这个文件，再跟着改动一起复制到大仓库 push。**忘了跑这一步不会报错或播放失败**——最坏情况下 SW 认不出新文件对应的旧记录，按"大小不一致"处理去重新下载，是安全的降级，只是没真正省到流量。
 
 ---
 
@@ -323,6 +331,7 @@ index.html                       页面骨架 + 三个 <div class="page">容器 
 manifest.json                    PWA 元数据（icons 需同时有 192/512 两个尺寸，否则装不上）
 service-worker.js                离线缓存，全部资源 cache-first（见十一节）
 version.json                     更新说明（semver + changelog，只用于展示，不参与判重，见第六节）
+backgroundmusic/manifest.json    音效文件名+字节数清单，由 scripts/generateMediaManifest.js 手动生成，供 CLEAR_CACHE 智能清理核对（见十一节）
 icon.png                         用户提供的图标（512×512，favicon + PWA 图标）
 icon-192.png                     从 icon.png 用 Pillow 缩放生成的 192×192 版本，PWA 安装要求
 Handbook/index.html              面向教师用户的产品使用手册（独立静态页，自带样式，见第十节）
@@ -341,7 +350,8 @@ styles/mediaLoader.css           启动蒙版（见五.2 节）
 scripts/shortcutUtil.js          键盘快捷键组合的标准化与匹配（见 4.1 节"抽奖快捷键"）
 scripts/state.js                 数据模型（多班级）+ IndexedDB + 权重公式（核心，改需求先看这里）
 scripts/navigation.js            三页面切换
-scripts/updateChecker.js         version.json 比对 + 升级/取消/跳过弹窗
+scripts/updateChecker.js         deploy-tag.json 比对 + 更新弹窗（完成更新/Maybe Later/Skip This Version，见第六节）
+scripts/generateMediaManifest.js Node 脚本，手动运行生成 backgroundmusic/manifest.json（见十一节）
 scripts/persistence.js           navigator.storage.persist() 封装
 scripts/importExport.js          本地 JSON 导出/导入 + 文件名生成
 scripts/pwaInstall.js            beforeinstallprompt 捕获 + 安装引导

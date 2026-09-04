@@ -1,5 +1,9 @@
-// updateChecker.js —— 检测 /deploy-tag.json 有没有变化，强制弹出"更新完成"弹窗（无法跳过/取消）
+// updateChecker.js —— 检测 /deploy-tag.json 有没有变化，弹出"更新完成"弹窗
 // 全局命名空间：window.UpdateChecker
+//
+// 弹窗有三个按钮："完成更新"（清缓存+刷新，立即用上新版本）、"Maybe Later"（这次先不管，下次打开
+// 应用照样会再弹一次）、"Skip This Version"（跳过这一个具体版本，直到下一次真的有新部署才再提示）——
+// 具体行为见 showDialog() 顶部注释。
 //
 // 判重信号是 /deploy-tag.json（仓库根目录，不是 LotteryMachine 自己目录下），这个文件不是本项目
 // 维护的，是大项目（shixunD.github.io，Cloudflare Workers 通过 Git 集成部署）的 Build 命令在每次
@@ -62,7 +66,15 @@
         `).join('');
     }
 
-    // 强制更新弹窗：没有"取消"/"跳过"选项，唯一出口是点击"完成更新"按钮（清缓存+刷新页面）
+    // 更新弹窗：三个出口——
+    // 1. "完成更新"：清缓存（智能清理，见 service-worker.js）+ 刷新，立即用上新版本。
+    // 2. "Maybe Later"：直接关掉弹窗，不写 lastSeenTag——下次打开应用时 tag 还是和 lastSeenTag
+    //    不一致，会照样再弹一次，相当于"这次先不管，下次打开再问我"。
+    // 3. "Skip This Version"：把 lastSeenTag 更新成这次的 tag 但不清缓存/不刷新——这个具体版本
+    //    以后不会再提示，但缓存也没清，用户依然在用旧版本运行；等下一次大仓库再 push、tag 变成
+    //    新的值，才会重新弹出提示。
+    // 后两者都不清缓存，所以旧版本代码依然会继续跑——这是有意的（用户主动选择"先不更新"），
+    // 不是 bug。
     function showDialog(tag, semver, changelog) {
         const overlay = document.createElement('div');
         overlay.className = 'update-overlay';
@@ -73,19 +85,35 @@
                 <div class="update-whatsnew-title">What's New</div>
                 <div class="update-changelog">${renderChangelog(changelog)}</div>
                 <div class="update-actions">
+                    <button type="button" class="btn-secondary" data-action="later">Maybe Later</button>
+                    <button type="button" class="btn-secondary" data-action="skip">Skip This Version</button>
                     <button type="button" class="btn-primary" data-action="finish">Click here to finish update</button>
                 </div>
             </div>
         `;
         document.body.appendChild(overlay);
 
+        function closeDialog() {
+            overlay.remove();
+        }
+
+        overlay.querySelector('[data-action="later"]').addEventListener('click', () => {
+            closeDialog(); // 不写 lastSeenTag，下次打开应用照样会再弹一次
+        });
+
+        overlay.querySelector('[data-action="skip"]').addEventListener('click', () => {
+            setLastSeen(tag); // 只记这一版跳过，不清缓存/不刷新，等下一次真正有新部署才会再提示
+            closeDialog();
+        });
+
         overlay.querySelector('[data-action="finish"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
-            btn.disabled = true;
+            overlay.querySelectorAll('button').forEach((b) => { b.disabled = true; });
             setLastSeen(tag);
             overlay.querySelector('.update-title').textContent = '正在完成更新...';
             overlay.querySelector('.update-whatsnew-title').style.display = 'none';
             overlay.querySelector('.update-changelog').style.display = 'none';
+            overlay.querySelector('.update-actions').style.display = 'none';
             await applyUpdate();
             location.reload();
         });
