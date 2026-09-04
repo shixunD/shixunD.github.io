@@ -1,6 +1,8 @@
-// 抽奖点名机 Service Worker - PWA 离线支持 + network-first 缓存策略
-// CACHE_NAME 每次发版时手动改一下（随便改，只要和上一个不同即可），用于清理旧缓存
-const CACHE_NAME = 'lottery-cache-20260904120000';
+// 抽奖点名机 Service Worker - PWA 离线支持，全部资源统一走 cache-first
+// CACHE_NAME 不需要每次发版手动改了——判重和"要不要拉新资源"完全交给 updateChecker.js
+// （比较 deploy-tag.json 的内容，见该文件顶部注释），用户点"完成更新"时会显式发 CLEAR_CACHE
+// 消息清空所有缓存桶，不依赖 CACHE_NAME 变化来触发清理。这个值固定不变即可。
+const CACHE_NAME = 'lottery-cache-v1';
 
 const URLS_TO_CACHE = [
     './',
@@ -51,12 +53,29 @@ const URLS_TO_CACHE = [
     // 在这里重复声明。
 ];
 
+// **不用 cache.addAll(URLS_TO_CACHE) 的便捷写法，改成逐个 fetch(url, {cache:'no-store'}) 再手动
+// cache.put()**——这是真实踩过的坑：cache.addAll() 内部发起的请求不会绕过浏览器自身的 HTTP 磁盘
+// 缓存，如果某个文件之前被普通方式请求过、还在浏览器 HTTP 缓存的新鲜期内，addAll() 会直接拿浏览器
+// 缓存里的旧内容去写入 Cache Storage——预缓存阶段本该拿到最新代码，结果缓存进去的是旧版本，之后
+// 全部走 cache-first 也就一直用着这份旧代码，跟"改了文件却没生效"表现一模一样，非常隐蔽。显式加
+// cache:'no-store' 强制每个文件都发真实网络请求，从根源杜绝这个问题。
+async function precacheAll(cache) {
+    await Promise.all(URLS_TO_CACHE.map(async (url) => {
+        try {
+            const response = await fetch(url, { cache: 'no-store' });
+            if (response && response.status === 200) {
+                await cache.put(url, response);
+            }
+        } catch (err) {
+            console.warn('[SW] 预缓存失败:', url, err);
+        }
+    }));
+}
+
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(URLS_TO_CACHE).catch((err) => {
-                console.warn('[SW] 部分资源预缓存失败:', err);
-            }))
+            .then((cache) => precacheAll(cache))
             .then(() => self.skipWaiting())
     );
 });
@@ -73,68 +92,51 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// 大体积、几乎不会频繁变动的静态素材（目前只有音效）：命中缓存就直接用，完全不发网络请求——
-// 不这么做的话，音效这种几百 KB～1.6MB 的文件会在每次打开页面时被 network-first 策略重新下载一遍，
-// 流量/加载体验都不划算。**这类资源"多久能看到最新版"完全依赖发版时手动改的 CACHE_NAME**：
-// CACHE_NAME 一变，activate 阶段会删掉旧缓存，下次访问触发 install 重新预缓存 URLS_TO_CACHE，
-// 新增/替换过的素材自然会被重新拉取；不改 CACHE_NAME 就不会重新下载，所以新增音效后**必须**照
-// PROJECT.md 第六节的发版清单把 CACHE_NAME、version.json 都改一遍，否则用户会一直用着旧缓存里的素材。
-const CACHE_FIRST_PATTERNS = [/\/backgroundmusic\//];
-function isCacheFirst(pathname) {
-    return CACHE_FIRST_PATTERNS.some((re) => re.test(pathname));
-}
-
+// 全部同源 GET 请求统一走 cache-first：命中缓存就直接用，完全不发网络请求（音频/JS/CSS/HTML/
+// 图标等等全部一视同仁，不再区分"大文件走 cache-first、代码文件走 network-first"）。
+// 这套策略下"要不要重新下载"完全不看文件类型，只看 updateChecker.js 有没有检测到 deploy-tag.json
+// 变化——检测到变化、用户点"完成更新"后会显式发 CLEAR_CACHE 消息清空所有缓存桶，刷新后 cache miss
+// 触发重新下载，重新写入缓存；平时没有新部署的时候，一次网络请求都不用发，比 network-first 更快、
+// 更省流量。**不要再指望靠"改 CACHE_NAME"来触发更新**——判重和清缓存都已经交给 updateChecker.js，
+// CACHE_NAME 保持不变即可（见文件顶部注释）。
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
 
     const url = new URL(event.request.url);
     if (url.origin !== location.origin) return;
 
-    if (isCacheFirst(url.pathname)) {
+    // /deploy-tag.json 是 updateChecker.js 用来判断"有没有新部署"的信号文件，必须永远绕过缓存、
+    // 直接走网络——如果也走 cache-first，它自己会在第一次被请求时就被写进缓存，之后所有判重请求
+    // 都只会读到那份第一次缓存下来的旧内容，永远检测不到后续的真实变化，整个更新机制会失效。
+    // 这个文件本身也不需要被存进 Cache Storage（内容本来就该常变，缓存了也没有意义）。
+    if (url.pathname === '/deploy-tag.json') {
         event.respondWith(
-            caches.match(event.request).then((cached) => {
-                if (cached) return cached; // 缓存命中，不发任何网络请求
-                return fetch(event.request.url)
-                    .then((response) => {
-                        if (response && response.status === 200) {
-                            const clone = response.clone();
-                            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                        }
-                        return response;
-                    })
-                    .catch(() => new Response('Network error - offline', {
-                        status: 408,
-                        headers: { 'Content-Type': 'text/plain' }
-                    }));
-            })
+            fetch(event.request.url, { cache: 'no-store' }).catch(() => new Response('Network error - offline', {
+                status: 408,
+                headers: { 'Content-Type': 'text/plain' }
+            }))
         );
         return;
     }
 
-    // 其余资源（代码/样式/HTML/version.json 等）维持 network-first：在线时始终拿最新资源并更新
-    // 缓存，离线时回退缓存。这些文件体积小、又直接决定"用户是否看到最新版本/最新更新提示"，
-    // 不适合像音效那样长期缓存。
     event.respondWith(
-        // cache: 'no-store' 显式绕过浏览器自身的 HTTP 缓存（GitHub Pages 等静态托管
-        // 通常会给文件加较长的 Cache-Control，普通 fetch(event.request) 在缓存未过期时
-        // 会直接复用浏览器磁盘缓存而不是真正发请求，导致"network-first"名不副实、
-        // 用户看不到最新版本。用 URL 字符串发起请求可以避免 navigate 等特殊请求模式
-        // 在被重新构造为 Request 时报错。
-        fetch(event.request.url, { cache: 'no-store' })
-            .then((response) => {
-                if (response && response.status === 200) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                }
-                return response;
-            })
-            .catch(() => caches.match(event.request).then((cached) => {
-                if (cached) return cached;
-                return new Response('Network error - offline', {
+        caches.match(event.request).then((cached) => {
+            if (cached) return cached; // 缓存命中，不发任何网络请求
+            // 缓存未命中时的兜底请求同样要加 cache:'no-store'（原因见 precacheAll 的注释）——
+            // 否则第一次把这个文件写进 Cache Storage 时，也可能不小心存进浏览器 HTTP 缓存里的旧内容
+            return fetch(event.request.url, { cache: 'no-store' })
+                .then((response) => {
+                    if (response && response.status === 200) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    }
+                    return response;
+                })
+                .catch(() => new Response('Network error - offline', {
                     status: 408,
                     headers: { 'Content-Type': 'text/plain' }
-                });
-            }))
+                }));
+        })
     );
 });
 

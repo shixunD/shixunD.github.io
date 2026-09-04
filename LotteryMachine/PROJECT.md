@@ -23,7 +23,7 @@
   → 依次加载 styles/*.css（纯样式，无逻辑）
   → 依次加载 scripts/*.js（IIFE 模块，每个文件在 window 上挂一个全局对象，如 window.AppState）
   → scripts/app.js 的 DOMContentLoaded 监听器执行 init()：
-      1. 注册 service-worker.js（离线缓存 + network-first 更新策略）
+      1. 注册 service-worker.js（离线缓存，全部资源 cache-first）
       2. MsalAuth.init()（预加载 OneDrive 登录所需的 MSAL.js，处理登录回调）
       3. AppState.load()（从 IndexedDB 读取学生名单和设置到内存）
       4. Navigation.init()（绑定导航栏点击事件）
@@ -195,25 +195,28 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 
 ---
 
-## 六、更新检测机制（需求 1）—— `scripts/updateChecker.js` + `version.json`
+## 六、更新检测机制（需求 1）—— `scripts/updateChecker.js` + `/deploy-tag.json` + `version.json`
 
-**这是最容易被后续修改遗漏的部分，务必读完。**
+**部署方式**：这个项目实际是作为子目录挂在 `shixunD.github.io` 这个大仓库里（Cloudflare 控制台直接连了这个 GitHub 仓库，`wrangler.jsonc` 的 `assets.directory` 指向仓库根目录），**push 到 `main` 分支后 Cloudflare 会自动重新构建部署整个仓库，服务器端内容"是否最新"完全不需要人管**（日常开发流程：在这个独立文件夹里改，改完手动复制整个文件夹去覆盖大仓库里的 `LotteryMachine/` 子目录，再由大仓库那边 push）。下面这套机制解决的是另一个问题：**已经打开过页面/已安装 PWA 的用户，怎么知道服务器上其实已经有新内容了**——尤其是现在 `service-worker.js` 已经改成全部资源 cache-first（见十一节），不主动检测的话用户会一直用着本地缓存，感知不到任何更新。
 
-- `version.json`（仓库根目录）内容三个字段：`{"version": "ISO 时间戳，驱动更新检测的判重", "semver": "人类可读的语义化版本号，如 1.2.0，展示用，不参与判重逻辑", "changelog": [{"semver","date","items":[...]}, ...] }`。**`version`/`semver` 两个字段职责分开，不要合并成一个**：`version`（时间戳）唯一职责是"和上次是否不同"，只要精确到秒就天然不会撞车（见下）；`semver` 唯一职责是给人看"这是第几个版本"，语义化版本号本身不保证单调递增可比较（`"1.10.0"` 和 `"1.9.0"` 做字符串比较会得出错误结论），所以更新检测逻辑**只认 `version` 字段，永远不要用 `semver` 做判重或新旧比较**。`changelog` 是**按版本从新到旧排列**的数组，供更新弹窗展示"What's New"（只取前 3 条，见下）。
-- **⚠️ 每次往 GitHub Pages 发布新版本时，必须手动做四件事**：
-  1. 把 `version.json` 的 `version` 改成新的精确时间戳（执行 `date -Iseconds`，如 `2026-09-03T09:46:38+08:00`，**不能手打一个整点/大概时间**——**真实踩过的坑**：早期习惯手打整点时间如 `19:00:00` 当占位符，同一天内改两次版本容易撞成完全相同的字符串，更新检测机制靠字符串"不同"判断有没有新版，一撞车第二次发布对用户来说等于没发生，弹窗不会触发；取精确到秒的真实时间可以从根本上避免）。
-  2. 把 `version.json` 的 `semver` 按语义化版本规则递增（纯 bug 修复 → patch 如 `1.1.1`；新增向后兼容的功能 → minor 如 `1.2.0`；破坏性变更/大改版 → major 如 `2.0.0`），并在 `UPDATE.md` 顶部加一条对应记录（版本号 + 日期 + 变更点）。**`version.json` 的 `semver` 必须始终等于 `UPDATE.md` 最新一条的版本号**，两处不同步会让人分不清到底哪个是真的当前版本。
-  3. 在 `version.json` 的 `changelog` 数组**最前面**插入一条 `{semver, date, items}`（`items` 和 `UPDATE.md` 这条记录的要点保持一致，措辞可以更精简，面向用户而不是面向开发者）——`changelog` 数组本身不需要裁剪旧记录（弹窗只读前 3 条），但新记录必须插在最前面，顺序错了弹窗展示的"最新版本"就会是错的。
-  4. 顺手把 `service-worker.js` 顶部的 `CACHE_NAME` 也改一个新值（否则依赖 SW 走 network-first 策略也能工作，但改一下能更彻底地清理旧缓存）。
-  这几步都没有自动化，是本项目更新提示机制和版本追踪能力生效的前提，发版前照着做，不要漏掉。
+- **判重信号是 `/deploy-tag.json`（大仓库根目录，注意不是 `LotteryMachine/version.json`）**，这个文件不由本项目维护，是大仓库在 Cloudflare 的 Build 命令里每次 push 后自动生成的（commit SHA + 构建时间），**任何一次 push 到大仓库都会让它的内容变化，不需要任何人手动同步任何字段**——这就是为什么"改没改 `version.json`"不再是判重条件：以前维护过一个专门的 `version`（ISO 时间戳）字段给判重用，每次发版都要记得手动改，真实踩过的坑是容易忘记同步改、或者同一天内改两次版本手打的时间戳撞成一样的字符串导致弹窗不触发；现在完全自动化，代价是"任何一次 push 到大仓库"（哪怕改的是 `shixunD.github.io` 里别的子项目，跟 LotteryMachine 无关）都会让 LotteryMachine 的用户看到一次更新提示——目前的开发习惯是"改完 LotteryMachine 就顺手复制过去 push"，这个粒度对现在的工作流来说是可接受的。
+- `LotteryMachine/version.json` 现在**只剩两个字段**：`{"semver": "人类可读的语义化版本号，如 1.2.0，展示用", "changelog": [{"semver","date","items":[...]}, ...] }`，**不参与判重，只用来给更新弹窗展示"What's New"**。发新版本时依然要人工维护：
+  1. 把 `semver` 按语义化版本规则递增（纯 bug 修复 → patch 如 `1.1.1`；新增向后兼容的功能 → minor 如 `1.2.0`；破坏性变更/大改版 → major 如 `2.0.0`），并在 `UPDATE.md` 顶部加一条对应记录（版本号 + 日期 + 变更点）。**`version.json` 的 `semver` 必须始终等于 `UPDATE.md` 最新一条的版本号**，两处不同步会让人分不清到底哪个是真的当前版本。
+  2. 在 `changelog` 数组**最前面**插入一条 `{semver, date, items}`（`items` 和 `UPDATE.md` 这条记录的要点保持一致，措辞可以更精简，面向用户而不是面向开发者）——`changelog` 数组本身不需要裁剪旧记录（弹窗只读前 3 条），但新记录必须插在最前面，顺序错了弹窗展示的"最新版本"就会是错的。
+  **这一步跟"用户会不会收到更新弹窗"已经脱钩**——弹不弹窗只看 `deploy-tag.json` 变没变（自动），`semver`/`changelog` 只影响弹窗里展示的文字内容，就算忘了改，弹窗依然会弹，只是 What's New 显示的还是上一条记录（`showDialog` 标题在拿不到 `semver` 时会退化成"You have successfully updated!!!"，不显示版本号，不会报错或显示"undefined"）。
+  `service-worker.js` 的 `CACHE_NAME` **不需要**跟着每次发版改——见该文件顶部注释。
 - **更新机制是强制型的，没有"跳过"/"取消"选项**（早期版本是软性提示，用户可以点"取消"或勾选"本版本不再提示"，后来改成强制，因为软性提示会导致部分用户长期停留在旧版本、遇到已修复的 bug 还来反馈）。逻辑（`UpdateChecker.check()`，`app.js` 启动时调用一次，设置页"检查更新"按钮也会手动调用）：
-  1. `fetch('./version.json', {cache:'no-store'})` 拿远端最新的 `{version, semver, changelog}`（`no-store` 绕过浏览器缓存，否则可能读到旧文件）。
-  2. 和 `localStorage['lottery.updateMeta.lastSeenVersion']` 比较：
-     - 首次访问（`lastSeenVersion` 是 `null`）：直接记录，不打扰用户（不是"跳过"，纯粹是新用户不需要看"更新"提示）。
+  1. `fetch('/deploy-tag.json', {cache:'no-store'})`（绝对路径，因为这个文件在大仓库根目录，LotteryMachine 部署后是子目录，相对路径找不到它；`no-store` 绕过浏览器缓存）拿这次部署的指纹（原始文本，不需要解析）。**本地单独跑 LotteryMachine 调试时这个文件不存在，`fetch` 会 404/失败，`check()` 直接跳过检测，不报错也不影响其它功能**——这是有意的降级行为，不是 bug。
+  2. 和 `localStorage['lottery.updateMeta.lastSeenTag']` 比较：
+     - 首次访问（`lastSeenTag` 是 `null`）：直接记录，不打扰用户（不是"跳过"，纯粹是新用户不需要看"更新"提示）。
      - 相同：不提示。
-     - 不同：弹出 `update.css` 样式的强制对话框，**没有任何关闭方式**（无遮罩点击关闭、无 Esc 监听、无取消按钮）——文案是"You have successfully updated to v{semver}!!!"（因为 Service Worker 的 network-first 策略下新资源其实已经在后台拿到了，这个弹窗是"确认收到"而不是"要不要更新"）+ "What's New" 展示 `changelog` 前 3 条 + 唯一按钮"Click here to finish update"。
-  3. 点击"Click here to finish update"：把 `lastSeenVersion` 更新为新版本号 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`，刷新后页面真正跑起新版本代码。
-- `service-worker.js` 的 `fetch` 事件处理器用的是 **network-first**：在线时永远优先请求网络最新资源并顺便更新缓存，离线才回退缓存。这从根源上减少"改了代码但用户看到旧版本"的情况；`version.json` 弹窗是在此之上**用户可感知、且强制确认的提示层**，两者互补，不要误以为二选一。
+     - 不同：额外 `fetch('./version.json')` 拿 `{semver, changelog}`（仅用于展示，失败也不影响弹窗本身弹出），弹出 `update.css` 样式的强制对话框，**没有任何关闭方式**（无遮罩点击关闭、无 Esc 监听、无取消按钮）——"What's New" 展示 `changelog` 前 3 条 + 唯一按钮"Click here to finish update"。
+  3. 点击"Click here to finish update"：把 `lastSeenTag` 更新为这次的指纹 → 通知 Service Worker `SKIP_WAITING` + `CLEAR_CACHE` → `location.reload()`，刷新后所有资源 cache miss，重新从网络拉取最新版本。
+- **大仓库那边需要配置的 Cloudflare Build 命令**（不在本项目仓库里，是 Cloudflare 控制台的项目设置）：Worker 项目 → Settings → Build，设置 Build command 在每次 push 构建时生成 `deploy-tag.json` 到仓库根目录，用 Cloudflare Workers Builds 自动注入的 `WORKERS_CI_COMMIT_SHA` 环境变量，例如：
+  ```
+  echo "{\"sha\":\"$WORKERS_CI_COMMIT_SHA\",\"builtAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > deploy-tag.json
+  ```
+  Deploy command 保持默认的 `npx wrangler deploy` 不用改——`assets.directory` 是仓库根目录，Build 命令生成的这个文件会随着其它静态资源一起被部署上去。
 
 ---
 
@@ -288,13 +291,13 @@ function siteRootUrl() { return `${window.location.origin}/`; }
 
 ## 十一、Service Worker（`service-worker.js`）
 
-- 缓存名 `CACHE_NAME`：**每次发版都应该改成新字符串**（配合 `version.json` 一起改，见第六节）。
-- `install`：预缓存 `URLS_TO_CACHE` 里列出的所有静态资源（**新增/改名文件后要记得把路径加进这个列表**，否则该文件不会被离线缓存，虽然 network-first 策略下在线时不受影响，但离线时会缺失），然后 `skipWaiting()`。**`backgroundmusic/` 下的音效文件故意没放进这个列表**——见下方"音效走 cache-first"小节，原因和真实踩过的并发下载坑都在那。
+- **注册时必须带 `{ updateViaCache: 'none' }`**（`app.js` 的 `registerServiceWorker()`）：`navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })`。**这是真实踩过的一个大坑，而且比上面几个缓存坑更隐蔽**——不加这个选项，`register()` 拉取 `service-worker.js` 这个文件本身时依然会遵守浏览器自己的 HTTP 磁盘缓存：如果这个 URL 之前被普通方式请求过（哪怕只是浏览器按启发式规则缓存过一次），后续的注册/更新检查可能会一直执行缓存住的旧版 SW 脚本，代码里已经改过的 `install`/`fetch` 逻辑完全不会生效，**且没有任何报错**——表现就是"怎么改 `service-worker.js` 都跟没改一样"，本地开发时用同一个端口反复调试几个小时后非常容易踩到，一开始很容易误判成"缓存清理逻辑写错了"，其实是 SW 脚本自己都没更新。`'none'` 强制每次注册/更新检查都绕过 HTTP 缓存去重新拉取 SW 脚本本身（对它的 `importScripts` 依赖同样生效，虽然本项目没用到）。
+- 缓存名 `CACHE_NAME`：**不需要每次发版改**——判重和"要不要拉新资源"完全交给 `updateChecker.js`（比较 `/deploy-tag.json`，见第六节），用户点"完成更新"时会显式发 `CLEAR_CACHE` 消息清空所有缓存桶，不依赖 `CACHE_NAME` 变化来触发清理，固定值即可。
+- `install`：**不用 `cache.addAll(URLS_TO_CACHE)` 的便捷写法**，改成自己实现的 `precacheAll()`——逐个 `fetch(url, {cache:'no-store'})` 再手动 `cache.put()`。**这是真实踩过的一个很隐蔽的坑**：`cache.addAll()` 内部发起的请求不会绕过浏览器自身的 HTTP 磁盘缓存——如果某个文件之前被普通方式请求过、还在浏览器 HTTP 缓存的新鲜期内，`addAll()` 会直接把浏览器缓存里的旧内容当成"这次预缓存该存的内容"写进 Cache Storage；预缓存阶段本该拿到这次改动后的最新代码，结果存进去的是改动前的旧版本，之后全部资源又都走 cache-first，就会一直用着这份旧代码——现象和"改了文件但完全没生效"一模一样，排查起来极容易被误判成"SW 没更新"或"改的文件路径不对"，实际上文件内容和路径都是对的，只是预缓存那一刻悄悄拿错了源。**新增/改名文件后要记得把路径加进 `URLS_TO_CACHE` 这个列表**，否则该文件离线时无法访问，在线时不受影响——cache-first 策略下第一次请求会自动 `fetch` 并补进缓存。**`backgroundmusic/` 下的音效文件故意没放进这个列表**——见下方说明，原因和真实复现过的并发下载坑都在那。
 - `activate`：删除所有不等于当前 `CACHE_NAME` 的旧缓存，`clients.claim()` 立即接管所有已打开的页面。
-- `fetch`：**按路径拆成两套策略**，不是所有请求都走同一套：
-  - `backgroundmusic/` 下的音效文件走 **cache-first**：`caches.match()` 命中就直接返回、完全不发网络请求；未命中（新文件/缓存被清过）才 `fetch()` 一次并写入缓存。这些文件体积大（700KB～1.6MB）又几乎不变，不适合像代码文件那样每次都重新拉取一遍，详见五.2 节"启动蒙版"。**`backgroundmusic/` 不能同时出现在 `URLS_TO_CACHE` 里**——`install` 阶段的 `cache.addAll()` 如果也去抓这批文件，会跟 `mediaLoader.js` 页面启动时发起的 fetch 同时各打一遍请求，16 个文件变成 32 个并发下载，抢占有限的并发连接数；**这是真实复现过的问题**：本地单线程调试服务器下会导致启动蒙版长时间卡在 0% 不动，即使在正常并发能力更强的托管环境下也是纯浪费流量。音效最终依然会被缓存——`mediaLoader.js` 发起的 fetch 本身就会经过下面这条 cache-first 分支，缓存未命中时自动写入。
-  - 其余同源 GET 请求（代码/样式/HTML/`version.json` 等）维持 **network-first**（在线优先拿最新，顺便更新缓存；离线才回退缓存）。**关键细节：请求时必须显式加 `{ cache: 'no-store' }`**（`fetch(event.request.url, { cache: 'no-store' })`，不能直接 `fetch(event.request)`）。原因是实测发现的一个真实坑：普通 `fetch(event.request)` 仍然会遵守浏览器自身的 HTTP 磁盘缓存语义——如果服务器（比如 GitHub Pages 默认的 `Cache-Control`）返回的资源还在新鲜期内，`fetch()` 会直接把磁盘缓存里的旧内容当作"网络响应"返回，SW 却误以为自己拿到了最新版本，"network-first" 名不副实，用户还是会看到旧版本。用 URL 字符串（而不是直接传 `event.request`）发起请求，是因为导航请求（`mode: 'navigate'`）等特殊模式的 `Request` 对象如果被 `new Request(event.request, {...})` 这样重新构造会直接报错，传 URL 字符串可以绕开这个限制。**改这段逻辑时不要图省事把 `cache: 'no-store'` 删掉**，否则更新检测机制会在某些托管环境下悄悄失效。
-- `message`：响应 `SKIP_WAITING`（立即激活新 SW）和 `CLEAR_CACHE`（清空所有缓存），由 `updateChecker.js` 在用户点"立即升级"时发送。
+- `fetch`：**全部同源 GET 请求统一走 cache-first**，不再区分文件类型/路径——`caches.match()` 命中就直接返回、完全不发网络请求；未命中（新文件/缓存被清过）才 `fetch(url, {cache:'no-store'})` 一次并写入缓存（这里的 `cache:'no-store'` 跟 `install` 阶段是同一个坑，不能省）。**这是从"音效 cache-first + 其它资源 network-first 两套并存"简化过来的**：旧方案下代码/样式/HTML 每次打开页面都要发一次网络请求确认有没有更新，哪怕内容根本没变；现在既然 `updateChecker.js` 已经能通过 `/deploy-tag.json` 主动、可靠地检测到"有没有新部署"（见第六节），就不再需要靠 network-first 兜底"顺便"发现新版本了——检测到变化时会显式 `CLEAR_CACHE` + 刷新，平时没有新部署时全部资源都直接读缓存，比 network-first 更快、更省流量。**`backgroundmusic/` 依然不能出现在 `URLS_TO_CACHE` 里**——`install` 阶段如果也去抓这批文件，会跟 `mediaLoader.js` 页面启动时发起的 fetch 同时各打一遍请求，16 个文件变成 32 个并发下载，抢占有限的并发连接数；**这是真实复现过的问题**：本地单线程调试服务器下会导致启动蒙版长时间卡在 0% 不动，即使在正常并发能力更强的托管环境下也是纯浪费流量。音效最终依然会被缓存——`mediaLoader.js` 发起的 fetch 本身就会经过这条 cache-first 逻辑，缓存未命中时自动写入。
+  - **`/deploy-tag.json` 是唯一的例外，必须永远绕过缓存**：`fetch` 事件处理器一进来就单独判断 `url.pathname === '/deploy-tag.json'`，命中就直接 `fetch(event.request.url, {cache:'no-store'})` 返回、完全不查缓存也不写缓存，`return` 掉，不走下面统一的 cache-first 逻辑。**这是真实踩过的一个逻辑坑，不是随手加的特殊情况**：`/deploy-tag.json` 本身就是 `updateChecker.js` 用来判断"有没有新部署"的判重信号，如果也走 cache-first，它会在第一次被请求时就被写进 Cache Storage，之后每次判重请求读到的都是那份"第一次缓存下来"的旧内容——判重逻辑本身用一个会被缓存的信号源来判断"要不要清缓存"，永远检测不到后续的真实变化，整个更新机制会从第二次部署开始彻底失效。以后如果要新增别的"判重用的信号文件"，都要照这个模式单独摘出来强制走网络，不能被卷进统一的 cache-first 分支里。
+- `message`：响应 `SKIP_WAITING`（立即激活新 SW）和 `CLEAR_CACHE`（清空所有缓存），由 `updateChecker.js` 在用户点"完成更新"时发送。
 
 ---
 
@@ -318,8 +321,8 @@ function siteRootUrl() { return `${window.location.origin}/`; }
 ```
 index.html                       页面骨架 + 三个 <div class="page">容器 + 所有 <script> 引入顺序
 manifest.json                    PWA 元数据（icons 需同时有 192/512 两个尺寸，否则装不上）
-service-worker.js                离线缓存 + network-first（fetch 必须带 cache:'no-store'，见十一节）
-version.json                     更新检测用的版本号（发版必改）
+service-worker.js                离线缓存，全部资源 cache-first（见十一节）
+version.json                     更新说明（semver + changelog，只用于展示，不参与判重，见第六节）
 icon.png                         用户提供的图标（512×512，favicon + PWA 图标）
 icon-192.png                     从 icon.png 用 Pillow 缩放生成的 192×192 版本，PWA 安装要求
 Handbook/index.html              面向教师用户的产品使用手册（独立静态页，自带样式，见第十节）

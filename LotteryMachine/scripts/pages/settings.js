@@ -362,7 +362,7 @@
         try {
             const res = await fetch('./version.json', { cache: 'no-store' });
             const data = await res.json();
-            el.textContent = data.semver ? `v${data.semver}（${data.version || '未知'}）` : (data.version || '未知');
+            el.textContent = data.semver ? `v${data.semver}` : '未知';
         } catch (e) {
             el.textContent = '获取失败';
         }

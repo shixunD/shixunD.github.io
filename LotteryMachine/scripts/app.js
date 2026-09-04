@@ -6,7 +6,14 @@
     function registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./service-worker.js').catch((err) => {
+            // updateViaCache: 'none' 是真实踩过的一个大坑——不加这个选项，
+            // navigator.serviceWorker.register() 拉取 service-worker.js 这个文件本身时，
+            // 依然会遵守浏览器自己的 HTTP 磁盘缓存：如果这个 URL 之前被普通方式请求过（哪怕只是
+            // 浏览器自己按启发式规则缓存过），register()/后续的更新检查可能会一直用着缓存住的
+            // 旧版 SW 脚本执行，代码里已经改过的 install/fetch 逻辑完全不会生效，且没有任何报错、
+            // 表现就是"怎么改 service-worker.js 都跟没改一样"，非常隐蔽难查。'none' 强制每次都绕过
+            // HTTP 缓存去更新检查 SW 脚本本身（对它的 importScripts 依赖同样生效，虽然本项目没用）。
+            navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).catch((err) => {
                 console.warn('[app] Service Worker 注册失败:', err);
             });
         });
