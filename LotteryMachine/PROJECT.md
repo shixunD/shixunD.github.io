@@ -183,9 +183,8 @@ weight = Math.max(MIN_WEIGHT, evaluate(settings.weightFormula, g=score))   // MI
 
 - `SPIN_FILES`/`WIN_FILES` 是两份素材路径清单（`backgroundmusic/spin/`、`backgroundmusic/win/` 下的 `.wav`），`playSpin(durationMs)` 随机选一个 spin 素材，用 `playbackRate` 倍速拉伸/压缩到刚好等于本次转盘旋转总时长；`playWin()` 随机选一个 win 素材原速播完。**这两个数组不是手写的，由 `loadFileList()` 在启动时读 `backgroundmusic/manifest.json` 原地填充**（按 key 前缀分到 spin/win，返回 `{相对路径: 字节数}` 给 `mediaLoader.js` 用）。**这是真实踩过的坑**：以前数组手写在代码里，往 `win/` 加了 3 个 wav 并重新生成了 manifest 却忘了同步改数组，结果启动蒙版把"数组里的 16 个"下完就显示 100% 放行，文件夹里另外 3 个从来没被下载和播放——用户看到的就是"没有把文件夹里的音频全部加载完"。现在加/删素材只需要放文件 + 跑一次 `node scripts/generateMediaManifest.js`，播放清单、下载清单、进度条分母、更新时的缓存核对全部自动跟上。
 - **`playSpin` 用"必须播完的绝对时刻"（`deadline = performance.now() + durationMs`）而不是固定的 `durationMs` 来算倍速**——**这是真实踩过的坑**：素材体积普遍 700KB～1.6MB，如果每次点"开始抽奖"才现 `new Audio()` 现下载，首次播放某个文件时要等一次网络请求，等待期间转盘已经在转，原来按"旋转总时长"算倍速会导致播放起点晚了、但播放长度没跟着缩短，到 `finish()` 里 `stopSpin()` 强制停止那一刻音效必然还没放完——**"延迟"和"播放不完整"其实是同一个根因**。改成按"距离 deadline 还剩多久"重新算倍速后，不管音效实际几点开始播都能精确播完。
-- `warmUp(files)` 用 `preload='auto'` 静默过一遍全部素材，记下真实时长到 `durationCacheMs`；引用存进 `preloadedAudioPool` 数组防止被当垃圾提前回收。**不在模块加载时自动调用**——改成导出给 `mediaLoader.js` 在自己确认全部素材已经写入 Cache Storage 之后再调（见下方"启动蒙版"）。这是真实踩过的坑：以前是模块一加载就自动 `warmUp()`，跟蒙版的下载同时抢带宽/连接数，还可能在缓存还没写完时就现发一次网络请求，表现为"第一次点开始抽奖音效延迟几秒、要刷新几次才恢复正常"。
-
-  这一步只是"让浏览器提前知道时长"，**不是"保证点开始抽奖时素材已经就绪"的机制**——那是下面启动蒙版的职责。
+- **播放路径完全不经过 Service Worker/网络**：`warmUp(files, cache)` 由 `mediaLoader.js` 在全部素材写入 Cache Storage 之后调用（并 `await` 它就绪后才撤蒙版），它用页面侧的 Cache API 直接把每个文件的 blob 读出来（不需要 SW 接管页面也能读），`URL.createObjectURL` 转成 object URL 建好 Audio 元素、等到 `loadedmetadata` 拿到时长，存进 `ready` Map（src → `{audio, durationMs}`）。`playSpin`/`playWin` 直接复用这些已经完全就绪的内存元素（`currentTime=0` 重播；同一个 win 音效上一次还没放完时 `cloneNode()` 叠着放），点击到出声约 30ms。预热没覆盖到的文件（解码失败/用户跳过等待）才退回 `new Audio(src)` 等 `loadedmetadata` 的老路。
+  **这是真实踩过的坑，而且只在第一次访问时出现、刷新几次就好，本地很难复现**：以前 `warmUp` 只是用 `preload='auto'` 让浏览器"顺手"缓存一遍、播放时再 `new Audio(src)` 让浏览器自己去取——首次访问时 Service Worker 还在安装（同时在预缓存四十多个 js/css），页面还没被它接管，这个请求不走 Cache Storage 而是又去服务器重新下一遍 wav，起点晚了几秒，被 `stopSpin()` 一掐就是"延迟 + 播不全"；第二次以后 SW 已接管、命中缓存，就正常了。本地 localhost 上 SW 几百毫秒就装好、网络也快，所以测不出来。改成从 blob 直接播之后，SW 接没接管、网络快不快都跟播放无关。
 
 ### 五.2 启动蒙版（`mediaLoader.js` + `styles/mediaLoader.css`）
 

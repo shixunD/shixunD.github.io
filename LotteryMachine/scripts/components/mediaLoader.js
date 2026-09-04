@@ -260,11 +260,13 @@
         clearTimeout(stallTimer);
         clearTimeout(skipTimer);
 
-        // 到这里清单里每个文件要么已确认在缓存里、要么服务器上确实没有。后台音效预热（读时长用于
-        // 播放倍速计算）放在这之后触发，保证它发起的 new Audio(src) 请求命中的都是已写好的缓存、
-        // 瞬间可用，不会再跟这里的下载抢带宽，也不会自己触发一次未缓存的网络请求
+        // 到这里清单里每个文件要么已确认在缓存里、要么服务器上确实没有。接着让 soundEffects.js
+        // 直接从这个 cache 里把 blob 读出来建好随时可播的 Audio 元素，**await 它就绪后再撤蒙版**——
+        // 播放路径从此完全不经过 Service Worker/网络（首次访问时 SW 还没接管页面，走网络会再下一遍，
+        // 见 soundEffects.js 里的踩坑记录），蒙版消失那一刻点"开始抽奖"就能立刻出声
         if (window.SoundEffects && typeof SoundEffects.warmUp === 'function') {
-            SoundEffects.warmUp(FILES.filter((src, i) => status[i] === true));
+            setText('正在准备音效…');
+            await SoundEffects.warmUp(FILES.filter((src, i) => status[i] === true), cache);
         }
 
         const missingCount = status.filter((s) => s === 'missing').length;

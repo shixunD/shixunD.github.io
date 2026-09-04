@@ -48,33 +48,57 @@
 
     let currentSpinAudio = null; // 当前正在播放的 spin 音效（用于旋转提前结束/被打断时能立刻停掉）
 
-    // 素材体积普遍有几百 KB～1.6MB（wav 无损格式），如果每次点"开始抽奖"才 new Audio() 现下载现播，
-    // 首次播放某个文件时要等一次网络请求+解码（慢网络/慢磁盘下可能是几百毫秒甚至更久）才会真正出声——
-    // 这段等待期间转盘视觉已经在转了，听感上就是"音效延迟"；更糟的是 playSpin() 原来按"旋转总时长"算
-    // 倍速，如果播放起点因为这段等待往后错了，到 stopSpin() 强制停止的那一刻音效必然还没放完，就变成
-    // "播放不完整"（真正的根因不是"放完了才截断"，而是"起点晚了、播放长度没跟着缩短"）。
-    // 解法：应用一启动就在后台把全部素材静默预加载一遍（`preload='auto'` 触发浏览器把整个文件缓存到内存/
-    // 磁盘缓存），并记下真实时长；引用必须存进这个数组保持"活着"，否则没有其它变量持有时对象可能被当
-    // 垃圾提前回收，预加载等于白做。真正播放时 `new Audio(src)` 拿到的是命中浏览器缓存的第二份实例，
-    // 不需要重新走网络，时长也大概率已经在缓存里、不用等 loadedmetadata 事件。
-    const durationCacheMs = new Map(); // src -> 时长（毫秒）
-    const preloadedAudioPool = [];
+    // 素材体积普遍有几百 KB～1.7MB（wav 无损格式）。如果点"开始抽奖"时才 `new Audio(src)` 让浏览器
+    // 自己去取，取数据这一步要经过 Service Worker/网络，起点一晚，转盘视觉已经在转，听感上就是"音效
+    // 延迟"，随后 stopSpin() 一掐就是"播不全"（根因是"起点晚了、播放长度没跟着缩短"）。
+    // **这是真实踩过的坑，而且只在第一次访问时出现、刷新几次就好**：首次访问时 Service Worker 还在
+    // 安装（同时在预缓存四十多个 js/css），这个页面还没被它接管，`new Audio(src)` 的请求不走缓存、
+    // 而是又去服务器重新下一遍 wav；第二次以后 SW 已接管、命中缓存，就正常了。
+    // 解法：播放路径彻底不依赖 SW/网络——mediaLoader.js 把素材写进 Cache Storage 后调 warmUp()，
+    // 这里直接用页面侧的 Cache API 把 blob 读出来（不需要 SW 接管也能读），转成 object URL 建好
+    // Audio 元素并等到拿到时长，之后播放就是操作一个已经完全就绪的内存对象，零等待。
+    const ready = new Map(); // src -> { audio, durationMs }
+    const WARMUP_TIMEOUT_MS = 5000; // 单个元素等 loadedmetadata 的上限，防止某个异常文件把蒙版永远挂住
 
-    // 不在这里模块加载时就自动调用——那时候 mediaLoader.js 还没跑完，Cache Storage 里啥也没有，
-    // 这里发起的 new Audio(src) 请求会在没有缓存可命中的情况下自己现发一次网络请求，跟 mediaLoader
-    // 正在做的下载抢带宽/连接数，还会让"第一次点抽奖"用到的时长信息来自一次仓促的加载。改成由
-    // mediaLoader.js 在自己确认全部素材已经写入缓存之后再调这个函数（见该文件 run() 末尾），
-    // 这时候这里的请求命中的都是缓存，是瞬时的。
-    function warmUp(files) {
-        files.forEach((src) => {
-            const probe = new Audio();
-            probe.preload = 'auto';
-            probe.addEventListener('loadedmetadata', () => {
-                durationCacheMs.set(src, probe.duration * 1000);
-            }, { once: true });
-            probe.src = src;
-            preloadedAudioPool.push(probe);
+    function prepareOne(src, blob) {
+        return new Promise((resolve) => {
+            const audio = new Audio();
+            audio.preload = 'auto';
+            const entry = { audio, durationMs: 0 };
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                if (audio.duration && isFinite(audio.duration)) entry.durationMs = audio.duration * 1000;
+                if (audio.error) {
+                    console.warn('[SoundEffects] 素材无法解码，播放时将退回网络加载:', src, audio.error);
+                    resolve();
+                    return;
+                }
+                ready.set(src, entry);
+                resolve();
+            };
+            audio.addEventListener('loadedmetadata', finish, { once: true });
+            audio.addEventListener('error', finish, { once: true });
+            setTimeout(finish, WARMUP_TIMEOUT_MS);
+            audio.src = URL.createObjectURL(blob);
+            audio.load();
         });
+    }
+
+    // cache：mediaLoader.js 打开的那个 Cache 对象（和 service-worker.js 同一个缓存桶）。
+    // 返回 Promise，全部元素就绪（或超时/失败）后 resolve——mediaLoader.js 会 await 它再撤蒙版，
+    // 保证蒙版消失的那一刻点"开始抽奖"就能立刻出声。
+    async function warmUp(files, cache) {
+        await Promise.all(files.map(async (src) => {
+            try {
+                const res = cache && await cache.match(src);
+                if (!res) return;
+                await prepareOne(src, await res.blob());
+            } catch (e) {
+                console.warn('[SoundEffects] 预热失败，播放时将退回网络加载:', src, e);
+            }
+        }));
     }
 
     function pickRandom(list) {
@@ -96,26 +120,28 @@
         // （哪怕预加载没命中、还是要等一次 loadedmetadata），都按"距离这个时刻还剩多久"重新拉伸，
         // 保证不会被 finish() 里的 stopSpin() 提前掐断——这是修复"播放延迟就等于播放不完整"的关键。
         const deadline = performance.now() + durationMs;
-        const audio = new Audio(src);
-        audio.preload = 'auto';
+        const entry = ready.get(src);
+        // 最常见的情况：预热好的元素，直接复用（同一时刻只会有一个 spin 在播，stopSpin 会把它停掉）
+        const audio = entry ? entry.audio : new Audio(src);
+        if (!entry) audio.preload = 'auto';
         currentSpinAudio = audio;
 
         const startPlayback = () => {
             if (currentSpinAudio !== audio) return; // 期间已经被 stopSpin()/新一轮 playSpin() 顶掉
-            const naturalMs = (audio.duration || 0) * 1000 || durationCacheMs.get(src) || 0;
+            const naturalMs = (audio.duration || 0) * 1000 || (entry && entry.durationMs) || 0;
             const remainingMs = Math.max(50, deadline - performance.now());
             if (naturalMs > 0) {
                 const rate = Math.min(MAX_RATE, Math.max(MIN_RATE, naturalMs / remainingMs));
                 try { audio.playbackRate = rate; } catch (e) { /* 部分浏览器对极端倍率会抛错，忽略即可 */ }
             }
+            try { audio.currentTime = 0; } catch (e) { /* 还没有元数据时 seek 会抛错，此时本来就在开头 */ }
             audio.play().catch(() => { /* 自动播放被浏览器策略拦截时静默失败，不影响抽奖流程 */ });
         };
 
-        if (durationCacheMs.has(src) || audio.readyState >= 1) {
-            // 时长已经从预加载缓存里拿到（最常见的情况），不用再等这个新 Audio 实例自己触发一次
-            // loadedmetadata，直接算倍速播放，消除等待窗口
+        if (entry || audio.readyState >= 1) {
             startPlayback();
         } else {
+            // 预热没覆盖到（比如该文件解码失败、或用户跳过了等待）：退回老路，等元数据到了再播
             audio.addEventListener('loadedmetadata', startPlayback, { once: true });
         }
     }
@@ -131,7 +157,17 @@
     // 中奖后调用：原速播完，不受旋转时长影响
     function playWin() {
         if (!soundEnabled()) return;
-        const audio = new Audio(pickRandom(WIN_FILES));
+        const src = pickRandom(WIN_FILES);
+        const entry = ready.get(src);
+        let audio;
+        if (entry && entry.audio.paused) {
+            audio = entry.audio;
+        } else if (entry) {
+            audio = entry.audio.cloneNode(); // 上一次中奖的同一个音效还没放完：克隆一份叠着放，源是内存里的 blob，瞬时可用
+        } else {
+            audio = new Audio(src);
+        }
+        try { audio.playbackRate = 1; audio.currentTime = 0; } catch (e) { /* 同上 */ }
         audio.play().catch(() => { /* 自动播放被拦截时静默失败 */ });
     }
 
