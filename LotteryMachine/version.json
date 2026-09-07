@@ -1,6 +1,14 @@
 {
-    "semver": "1.3.2",
+    "semver": "1.3.3",
     "changelog": [
+        {
+            "semver": "1.3.3",
+            "date": "2026-09-07",
+            "items": [
+                "修复：部署后直接访问 .../LotteryMachine/index.html 打不开（只有不带 index.html 的目录地址能打开）——新增页面加载时的路径检测，访问到 .../index.html 会自动跳转到规范的目录地址；该跳转只在 http(s) 下生效，本地用 file:// 直接打开 index.html 调试时不受影响",
+                "变更：PWA 安装的 start_url/id 改为目录地址（./）而不是 ./index.html，与上面的跳转逻辑保持一致，避免安装后打开的地址又变回打不开的那个"
+            ]
+        },
         {
             "semver": "1.3.2",
             "date": "2026-09-04",
