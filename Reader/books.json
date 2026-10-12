@@ -1,5 +1,12 @@
 [
   {
+    "book_id": "nonviolent-communication-a-language-of-life-3rd-ed",
+    "title": "Nonviolent Communication: A Language of Life, 3rd Edition: Life-Changing Tools for Healthy Relationships (Nonviolent Communication Guides)",
+    "author": "Marshall B. Rosenberg",
+    "cover_image": "books_src/nonviolent-communication-a-language-of-life-3rd-ed/assets/cover.jpeg",
+    "meta_path": "books_src/nonviolent-communication-a-language-of-life-3rd-ed/meta.json"
+  },
+  {
     "book_id": "rich-dad-poor-dad",
     "title": "Rich Dad Poor Dad",
     "author": "Robert T. Kiyosaki",

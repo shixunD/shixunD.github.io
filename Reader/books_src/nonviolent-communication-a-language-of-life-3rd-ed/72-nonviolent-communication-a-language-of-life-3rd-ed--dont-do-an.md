@@ -1,0 +1,7 @@
+# **Don’t Do Anything That Isn’t Play!**
+
+In addition to the process of mourning and self-forgiveness, another aspect of self-compassion I emphasize is in the energy that’s behind whatever action we take. When I advise, “Don’t do anything that isn’t play!” some take me to be radical, even insane. I earnestly believe, however, that an important form of self-compassion is to make choices motivated purely by our desire to contribute to life rather than out of fear, guilt, shame, duty, or obligation. When we are conscious of the life-enriching purpose behind an action we take, when the sole energy that motivates us is simply to make life wonderful for others and ourselves, then even hard work has an element of play in it. Correspondingly, an otherwise joyful activity performed out of obligation, duty, fear, guilt, or shame will lose its joy and eventually engender resistance.
+
+We want to take action out of the desire to contribute to life rather than out of fear, guilt, shame, or obligation.
+
+In [Chapter 2](part0008_split_000.html#ch-2), we considered replacing language that implies lack of choice with language that acknowledges choice. Many years ago I began to engage in an activity which significantly enlarged the pool of joy and happiness available to my life, while diminishing depression, guilt, and shame. I offer it here as a possible way to deepen our compassion for ourselves, to help us live our lives out of joyous play by staying grounded in a clear awareness of the life-enriching need behind everything we do.

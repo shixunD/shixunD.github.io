@@ -1,0 +1,15 @@
+# **All Anger Has a Life-Serving Core**
+
+“But,” I am asked, “aren’t there circumstances in which anger is justified? Isn’t ‘righteous indignation’ called for in the face of careless, thoughtless pollution of the environment, for example?” My answer is that I strongly believe that to whatever degree I support the consciousness that there _is_ such a thing as a “careless action” or a “conscientious action,” a “greedy person” or a “moral person,” I am contributing to violence on this planet. Rather than agreeing or disagreeing about what people _are_ for murdering, raping, or polluting the environment, I believe we serve life better by focusing attention on what we are needing.
+
+When we judge others, we contribute to violence.
+
+I see all anger as a result of life-alienating, violence-provoking thinking. At the core of all anger is a need that is not being fulfilled. Thus anger can be valuable if we use it as an alarm clock to wake us up—to realize we have a need that isn’t being met and that we are thinking in a way that makes it unlikely to be met. To fully express anger requires full consciousness of our need. In addition, energy is required to get the need met. Anger, however, co-opts our energy by directing it toward punishing people rather than meeting our needs. Instead of engaging in “righteous indignation,” I recommend connecting empathically with our own needs or those of others. This may take extensive practice, whereby over and over again, we consciously replace the phrase “I am angry because they … ” with “I am angry _because I am needing_ … ”
+
+Use anger as a wake-up call.
+
+I once was taught a remarkable lesson while working with students in a correctional school for children in Wisconsin. On two successive days I was hit on the nose in remarkably similar ways. The first time, I received a sharp blow across the nose from an elbow while interceding in a fight between two students. I was so enraged it was all I could do to keep myself from hitting back. (On the streets of Detroit where I grew up, it took far less than an elbow in the nose to provoke me to rage.) The second day: similar situation, same nose—and thus more physical pain—but not a bit of anger!
+
+Anger co-opts our energy by diverting it toward punitive actions.
+
+Reflecting deeply that evening on this experience, I recognized how I had labeled the first child in my mind as a “spoiled brat.” That image was in my head before his elbow ever caught my nose, and when it did, it was no longer simply an elbow hitting my nose. It was: “That obnoxious brat has no right to do this!” I had another judgment about the second child; I saw him as a “pathetic creature.” Since I had a tendency to worry about this child, even though my nose was hurting and bleeding much more severely, the second day I felt no rage at all. I could not have received a more powerful lesson to help me see that it’s not what the other person does, but the images and interpretations in my own head that produce my anger.

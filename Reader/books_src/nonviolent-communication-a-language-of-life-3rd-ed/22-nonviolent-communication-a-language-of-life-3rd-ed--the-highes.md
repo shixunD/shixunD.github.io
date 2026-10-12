@@ -1,0 +1,19 @@
+# **The Highest Form of Human Intelligence**
+
+The Indian philosopher J. Krishnamurti once remarked that observing without evaluating is the highest form of human intelligence. When I first read this statement, the thought, “What nonsense!” shot through my mind before I realized that I had just made an evaluation. For most of us, it is difficult to make observations, especially of people and their behavior, that are free of judgment, criticism, or other forms of analysis.
+
+I became acutely aware of this difficulty while working with an elementary school where the staff and principal had often reported communication difficulties. The district superintendent had requested that I help them resolve the conflict. First I was to confer with the staff, and then with the staff and principal together.
+
+I opened the meeting by asking the staff, “What is the principal doing that conflicts with your needs?”
+
+“He has a big mouth!” came the swift response. My question called for an observation, but while “big mouth” gave me information on how this teacher evaluated the principal, it failed to describe what the principal _said or did_ that led to the interpretation that he had a “big mouth.”
+
+When I pointed this out, a second teacher offered, “I know what he means: the principal talks too much!” Instead of a clear observation of the principal’s behavior, this was also an evaluation—of how much the principal talked. A third teacher then declared, “He thinks only he has anything worth saying.” I explained that inferring what another person is thinking is not the same as observing his behavior. Finally a fourth teacher ventured, “He wants to be the center of attention all the time.” After I remarked that this too was an inference—of what another person is wanting—two teachers blurted in unison, “Well, your question is very hard to answer!”
+
+We subsequently worked together to create a list identifying _specific behaviors,_ on the part of the principal, that bothered them, and made sure that the list was free of evaluation. For example, the principal told stories about his childhood and war experiences during faculty meetings, with the result that meetings sometimes ran twenty minutes overtime. When I asked whether they had ever communicated their annoyance to the principal, the staff replied that they had tried, but only through evaluative comments. They had never made reference to specific behaviors—such as his storytelling—and they agreed to bring these up when we were all to meet together.
+
+Almost as soon as the meeting began, I saw what the staff had been telling me. No matter what was being discussed, the principal would interject, “This reminds me of the time … ” and then launch into a story about his childhood or war experience. I waited for the staff to voice their discomfort around the principal’s behavior. However, instead of Nonviolent Communication, they applied nonverbal condemnation. Some rolled their eyes; others yawned pointedly; one stared at his watch.
+
+I endured this painful scenario until finally I asked, “Isn’t anyone going to say something?” An awkward silence ensued. The teacher who had spoken first at our meeting screwed up his courage, looked directly at the principal, and said, “Ed, you have a big mouth.”
+
+As this story illustrates, it’s not always easy to shed our old habits and master the ability to separate observation from evaluation. Eventually, the teachers succeeded in clarifying for the principal the specific actions that led to their concern. The principal listened earnestly and then pressed, “Why didn’t one of you tell me before?” He admitted he was aware of his storytelling habit, and then began a story pertaining to this habit! I interrupted him, observing (good-naturedly) that he was doing it again. We ended our meeting by developing ways for the staff to let their principal know, in a gentle way, when his stories weren’t appreciated.

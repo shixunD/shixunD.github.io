@@ -1,0 +1,15 @@
+# **Asking for a Reflection**
+
+As we know, the message we send is not always the message that’s received. We generally rely on verbal cues to determine whether our message has been understood to our satisfaction. If, however, we’re uncertain that it has been received as intended, we need to be able to clearly request a response that tells us how the message was heard so as to be able to correct any misunderstanding. On some occasions, a simple question like, “Is that clear?” will suffice. At other times, we need more than “Yes, I understood you,” to feel confident that we’ve been truly understood. At such times, we might ask others to reflect back in their own words what they heard us say. We then have the opportunity to restate parts of our message to address any discrepancy or omission we might have noticed in their reflection.
+
+To make sure the message we sent is the message that’s received, ask the listener to reflect it back.
+
+For example, a teacher approaches a student and says, “Peter, I got concerned when I checked my record book yesterday. I want to make sure you’re aware of the homework I’m missing from you. Will you drop by my office after school?” Peter mumbles, “Okay, I know,” and then turns away, leaving the teacher uneasy as to whether her message had been accurately received. She asks for a reflection—“Could you tell me what you just heard me say?”—to which Peter replies, “You said I gotta miss soccer to stay after school because you didn’t like my homework.” Confirmed in her suspicion that Peter had not heard her intended message, the teacher tries to restate it, but first she is careful of her next remark.
+
+An assertion like “You didn’t hear me,” “That’s not what I said,” or “You’re misunderstanding me,” may easily lead Peter to think that he is being chastised. Since the teacher perceives Peter as having sincerely responded to her request for a reflection, she might say, “I’m grateful to you for telling me what you heard. I can see that I didn’t make myself as clear as I’d have liked, so let me try again.”
+
+Express appreciation when your listener tries to meet your request for a reflection.
+
+When we first begin asking others to reflect back what they hear us say, it may feel awkward and strange because such requests are rarely made. When I emphasize the importance of our ability to ask for reflections, people often express reservations. They are worried about reactions like, “What do you think I am—deaf?” or, “Quit playing your psychological games.” To prevent such responses, we can explain to people ahead of time why we may sometimes ask them to reflect back our words. We make clear that we’re not testing their listening skills, but checking out whether we’ve expressed ourselves clearly. However, should the listener retort, “I heard what you said; I’m not stupid!” we have the option to focus on the listener’s feelings and needs and ask—either aloud or silently—“Are you saying you’re feeling annoyed because you want respect for your ability to understand things?”
+
+Empathize with the listener who doesn’t want to reflect back.

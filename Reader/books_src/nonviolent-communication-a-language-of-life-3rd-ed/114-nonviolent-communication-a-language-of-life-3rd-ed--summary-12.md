@@ -1,0 +1,3 @@
+# **Summary**
+
+In situations where there is no opportunity for communication, such as in instances of imminent danger, we may need to resort to the protective use of force. The intention behind the protective use of force is to prevent injury or injustice, never to punish or to cause individuals to suffer, repent, or change. The punitive use of force tends to generate hostility and to reinforce resistance to the very behavior we are seeking. Punishment damages goodwill and self-esteem, and shifts our attention from the intrinsic value of an action to external consequences. Blaming and punishing fail to contribute to the motivations we would like to inspire in others.

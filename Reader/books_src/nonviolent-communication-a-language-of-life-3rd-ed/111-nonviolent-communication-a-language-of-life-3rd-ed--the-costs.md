@@ -1,0 +1,11 @@
+# **The Costs of Punishment**
+
+When we submit to doing something solely for the purpose of avoiding punishment, our attention is distracted from the value of the action itself. Instead, we are focusing upon the consequences, on what might happen if we fail to take that action. If a worker’s performance is prompted by fear of punishment, the job gets done, but morale suffers; sooner or later, productivity will decrease. Self-esteem is also diminished when punitive force is used. If children brush their teeth because they fear shame and ridicule, their oral health may improve but their self-respect will develop cavities. Furthermore, as we all know, punishment is costly in terms of goodwill. The more we are seen as agents of punishment, the harder it is for others to respond compassionately to our needs.
+
+When we fear punishment, we focus on consequences, not on our own values.
+
+Fear of punishment diminishes self-esteem and goodwill.
+
+I was visiting a friend, a school principal, at his office when he noticed through the window a big child hitting a smaller one. “Excuse me,” he said as he leapt up and rushed to the playground. Grabbing the larger child, he gave him a swat and scolded, “I’ll teach you not to hit smaller people!” When the principal returned inside, I remarked, “I don’t think you taught that child what you thought you were teaching him. I suspect what he learned instead was not to hit people smaller than he is when somebody bigger—like the principal—might be watching! If anything, it seems to me that you have reinforced the notion that the way to get what you want from somebody else is to hit them.”
+
+In such situations, I recommend first empathizing with the child who is behaving violently. For example, if I saw a child hit someone after being called a name, I might empathize, “I’m sensing that you’re feeling angry because you’d like to be treated with more respect.” If I guessed correctly, and the child acknowledges this to be true, I would then continue by expressing my own feelings, needs, and requests in the situation without insinuating blame: “I’m feeling sad because I want us to find ways to get respect that don’t turn people into enemies. I’d like you to tell me if you’d be willing to explore with me some other ways to get the respect you’re wanting.”

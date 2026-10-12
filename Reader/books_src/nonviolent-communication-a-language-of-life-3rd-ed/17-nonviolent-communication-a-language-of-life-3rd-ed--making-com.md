@@ -1,0 +1,9 @@
+# **Making Comparisons**
+
+Another form of judgment is the use of comparisons. In his book _How to Make Yourself Miserable,_ Dan Greenburg demonstrates through humor the insidious power that comparative thinking can exert over us. He suggests that if readers have a sincere desire to make life miserable for themselves, they might learn to compare themselves to other people. For those unfamiliar with this practice, he provides a few exercises. The first one displays full-length pictures of a man and a woman who embody ideal physical beauty by contemporary media standards. Readers are instructed to take their own body measurements, compare them to those superimposed on the pictures of the attractive specimens, and dwell on the differences.
+
+Comparisons are a form of judgment.
+
+This exercise produces what it promises: we start to feel miserable as we engage in these comparisons. By the time we’re as depressed as we think possible, we turn the page to discover that the first exercise was a mere warm-up. Since physical beauty is relatively superficial, Greenburg next provides an opportunity to compare ourselves on something that matters: achievement. He turns to the phone book to give readers a few random individuals to compare themselves with. The first name he claims to have pulled out of the phone book is Wolfgang Amadeus Mozart. Greenburg lists the languages Mozart spoke and the major pieces he had composed by the time he was a teenager. The exercise then instructs readers to reflect on their own achievements at their current stage of life, to compare them with what Mozart had accomplished by age twelve, and to dwell on the differences.
+
+Even readers who never emerge from the self-induced misery of this exercise might see how powerfully this type of thinking blocks compassion, both for oneself and for others.

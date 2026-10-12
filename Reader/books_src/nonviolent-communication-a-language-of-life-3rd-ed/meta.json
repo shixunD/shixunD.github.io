@@ -1,0 +1,967 @@
+{
+  "book_id": "nonviolent-communication-a-language-of-life-3rd-ed",
+  "title": "Nonviolent Communication: A Language of Life, 3rd Edition: Life-Changing Tools for Healthy Relationships (Nonviolent Communication Guides)",
+  "author": "Marshall B. Rosenberg",
+  "chapters": [
+    {
+      "chapter_id": "01-cover",
+      "order": 1,
+      "title": "Cover",
+      "markdown_file": "01-nonviolent-communication-a-language-of-life-3rd-ed--cover.md"
+    },
+    {
+      "chapter_id": "02-nonviolent",
+      "order": 2,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "02-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent.md"
+    },
+    {
+      "chapter_id": "03-nonviolent-2",
+      "order": 3,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "03-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-2.md"
+    },
+    {
+      "chapter_id": "04-nonviolent-3",
+      "order": 4,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "04-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-3.md"
+    },
+    {
+      "chapter_id": "05-contents",
+      "order": 5,
+      "title": "Contents",
+      "markdown_file": "05-nonviolent-communication-a-language-of-life-3rd-ed--contents.md"
+    },
+    {
+      "chapter_id": "06-foreword",
+      "order": 6,
+      "title": "Foreword",
+      "markdown_file": "06-nonviolent-communication-a-language-of-life-3rd-ed--foreword.md"
+    },
+    {
+      "chapter_id": "07-acknowledg",
+      "order": 7,
+      "title": "Acknowledgments",
+      "markdown_file": "07-nonviolent-communication-a-language-of-life-3rd-ed--acknowledg.md"
+    },
+    {
+      "chapter_id": "08-nonviolent-4",
+      "order": 8,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "08-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-4.md"
+    },
+    {
+      "chapter_id": "09-1",
+      "order": 9,
+      "title": "1\nGiving From the Heart\nThe Heart of Nonviolent Communication",
+      "markdown_file": "09-nonviolent-communication-a-language-of-life-3rd-ed--1.md"
+    },
+    {
+      "chapter_id": "10-introducti",
+      "order": 10,
+      "title": "Introduction",
+      "markdown_file": "10-nonviolent-communication-a-language-of-life-3rd-ed--introducti.md"
+    },
+    {
+      "chapter_id": "11-a-way-to-f",
+      "order": 11,
+      "title": "A Way to Focus Attention",
+      "markdown_file": "11-nonviolent-communication-a-language-of-life-3rd-ed--a-way-to-f.md"
+    },
+    {
+      "chapter_id": "12-the-nvc-pr",
+      "order": 12,
+      "title": "The NVC Process",
+      "markdown_file": "12-nonviolent-communication-a-language-of-life-3rd-ed--the-nvc-pr.md"
+    },
+    {
+      "chapter_id": "13-applying-n",
+      "order": 13,
+      "title": "Applying NVC in Our Lives and the World",
+      "markdown_file": "13-nonviolent-communication-a-language-of-life-3rd-ed--applying-n.md"
+    },
+    {
+      "chapter_id": "14-summary",
+      "order": 14,
+      "title": "Summary",
+      "markdown_file": "14-nonviolent-communication-a-language-of-life-3rd-ed--summary.md"
+    },
+    {
+      "chapter_id": "15-2",
+      "order": 15,
+      "title": "2\nCommunication That Blocks Compassion",
+      "markdown_file": "15-nonviolent-communication-a-language-of-life-3rd-ed--2.md"
+    },
+    {
+      "chapter_id": "16-moralistic",
+      "order": 16,
+      "title": "Moralistic Judgments",
+      "markdown_file": "16-nonviolent-communication-a-language-of-life-3rd-ed--moralistic.md"
+    },
+    {
+      "chapter_id": "17-making-com",
+      "order": 17,
+      "title": "Making Comparisons",
+      "markdown_file": "17-nonviolent-communication-a-language-of-life-3rd-ed--making-com.md"
+    },
+    {
+      "chapter_id": "18-denial-of",
+      "order": 18,
+      "title": "Denial of Responsibility",
+      "markdown_file": "18-nonviolent-communication-a-language-of-life-3rd-ed--denial-of.md"
+    },
+    {
+      "chapter_id": "19-other-form",
+      "order": 19,
+      "title": "Other Forms of Life-Alienating Communication",
+      "markdown_file": "19-nonviolent-communication-a-language-of-life-3rd-ed--other-form.md"
+    },
+    {
+      "chapter_id": "20-summary-2",
+      "order": 20,
+      "title": "Summary",
+      "markdown_file": "20-nonviolent-communication-a-language-of-life-3rd-ed--summary-2.md"
+    },
+    {
+      "chapter_id": "21-3",
+      "order": 21,
+      "title": "3\nObserving Without Evaluating",
+      "markdown_file": "21-nonviolent-communication-a-language-of-life-3rd-ed--3.md"
+    },
+    {
+      "chapter_id": "22-the-highes",
+      "order": 22,
+      "title": "The Highest Form of Human Intelligence",
+      "markdown_file": "22-nonviolent-communication-a-language-of-life-3rd-ed--the-highes.md"
+    },
+    {
+      "chapter_id": "23-distinguis",
+      "order": 23,
+      "title": "Distinguishing Observations From Evaluations",
+      "markdown_file": "23-nonviolent-communication-a-language-of-life-3rd-ed--distinguis.md"
+    },
+    {
+      "chapter_id": "24-summary-3",
+      "order": 24,
+      "title": "Summary",
+      "markdown_file": "24-nonviolent-communication-a-language-of-life-3rd-ed--summary-3.md"
+    },
+    {
+      "chapter_id": "25-nonviolent-5",
+      "order": 25,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "25-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-5.md"
+    },
+    {
+      "chapter_id": "26-nonviolent-6",
+      "order": 26,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "26-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-6.md"
+    },
+    {
+      "chapter_id": "27-4",
+      "order": 27,
+      "title": "4\nIdentifying and Expressing Feelings",
+      "markdown_file": "27-nonviolent-communication-a-language-of-life-3rd-ed--4.md"
+    },
+    {
+      "chapter_id": "28-the-heavy",
+      "order": 28,
+      "title": "The Heavy Cost of Unexpressed Feelings",
+      "markdown_file": "28-nonviolent-communication-a-language-of-life-3rd-ed--the-heavy.md"
+    },
+    {
+      "chapter_id": "29-feelings-v",
+      "order": 29,
+      "title": "Feelings versus Non-Feelings",
+      "markdown_file": "29-nonviolent-communication-a-language-of-life-3rd-ed--feelings-v.md"
+    },
+    {
+      "chapter_id": "30-building-a",
+      "order": 30,
+      "title": "Building a Vocabulary for Feelings",
+      "markdown_file": "30-nonviolent-communication-a-language-of-life-3rd-ed--building-a.md"
+    },
+    {
+      "chapter_id": "31-summary-4",
+      "order": 31,
+      "title": "Summary",
+      "markdown_file": "31-nonviolent-communication-a-language-of-life-3rd-ed--summary-4.md"
+    },
+    {
+      "chapter_id": "32-nonviolent-7",
+      "order": 32,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "32-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-7.md"
+    },
+    {
+      "chapter_id": "33-5",
+      "order": 33,
+      "title": "5\nTaking Responsibility for Our Feelings",
+      "markdown_file": "33-nonviolent-communication-a-language-of-life-3rd-ed--5.md"
+    },
+    {
+      "chapter_id": "34-hearing-a",
+      "order": 34,
+      "title": "Hearing a Negative Message: Four Options",
+      "markdown_file": "34-nonviolent-communication-a-language-of-life-3rd-ed--hearing-a.md"
+    },
+    {
+      "chapter_id": "35-the-needs",
+      "order": 35,
+      "title": "The Needs at the Roots of Feelings",
+      "markdown_file": "35-nonviolent-communication-a-language-of-life-3rd-ed--the-needs.md"
+    },
+    {
+      "chapter_id": "36-the-pain-o",
+      "order": 36,
+      "title": "The Pain of Expressing Our Needs versus the Pain of Not Expressing Our Needs",
+      "markdown_file": "36-nonviolent-communication-a-language-of-life-3rd-ed--the-pain-o.md"
+    },
+    {
+      "chapter_id": "37-from-emoti",
+      "order": 37,
+      "title": "From Emotional Slavery to Emotional Liberation",
+      "markdown_file": "37-nonviolent-communication-a-language-of-life-3rd-ed--from-emoti.md"
+    },
+    {
+      "chapter_id": "38-summary-5",
+      "order": 38,
+      "title": "Summary",
+      "markdown_file": "38-nonviolent-communication-a-language-of-life-3rd-ed--summary-5.md"
+    },
+    {
+      "chapter_id": "39-nonviolent-8",
+      "order": 39,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "39-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-8.md"
+    },
+    {
+      "chapter_id": "40-6",
+      "order": 40,
+      "title": "6\nRequesting That Which Would Enrich Life",
+      "markdown_file": "40-nonviolent-communication-a-language-of-life-3rd-ed--6.md"
+    },
+    {
+      "chapter_id": "41-using-posi",
+      "order": 41,
+      "title": "Using Positive Action Language",
+      "markdown_file": "41-nonviolent-communication-a-language-of-life-3rd-ed--using-posi.md"
+    },
+    {
+      "chapter_id": "42-making-req",
+      "order": 42,
+      "title": "Making Requests Consciously",
+      "markdown_file": "42-nonviolent-communication-a-language-of-life-3rd-ed--making-req.md"
+    },
+    {
+      "chapter_id": "43-asking-for",
+      "order": 43,
+      "title": "Asking for a Reflection",
+      "markdown_file": "43-nonviolent-communication-a-language-of-life-3rd-ed--asking-for.md"
+    },
+    {
+      "chapter_id": "44-requesting",
+      "order": 44,
+      "title": "Requesting Honesty",
+      "markdown_file": "44-nonviolent-communication-a-language-of-life-3rd-ed--requesting.md"
+    },
+    {
+      "chapter_id": "45-making-req-2",
+      "order": 45,
+      "title": "Making Requests of a Group",
+      "markdown_file": "45-nonviolent-communication-a-language-of-life-3rd-ed--making-req-2.md"
+    },
+    {
+      "chapter_id": "46-requests-v",
+      "order": 46,
+      "title": "Requests versus Demands",
+      "markdown_file": "46-nonviolent-communication-a-language-of-life-3rd-ed--requests-v.md"
+    },
+    {
+      "chapter_id": "47-defining-o",
+      "order": 47,
+      "title": "Defining Our Objective When Making Requests",
+      "markdown_file": "47-nonviolent-communication-a-language-of-life-3rd-ed--defining-o.md"
+    },
+    {
+      "chapter_id": "48-summary-6",
+      "order": 48,
+      "title": "Summary",
+      "markdown_file": "48-nonviolent-communication-a-language-of-life-3rd-ed--summary-6.md"
+    },
+    {
+      "chapter_id": "49-nonviolent-9",
+      "order": 49,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "49-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-9.md"
+    },
+    {
+      "chapter_id": "50-7",
+      "order": 50,
+      "title": "7\nReceiving Empathically",
+      "markdown_file": "50-nonviolent-communication-a-language-of-life-3rd-ed--7.md"
+    },
+    {
+      "chapter_id": "51-presence-d",
+      "order": 51,
+      "title": "Presence: Don’t Just Do Something, Stand There",
+      "markdown_file": "51-nonviolent-communication-a-language-of-life-3rd-ed--presence-d.md"
+    },
+    {
+      "chapter_id": "52-listening",
+      "order": 52,
+      "title": "Listening for Feelings and Needs",
+      "markdown_file": "52-nonviolent-communication-a-language-of-life-3rd-ed--listening.md"
+    },
+    {
+      "chapter_id": "53-paraphrasi",
+      "order": 53,
+      "title": "Paraphrasing",
+      "markdown_file": "53-nonviolent-communication-a-language-of-life-3rd-ed--paraphrasi.md"
+    },
+    {
+      "chapter_id": "54-sustaining",
+      "order": 54,
+      "title": "Sustaining Empathy",
+      "markdown_file": "54-nonviolent-communication-a-language-of-life-3rd-ed--sustaining.md"
+    },
+    {
+      "chapter_id": "55-when-pain",
+      "order": 55,
+      "title": "When Pain Blocks Our Ability to Empathize",
+      "markdown_file": "55-nonviolent-communication-a-language-of-life-3rd-ed--when-pain.md"
+    },
+    {
+      "chapter_id": "56-summary-7",
+      "order": 56,
+      "title": "Summary",
+      "markdown_file": "56-nonviolent-communication-a-language-of-life-3rd-ed--summary-7.md"
+    },
+    {
+      "chapter_id": "57-nonviolent-10",
+      "order": 57,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "57-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-10.md"
+    },
+    {
+      "chapter_id": "58-8",
+      "order": 58,
+      "title": "8\nThe Power of Empathy\nEmpathy That Heals",
+      "markdown_file": "58-nonviolent-communication-a-language-of-life-3rd-ed--8.md"
+    },
+    {
+      "chapter_id": "59-empathy-an",
+      "order": 59,
+      "title": "Empathy and the Ability to Be Vulnerable",
+      "markdown_file": "59-nonviolent-communication-a-language-of-life-3rd-ed--empathy-an.md"
+    },
+    {
+      "chapter_id": "60-using-empa",
+      "order": 60,
+      "title": "Using Empathy to Defuse Danger",
+      "markdown_file": "60-nonviolent-communication-a-language-of-life-3rd-ed--using-empa.md"
+    },
+    {
+      "chapter_id": "61-empathy-in",
+      "order": 61,
+      "title": "Empathy in Hearing Someone’s “No!”",
+      "markdown_file": "61-nonviolent-communication-a-language-of-life-3rd-ed--empathy-in.md"
+    },
+    {
+      "chapter_id": "62-empathy-to",
+      "order": 62,
+      "title": "Empathy to Revive a Lifeless Conversation",
+      "markdown_file": "62-nonviolent-communication-a-language-of-life-3rd-ed--empathy-to.md"
+    },
+    {
+      "chapter_id": "63-empathy-fo",
+      "order": 63,
+      "title": "Empathy for Silence",
+      "markdown_file": "63-nonviolent-communication-a-language-of-life-3rd-ed--empathy-fo.md"
+    },
+    {
+      "chapter_id": "64-summary-8",
+      "order": 64,
+      "title": "Summary",
+      "markdown_file": "64-nonviolent-communication-a-language-of-life-3rd-ed--summary-8.md"
+    },
+    {
+      "chapter_id": "65-9",
+      "order": 65,
+      "title": "9\nConnecting Compassionately With Ourselves",
+      "markdown_file": "65-nonviolent-communication-a-language-of-life-3rd-ed--9.md"
+    },
+    {
+      "chapter_id": "66-rememberin",
+      "order": 66,
+      "title": "Remembering the Specialness of What We Are",
+      "markdown_file": "66-nonviolent-communication-a-language-of-life-3rd-ed--rememberin.md"
+    },
+    {
+      "chapter_id": "67-evaluating",
+      "order": 67,
+      "title": "Evaluating Ourselves When We’ve Been Less Than Perfect",
+      "markdown_file": "67-nonviolent-communication-a-language-of-life-3rd-ed--evaluating.md"
+    },
+    {
+      "chapter_id": "68-translatin",
+      "order": 68,
+      "title": "Translating Self-Judgments and Inner Demands",
+      "markdown_file": "68-nonviolent-communication-a-language-of-life-3rd-ed--translatin.md"
+    },
+    {
+      "chapter_id": "69-nvc-mourni",
+      "order": 69,
+      "title": "NVC Mourning",
+      "markdown_file": "69-nonviolent-communication-a-language-of-life-3rd-ed--nvc-mourni.md"
+    },
+    {
+      "chapter_id": "70-self-forgi",
+      "order": 70,
+      "title": "Self-Forgiveness",
+      "markdown_file": "70-nonviolent-communication-a-language-of-life-3rd-ed--self-forgi.md"
+    },
+    {
+      "chapter_id": "71-the-lesson",
+      "order": 71,
+      "title": "The Lesson of the Polka-Dotted Suit",
+      "markdown_file": "71-nonviolent-communication-a-language-of-life-3rd-ed--the-lesson.md"
+    },
+    {
+      "chapter_id": "72-dont-do-an",
+      "order": 72,
+      "title": "Don’t Do Anything That Isn’t Play!",
+      "markdown_file": "72-nonviolent-communication-a-language-of-life-3rd-ed--dont-do-an.md"
+    },
+    {
+      "chapter_id": "73-translatin-2",
+      "order": 73,
+      "title": "Translating “Have to” to “Choose to”\nStep 1",
+      "markdown_file": "73-nonviolent-communication-a-language-of-life-3rd-ed--translatin-2.md"
+    },
+    {
+      "chapter_id": "74-step-2",
+      "order": 74,
+      "title": "Step 2",
+      "markdown_file": "74-nonviolent-communication-a-language-of-life-3rd-ed--step-2.md"
+    },
+    {
+      "chapter_id": "75-step-3",
+      "order": 75,
+      "title": "Step 3",
+      "markdown_file": "75-nonviolent-communication-a-language-of-life-3rd-ed--step-3.md"
+    },
+    {
+      "chapter_id": "76-cultivatin",
+      "order": 76,
+      "title": "Cultivating Awareness of the Energy Behind Our Actions",
+      "markdown_file": "76-nonviolent-communication-a-language-of-life-3rd-ed--cultivatin.md"
+    },
+    {
+      "chapter_id": "77-summary-9",
+      "order": 77,
+      "title": "Summary",
+      "markdown_file": "77-nonviolent-communication-a-language-of-life-3rd-ed--summary-9.md"
+    },
+    {
+      "chapter_id": "78-10",
+      "order": 78,
+      "title": "10\nExpressing Anger Fully",
+      "markdown_file": "78-nonviolent-communication-a-language-of-life-3rd-ed--10.md"
+    },
+    {
+      "chapter_id": "79-distinguis-2",
+      "order": 79,
+      "title": "Distinguishing Stimulus From Cause",
+      "markdown_file": "79-nonviolent-communication-a-language-of-life-3rd-ed--distinguis-2.md"
+    },
+    {
+      "chapter_id": "80-all-anger",
+      "order": 80,
+      "title": "All Anger Has a Life-Serving Core",
+      "markdown_file": "80-nonviolent-communication-a-language-of-life-3rd-ed--all-anger.md"
+    },
+    {
+      "chapter_id": "81-stimulus-v",
+      "order": 81,
+      "title": "Stimulus versus Cause: Practical Implications",
+      "markdown_file": "81-nonviolent-communication-a-language-of-life-3rd-ed--stimulus-v.md"
+    },
+    {
+      "chapter_id": "82-four-steps",
+      "order": 82,
+      "title": "Four Steps to Expressing Anger",
+      "markdown_file": "82-nonviolent-communication-a-language-of-life-3rd-ed--four-steps.md"
+    },
+    {
+      "chapter_id": "83-offering-e",
+      "order": 83,
+      "title": "Offering Empathy First",
+      "markdown_file": "83-nonviolent-communication-a-language-of-life-3rd-ed--offering-e.md"
+    },
+    {
+      "chapter_id": "84-taking-our",
+      "order": 84,
+      "title": "Taking Our Time",
+      "markdown_file": "84-nonviolent-communication-a-language-of-life-3rd-ed--taking-our.md"
+    },
+    {
+      "chapter_id": "85-summary-10",
+      "order": 85,
+      "title": "Summary",
+      "markdown_file": "85-nonviolent-communication-a-language-of-life-3rd-ed--summary-10.md"
+    },
+    {
+      "chapter_id": "86-11",
+      "order": 86,
+      "title": "11\nConflict Resolution and Mediation",
+      "markdown_file": "86-nonviolent-communication-a-language-of-life-3rd-ed--11.md"
+    },
+    {
+      "chapter_id": "87-human-conn",
+      "order": 87,
+      "title": "Human Connection",
+      "markdown_file": "87-nonviolent-communication-a-language-of-life-3rd-ed--human-conn.md"
+    },
+    {
+      "chapter_id": "88-nvc-confli",
+      "order": 88,
+      "title": "NVC Conflict Resolution versus Traditional Mediation",
+      "markdown_file": "88-nonviolent-communication-a-language-of-life-3rd-ed--nvc-confli.md"
+    },
+    {
+      "chapter_id": "89-nvc-confli-2",
+      "order": 89,
+      "title": "NVC Conflict Resolution Steps—A Quick Overview",
+      "markdown_file": "89-nonviolent-communication-a-language-of-life-3rd-ed--nvc-confli-2.md"
+    },
+    {
+      "chapter_id": "90-on-needs-s",
+      "order": 90,
+      "title": "On Needs, Strategies, and Analysis",
+      "markdown_file": "90-nonviolent-communication-a-language-of-life-3rd-ed--on-needs-s.md"
+    },
+    {
+      "chapter_id": "91-sensing-ot",
+      "order": 91,
+      "title": "Sensing Others’ Needs, No Matter What They’re Saying",
+      "markdown_file": "91-nonviolent-communication-a-language-of-life-3rd-ed--sensing-ot.md"
+    },
+    {
+      "chapter_id": "92-have-the-n",
+      "order": 92,
+      "title": "Have the Needs Been Heard?",
+      "markdown_file": "92-nonviolent-communication-a-language-of-life-3rd-ed--have-the-n.md"
+    },
+    {
+      "chapter_id": "93-empathy-to-2",
+      "order": 93,
+      "title": "Empathy to Ease the Pain That Prevents Hearing",
+      "markdown_file": "93-nonviolent-communication-a-language-of-life-3rd-ed--empathy-to-2.md"
+    },
+    {
+      "chapter_id": "94-using-pres",
+      "order": 94,
+      "title": "Using Present and Positive Action Language to Resolve Conflict",
+      "markdown_file": "94-nonviolent-communication-a-language-of-life-3rd-ed--using-pres.md"
+    },
+    {
+      "chapter_id": "95-using-acti",
+      "order": 95,
+      "title": "Using Action Verbs",
+      "markdown_file": "95-nonviolent-communication-a-language-of-life-3rd-ed--using-acti.md"
+    },
+    {
+      "chapter_id": "96-translatin-3",
+      "order": 96,
+      "title": "Translating “No”",
+      "markdown_file": "96-nonviolent-communication-a-language-of-life-3rd-ed--translatin-3.md"
+    },
+    {
+      "chapter_id": "97-nvc-and-th",
+      "order": 97,
+      "title": "NVC and the Mediator Role",
+      "markdown_file": "97-nonviolent-communication-a-language-of-life-3rd-ed--nvc-and-th.md"
+    },
+    {
+      "chapter_id": "98-your-role",
+      "order": 98,
+      "title": "Your Role, and Trust in the Process",
+      "markdown_file": "98-nonviolent-communication-a-language-of-life-3rd-ed--your-role.md"
+    },
+    {
+      "chapter_id": "99-remember-i",
+      "order": 99,
+      "title": "Remember: It’s Not About Us",
+      "markdown_file": "99-nonviolent-communication-a-language-of-life-3rd-ed--remember-i.md"
+    },
+    {
+      "chapter_id": "100-emergency",
+      "order": 100,
+      "title": "Emergency First-Aid Empathy",
+      "markdown_file": "100-nonviolent-communication-a-language-of-life-3rd-ed--emergency.md"
+    },
+    {
+      "chapter_id": "101-keep-track",
+      "order": 101,
+      "title": "Keep Track: Follow the Bouncing Ball",
+      "markdown_file": "101-nonviolent-communication-a-language-of-life-3rd-ed--keep-track.md"
+    },
+    {
+      "chapter_id": "102-keep-the-c",
+      "order": 102,
+      "title": "Keep the Conversation in the Present",
+      "markdown_file": "102-nonviolent-communication-a-language-of-life-3rd-ed--keep-the-c.md"
+    },
+    {
+      "chapter_id": "103-keep-thing",
+      "order": 103,
+      "title": "Keep Things Moving",
+      "markdown_file": "103-nonviolent-communication-a-language-of-life-3rd-ed--keep-thing.md"
+    },
+    {
+      "chapter_id": "104-interrupti",
+      "order": 104,
+      "title": "Interrupting",
+      "markdown_file": "104-nonviolent-communication-a-language-of-life-3rd-ed--interrupti.md"
+    },
+    {
+      "chapter_id": "105-when-peopl",
+      "order": 105,
+      "title": "When People Say “No” to Meeting Face to Face",
+      "markdown_file": "105-nonviolent-communication-a-language-of-life-3rd-ed--when-peopl.md"
+    },
+    {
+      "chapter_id": "106-informal-m",
+      "order": 106,
+      "title": "Informal Mediation: Sticking Our Nose in Other People’s Business",
+      "markdown_file": "106-nonviolent-communication-a-language-of-life-3rd-ed--informal-m.md"
+    },
+    {
+      "chapter_id": "107-summary-11",
+      "order": 107,
+      "title": "Summary",
+      "markdown_file": "107-nonviolent-communication-a-language-of-life-3rd-ed--summary-11.md"
+    },
+    {
+      "chapter_id": "108-12",
+      "order": 108,
+      "title": "12\nThe Protective Use of Force\nWhen the Use of Force Is Unavoidable",
+      "markdown_file": "108-nonviolent-communication-a-language-of-life-3rd-ed--12.md"
+    },
+    {
+      "chapter_id": "109-the-thinki",
+      "order": 109,
+      "title": "The Thinking Behind the Use of Force",
+      "markdown_file": "109-nonviolent-communication-a-language-of-life-3rd-ed--the-thinki.md"
+    },
+    {
+      "chapter_id": "110-types-of-p",
+      "order": 110,
+      "title": "Types of Punitive Force",
+      "markdown_file": "110-nonviolent-communication-a-language-of-life-3rd-ed--types-of-p.md"
+    },
+    {
+      "chapter_id": "111-the-costs",
+      "order": 111,
+      "title": "The Costs of Punishment",
+      "markdown_file": "111-nonviolent-communication-a-language-of-life-3rd-ed--the-costs.md"
+    },
+    {
+      "chapter_id": "112-two-questi",
+      "order": 112,
+      "title": "Two Questions That Reveal the Limitations of Punishment",
+      "markdown_file": "112-nonviolent-communication-a-language-of-life-3rd-ed--two-questi.md"
+    },
+    {
+      "chapter_id": "113-the-protec",
+      "order": 113,
+      "title": "The Protective Use of Force in Schools",
+      "markdown_file": "113-nonviolent-communication-a-language-of-life-3rd-ed--the-protec.md"
+    },
+    {
+      "chapter_id": "114-summary-12",
+      "order": 114,
+      "title": "Summary",
+      "markdown_file": "114-nonviolent-communication-a-language-of-life-3rd-ed--summary-12.md"
+    },
+    {
+      "chapter_id": "115-nonviolent-11",
+      "order": 115,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "115-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-11.md"
+    },
+    {
+      "chapter_id": "116-13",
+      "order": 116,
+      "title": "13\nLiberating Ourselves and Counseling Others\nFreeing Ourselves From Old Programming",
+      "markdown_file": "116-nonviolent-communication-a-language-of-life-3rd-ed--13.md"
+    },
+    {
+      "chapter_id": "117-resolving",
+      "order": 117,
+      "title": "Resolving Internal Conflicts",
+      "markdown_file": "117-nonviolent-communication-a-language-of-life-3rd-ed--resolving.md"
+    },
+    {
+      "chapter_id": "118-caring-for",
+      "order": 118,
+      "title": "Caring for Our Inner Environment",
+      "markdown_file": "118-nonviolent-communication-a-language-of-life-3rd-ed--caring-for.md"
+    },
+    {
+      "chapter_id": "119-replacing",
+      "order": 119,
+      "title": "Replacing Diagnosis With NVC",
+      "markdown_file": "119-nonviolent-communication-a-language-of-life-3rd-ed--replacing.md"
+    },
+    {
+      "chapter_id": "120-summary-13",
+      "order": 120,
+      "title": "Summary",
+      "markdown_file": "120-nonviolent-communication-a-language-of-life-3rd-ed--summary-13.md"
+    },
+    {
+      "chapter_id": "121-nonviolent-12",
+      "order": 121,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "121-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-12.md"
+    },
+    {
+      "chapter_id": "122-14",
+      "order": 122,
+      "title": "14\nExpressing Appreciation in Nonviolent Communication\nThe Intention Behind the Appreciation",
+      "markdown_file": "122-nonviolent-communication-a-language-of-life-3rd-ed--14.md"
+    },
+    {
+      "chapter_id": "123-the-three",
+      "order": 123,
+      "title": "The Three Components of Appreciation",
+      "markdown_file": "123-nonviolent-communication-a-language-of-life-3rd-ed--the-three.md"
+    },
+    {
+      "chapter_id": "124-receiving",
+      "order": 124,
+      "title": "Receiving Appreciation",
+      "markdown_file": "124-nonviolent-communication-a-language-of-life-3rd-ed--receiving.md"
+    },
+    {
+      "chapter_id": "125-the-hunger",
+      "order": 125,
+      "title": "The Hunger for Appreciation",
+      "markdown_file": "125-nonviolent-communication-a-language-of-life-3rd-ed--the-hunger.md"
+    },
+    {
+      "chapter_id": "126-overcoming",
+      "order": 126,
+      "title": "Overcoming the Reluctance to Express Appreciation",
+      "markdown_file": "126-nonviolent-communication-a-language-of-life-3rd-ed--overcoming.md"
+    },
+    {
+      "chapter_id": "127-summary-14",
+      "order": 127,
+      "title": "Summary",
+      "markdown_file": "127-nonviolent-communication-a-language-of-life-3rd-ed--summary-14.md"
+    },
+    {
+      "chapter_id": "128-epilogue",
+      "order": 128,
+      "title": "Epilogue",
+      "markdown_file": "128-nonviolent-communication-a-language-of-life-3rd-ed--epilogue.md"
+    },
+    {
+      "chapter_id": "129-bibliograp",
+      "order": 129,
+      "title": "Bibliography",
+      "markdown_file": "129-nonviolent-communication-a-language-of-life-3rd-ed--bibliograp.md"
+    },
+    {
+      "chapter_id": "130-nonviolent-13",
+      "order": 130,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "130-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-13.md"
+    },
+    {
+      "chapter_id": "131-nonviolent-14",
+      "order": 131,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "131-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-14.md"
+    },
+    {
+      "chapter_id": "132-nonviolent-15",
+      "order": 132,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "132-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-15.md"
+    },
+    {
+      "chapter_id": "133-nonviolent-16",
+      "order": 133,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "133-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-16.md"
+    },
+    {
+      "chapter_id": "134-nonviolent-17",
+      "order": 134,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "134-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-17.md"
+    },
+    {
+      "chapter_id": "135-nonviolent-18",
+      "order": 135,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "135-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-18.md"
+    },
+    {
+      "chapter_id": "136-nonviolent-19",
+      "order": 136,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "136-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-19.md"
+    },
+    {
+      "chapter_id": "137-nonviolent-20",
+      "order": 137,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "137-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-20.md"
+    },
+    {
+      "chapter_id": "138-nonviolent-21",
+      "order": 138,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "138-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-21.md"
+    },
+    {
+      "chapter_id": "139-nonviolent-22",
+      "order": 139,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "139-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-22.md"
+    },
+    {
+      "chapter_id": "140-nonviolent-23",
+      "order": 140,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "140-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-23.md"
+    },
+    {
+      "chapter_id": "141-nonviolent-24",
+      "order": 141,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "141-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-24.md"
+    },
+    {
+      "chapter_id": "142-nonviolent-25",
+      "order": 142,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "142-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-25.md"
+    },
+    {
+      "chapter_id": "143-nonviolent-26",
+      "order": 143,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "143-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-26.md"
+    },
+    {
+      "chapter_id": "144-nonviolent-27",
+      "order": 144,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "144-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-27.md"
+    },
+    {
+      "chapter_id": "145-nonviolent-28",
+      "order": 145,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "145-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-28.md"
+    },
+    {
+      "chapter_id": "146-nonviolent-29",
+      "order": 146,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "146-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-29.md"
+    },
+    {
+      "chapter_id": "147-nonviolent-30",
+      "order": 147,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "147-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-30.md"
+    },
+    {
+      "chapter_id": "148-nonviolent-31",
+      "order": 148,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "148-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-31.md"
+    },
+    {
+      "chapter_id": "149-nonviolent-32",
+      "order": 149,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "149-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-32.md"
+    },
+    {
+      "chapter_id": "150-nonviolent-33",
+      "order": 150,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "150-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-33.md"
+    },
+    {
+      "chapter_id": "151-nonviolent-34",
+      "order": 151,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "151-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-34.md"
+    },
+    {
+      "chapter_id": "152-nonviolent-35",
+      "order": 152,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "152-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-35.md"
+    },
+    {
+      "chapter_id": "153-nonviolent-36",
+      "order": 153,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "153-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-36.md"
+    },
+    {
+      "chapter_id": "154-nonviolent-37",
+      "order": 154,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "154-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-37.md"
+    },
+    {
+      "chapter_id": "155-nonviolent-38",
+      "order": 155,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "155-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-38.md"
+    },
+    {
+      "chapter_id": "156-nonviolent-39",
+      "order": 156,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "156-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-39.md"
+    },
+    {
+      "chapter_id": "157-nonviolent-40",
+      "order": 157,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "157-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-40.md"
+    },
+    {
+      "chapter_id": "158-nonviolent-41",
+      "order": 158,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "158-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-41.md"
+    },
+    {
+      "chapter_id": "159-nonviolent-42",
+      "order": 159,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "159-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-42.md"
+    },
+    {
+      "chapter_id": "160-nonviolent-43",
+      "order": 160,
+      "title": "Nonviolent Communication: A Language of Life",
+      "markdown_file": "160-nonviolent-communication-a-language-of-life-3rd-ed--nonviolent-43.md"
+    }
+  ]
+}

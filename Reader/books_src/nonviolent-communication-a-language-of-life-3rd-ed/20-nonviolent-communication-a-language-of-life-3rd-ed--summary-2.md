@@ -1,0 +1,3 @@
+# **Summary**
+
+It is our nature to enjoy giving and receiving compassionately. We have, however, learned many forms of life-alienating communication that lead us to speak and behave in ways that injure others and ourselves. One form of life-alienating communication is the use of moralistic judgments that imply wrongness or badness on the part of those who don’t act in harmony with our values. Another is the use of comparisons, which can block compassion both for others and for ourselves. Life-alienating communication also obscures our awareness that we are each responsible for our own thoughts, feelings, and actions. Communicating our desires in the form of demands is yet another characteristic of language that blocks compassion.

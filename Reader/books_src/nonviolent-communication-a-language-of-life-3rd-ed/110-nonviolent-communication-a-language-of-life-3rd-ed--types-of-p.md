@@ -1,0 +1,13 @@
+# **Types of Punitive Force**
+
+Physical punishment, such as spanking, is one punitive use of force. I have found the subject of corporal punishment to provoke strong sentiments among parents. Some adamantly defend the practice, referring to the Bible: “Spare the rod, spoil the child. It’s because parents don’t spank that delinquency is now rampant.” They are persuaded that spanking our children shows that we love them by setting clear boundaries. Other parents are equally insistent that spanking is unloving and ineffective because it teaches children that, when all else fails, we can always resort to physical violence.
+
+My personal concern is that children’s fear of corporal punishment may obscure their awareness of the compassion that underlies parental demands. Parents often tell me that they “have to” use punitive force because they see no other way to influence their children to do “what’s good for them.” They support their opinion with anecdotes of children expressing appreciation for “seeing the light” after having been punished. Having raised four children, I empathize deeply with parents regarding the daily challenges they face in educating children and keeping them safe. This does not, however, lessen my concern about the use of physical punishment.
+
+Fear of corporal punishment obscures children’s awareness of the compassion underlying their parents’ demands.
+
+First, I wonder whether people who proclaim the successes of such punishment are aware of the countless instances of children who turn against what might be good for them simply because they choose to fight, rather than succumb, to coercion. Second, the apparent success of corporal punishment in influencing a child doesn’t mean that other methods of influence wouldn’t have worked equally well. Finally, I share the concerns of many parents about the social consequences of using physical punishment. When parents opt to use force, we may win the battle of getting children to do what we want, but, in the process, are we not perpetuating a social norm that justifies violence as a means of resolving differences?
+
+In addition to the physical, other uses of force also qualify as punishment. One is the use of blame to discredit another person; for example, a parent may label a child as “wrong,” “selfish,” or “immature” when a child doesn’t behave in a certain way. Another form of punitive force is the withholding of some means of gratification, such as parents’ curtailing allowances or driving privileges. In this vein, the withdrawal of caring or respect is one of the most powerful threats of all.
+
+Punishment also includes judgmental labeling and the withholding of privileges.

@@ -1,0 +1,11 @@
+# **Overcoming the Reluctance to Express Appreciation**
+
+I was deeply touched by a passage in John Powell’s book _The Secret of Staying in Love,_ in which Powell describes his sadness over having been unable, during his father’s lifetime, to express the appreciation he felt for his father _to_ his father. How grievous it seemed to me to miss the chance of appreciating the people who have been the greatest positive influences in our lives!
+
+Immediately an uncle of mine, Julius Fox, came to mind. When I was a boy, he came daily to offer nursing care to my grandmother, who was totally paralyzed. While he cared for my grandmother, he always had a warm and loving smile on his face. No matter how unpleasant the task may have appeared to my boyish eyes, he treated her as if she were doing him the greatest favor in the world by letting him care for her. This provided a wonderful model of masculine strength for me—one that I’ve often called upon in the years since.
+
+I realized that I had never expressed my appreciation for my uncle, who himself was now ill and near death. I considered doing so, but sensed my own resistance: “I’m sure he already knows how much he means to me, I don’t need to express it out loud; besides, it might embarrass him if I put it into words.” As soon as these thoughts entered my head, I already knew they weren’t true. Too often I had assumed that others knew the intensity of my appreciation for them, only to discover otherwise. And even when people were embarrassed, they still wanted to hear appreciation verbalized.
+
+Still hesitant, I told myself that words couldn’t do justice to the depth of what I wished to communicate. I quickly saw through that one, though: yes, words may be poor vehicles in conveying our heartfelt realities, but as I have learned, “Anything that is worth doing is worth doing poorly!”
+
+As it happened, I soon found myself seated next to Uncle Julius at a family gathering, and the words simply flowed out of me. He took them in joyfully, without embarrassment. Brimming over with feelings from the evening, I went home, composed a poem and sent it to him. I was later told that each day until he died three weeks later, my uncle had asked that the poem be read to him.

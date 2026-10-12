@@ -1,0 +1,15 @@
+# **Evaluating Ourselves When We’ve Been Less Than Perfect**
+
+In a routine workshop activity, I ask participants to recall a recent occasion when they did something they wish they hadn’t. We then look at how they spoke to themselves immediately after having made what is referred in common language as a “mistake” or “error.” Typical statements were: “That was dumb!” “How could you do such a stupid thing?” “What’s wrong with you?” “You’re always messing up!” “That’s selfish!”
+
+These speakers had been taught to judge themselves in ways that imply that what they did was wrong or bad; their self-admonishment implicitly assumes that they deserve to suffer for what they’ve done. It is tragic that so many of us get enmeshed in self-hatred rather than benefit from our mistakes, which show us our limitations and guide us towards growth.
+
+Even when we sometimes do “learn a lesson” from mistakes for which we judge ourselves harshly, I worry about the nature of the energy behind that kind of change and learning. I’d like change to be stimulated by a clear desire to enrich life for ourselves or for others rather than by destructive energies such as shame or guilt.
+
+If the way we evaluate ourselves leads us to feel shame, and we consequently change our behavior, we are allowing our growing and learning to be guided by self-hatred. Shame is a form of self-hatred, and actions taken in reaction to shame are not free and joyful acts. Even if our intention is to behave with more kindness and sensitivity, if people sense shame or guilt behind our actions, they are less likely to appreciate what we do than if we are motivated purely by the human desire to contribute to life.
+
+In our language there is a word with enormous power to create shame and guilt. This violent word, which we commonly use to evaluate ourselves, is so deeply ingrained in our consciousness that many of us would have trouble imagining how to live without it. It is the word _should,_ as in “I should have known better” or “I shouldn’t have done that.” Most of the time when we use this word with ourselves, we resist learning, because _should_ implies that there is no choice. Human beings, when hearing any kind of demand, tend to resist because it threatens our autonomy—our strong need for choice. We have this reaction to tyranny even when it’s internal tyranny in the form of a _should._
+
+Avoid shoulding yourself!
+
+A similar expression of internal demand occurs in the following self-evaluation: “What I’m doing is just terrible. I really must do something about it!” Think for a moment of all the people you’ve heard say, “I really should give up smoking,” or, “I really have to do something about exercising more.” They keep saying what they “must” do and they keep resisting doing it, because human beings were not meant to be slaves. We were not meant to succumb to the dictates of _should_ and _have to,_ whether they come from outside or inside of ourselves. And if we do yield and submit to these demands, our actions arise from an energy that is devoid of life-giving joy.

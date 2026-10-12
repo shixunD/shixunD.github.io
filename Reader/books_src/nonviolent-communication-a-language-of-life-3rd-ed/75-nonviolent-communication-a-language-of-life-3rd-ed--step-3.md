@@ -1,0 +1,9 @@
+# _Step 3_
+
+After having acknowledged that you choose to do a particular activity, get in touch with the intention behind your choice by completing the statement, I choose to … because I want ….
+
+At first I fumbled to identify what I wanted from writing clinical reports. I had already determined, several months earlier, that the reports did not serve my clients enough to justify the time they were taking, so why was I continuing to invest so much energy in their preparation? Finally I realized that I was choosing to write the reports solely because I wanted the income they provided. As soon as I recognized this, I never wrote another clinical report. I can’t tell you how joyful I feel just thinking of how many clinical reports I haven’t written since that moment thirty-five years ago! When I realized that money was my primary motivation, I immediately saw that I could find other ways to take care of myself financially, and that in fact, I’d rather scavenge in garbage cans for food than write another clinical report.
+
+The next item on my list of unjoyful tasks was driving the children to school. When I examined the reason behind that chore, however, I felt appreciation for the benefits my children received from attending their school. They could easily walk to the neighborhood school, but their own school was far more in harmony with my educational values. I continued to drive, but with a different energy; instead of “Oh, darn, I have to drive the car pool today,” I was conscious of my purpose, which was for my children to have a quality of education that was very dear to me. Of course I sometimes needed to remind myself two or three times during the drive to refocus my mind on what purpose my action was serving.
+
+With every choice you make, be conscious of what need it serves.

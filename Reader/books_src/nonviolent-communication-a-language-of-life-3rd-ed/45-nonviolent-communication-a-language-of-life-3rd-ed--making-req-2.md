@@ -1,0 +1,19 @@
+# **Making Requests of a Group**
+
+It is especially important when we are addressing a group to be clear about the kind of understanding or honesty we want back after we’ve expressed ourselves. When we are not clear about the response we’d like, we may initiate unproductive conversations that end up satisfying no one’s needs.
+
+I’ve been invited from time to time to work with groups of citizens concerned about racism in their communities. One issue that frequently arises among these groups is that their meetings are tedious and fruitless. This lack of productivity is very costly for group members, who often expend limited resources to arrange for transportation and child care in order to attend meetings. Frustrated by prolonged discussions that yield little direction, many members quit the groups, declaring meetings a waste of time. Furthermore, the institutional changes they are striving to make are not usually ones that occur quickly or easily. For all these reasons, when such groups do meet, it’s important that they make good use of their time together.
+
+I knew members of one such group that had been organized to effect change in the local school system. It was their belief that various elements in the school system discriminated against students on the basis of race. Because their meetings were unproductive and the group was losing members, they invited me to observe their discussions. I suggested that they conduct their meeting as usual, and that I would let them know if I saw any ways NVC might help.
+
+One man began the meeting by calling the group’s attention to a recent newspaper article in which a minority mother had raised complaints and concerns regarding the principal’s treatment of her daughter. A woman responded by sharing a situation that had occurred to her when she was a student at the same school. One by one, each member then related a similar personal experience. After twenty minutes I asked the group if their needs were being met by the current discussion. Not one person said yes. “This is what happens all the time in these meetings!” huffed one man, “I have better things to do with my time than sit around listening to the same old bullshit.”
+
+I then addressed the man who had initiated the discussion: “Can you tell me, when you brought up the newspaper article, what response you were wanting from the group?”
+
+“I thought it was interesting,” he replied. I explained that I was asking what response he wanted from the group, rather than what he thought about the article. He pondered awhile and then conceded, “I’m not sure what I wanted.”
+
+And that’s why, I believe, twenty minutes of the group’s valuable time had been squandered on fruitless discourse. When we address a group without being clear what we are wanting back, unproductive discussions will often follow. However, if even one member of a group is conscious of the importance of clearly requesting the response that is desired, he or she can extend this consciousness to the group. For example, when this particular speaker didn’t define what response he wanted, a member of the group might have said, “I’m confused about how you’d like us to respond to your story. Would you be willing to say what response you’d like from us?” Such interventions can prevent the waste of precious group time.
+
+In a group, much time is wasted when speakers aren’t certain what response they’re wanting.
+
+Conversations often drag on and on, fulfilling no one’s needs, because it is unclear whether the initiator of the conversation has gotten what she or he wanted. In India, when people have received the response they want in conversations they have initiated, they say “bas” (pronounced “bus”). This means, “You need not say more. I feel satisfied and am now ready to move on to something else.” Though we lack such a word in our own language, we can benefit from developing and promoting “bas-consciousness” in all our interactions.
