@@ -1,0 +1,181 @@
+{
+  "book_id": "vibe",
+  "title": "Vibe",
+  "author": "Adam Grant",
+  "chapters": [
+    {
+      "chapter_id": "01-cover-vibe",
+      "order": 1,
+      "title": "Cover, Vibe",
+      "markdown_file": "01-vibe--cover-vibe.md"
+    },
+    {
+      "chapter_id": "02-also-by-ad",
+      "order": 2,
+      "title": "Also by Adam Grant",
+      "markdown_file": "02-vibe--also-by-ad.md"
+    },
+    {
+      "chapter_id": "03-title-page",
+      "order": 3,
+      "title": "Title Page, Vibe",
+      "markdown_file": "03-vibe--title-page.md"
+    },
+    {
+      "chapter_id": "04-copyright",
+      "order": 4,
+      "title": "Copyright, Vibe",
+      "markdown_file": "04-vibe--copyright.md"
+    },
+    {
+      "chapter_id": "05-contents",
+      "order": 5,
+      "title": "Contents",
+      "markdown_file": "05-vibe--contents.md"
+    },
+    {
+      "chapter_id": "06-dedication",
+      "order": 6,
+      "title": "Dedication, Vibe",
+      "markdown_file": "06-vibe--dedication.md"
+    },
+    {
+      "chapter_id": "07-prologue",
+      "order": 7,
+      "title": "-Prologue",
+      "markdown_file": "07-vibe--prologue.md"
+    },
+    {
+      "chapter_id": "08-part-1",
+      "order": 8,
+      "title": "Part 1",
+      "markdown_file": "08-vibe--part-1.md"
+    },
+    {
+      "chapter_id": "09-chapter-1",
+      "order": 9,
+      "title": "-Chapter 1",
+      "markdown_file": "09-vibe--chapter-1.md"
+    },
+    {
+      "chapter_id": "10-chapter-2",
+      "order": 10,
+      "title": "-Chapter 2",
+      "markdown_file": "10-vibe--chapter-2.md"
+    },
+    {
+      "chapter_id": "11-chapter-3",
+      "order": 11,
+      "title": "-Chapter 3",
+      "markdown_file": "11-vibe--chapter-3.md"
+    },
+    {
+      "chapter_id": "12-part-2",
+      "order": 12,
+      "title": "Part 2",
+      "markdown_file": "12-vibe--part-2.md"
+    },
+    {
+      "chapter_id": "13-chapter-4",
+      "order": 13,
+      "title": "-Chapter 4",
+      "markdown_file": "13-vibe--chapter-4.md"
+    },
+    {
+      "chapter_id": "14-chapter-5",
+      "order": 14,
+      "title": "-Chapter 5",
+      "markdown_file": "14-vibe--chapter-5.md"
+    },
+    {
+      "chapter_id": "15-chapter-6",
+      "order": 15,
+      "title": "-Chapter 6",
+      "markdown_file": "15-vibe--chapter-6.md"
+    },
+    {
+      "chapter_id": "16-part-3",
+      "order": 16,
+      "title": "Part 3",
+      "markdown_file": "16-vibe--part-3.md"
+    },
+    {
+      "chapter_id": "17-chapter-7",
+      "order": 17,
+      "title": "-Chapter 7",
+      "markdown_file": "17-vibe--chapter-7.md"
+    },
+    {
+      "chapter_id": "18-chapter-8",
+      "order": 18,
+      "title": "-Chapter 8",
+      "markdown_file": "18-vibe--chapter-8.md"
+    },
+    {
+      "chapter_id": "19-chapter-9",
+      "order": 19,
+      "title": "-Chapter 9",
+      "markdown_file": "19-vibe--chapter-9.md"
+    },
+    {
+      "chapter_id": "20-chapter-10",
+      "order": 20,
+      "title": "-Chapter 10",
+      "markdown_file": "20-vibe--chapter-10.md"
+    },
+    {
+      "chapter_id": "21-epilogue",
+      "order": 21,
+      "title": "-Epilogue",
+      "markdown_file": "21-vibe--epilogue.md"
+    },
+    {
+      "chapter_id": "22-actions-fo",
+      "order": 22,
+      "title": "Actions for Impact",
+      "markdown_file": "22-vibe--actions-fo.md"
+    },
+    {
+      "chapter_id": "23-acknowledg",
+      "order": 23,
+      "title": "Acknowledgments",
+      "markdown_file": "23-vibe--acknowledg.md"
+    },
+    {
+      "chapter_id": "24-notes",
+      "order": 24,
+      "title": "Notes",
+      "markdown_file": "24-vibe--notes.md"
+    },
+    {
+      "chapter_id": "25-image-cred",
+      "order": 25,
+      "title": "Image Credits",
+      "markdown_file": "25-vibe--image-cred.md"
+    },
+    {
+      "chapter_id": "26-index",
+      "order": 26,
+      "title": "Index",
+      "markdown_file": "26-vibe--index.md"
+    },
+    {
+      "chapter_id": "27-about-the",
+      "order": 27,
+      "title": "About the Author",
+      "markdown_file": "27-vibe--about-the.md"
+    },
+    {
+      "chapter_id": "28-appendix-i",
+      "order": 28,
+      "title": "Appendix: Image Description",
+      "markdown_file": "28-vibe--appendix-i.md"
+    },
+    {
+      "chapter_id": "29-whats-next",
+      "order": 29,
+      "title": "What’s next on your reading list?",
+      "markdown_file": "29-vibe--whats-next.md"
+    }
+  ]
+}

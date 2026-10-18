@@ -1,0 +1,3 @@
+# About the Author
+
+**Adam Grant** is an organizational psychologist at Wharton, where he has been the top-rated professor for seven straight years. His books have sold millions of copies, he is one of TED’s most popular speakers, and his podcasts have over 100 million downloads; he hosts _Re:Thinking_. Grant has been recognized as the world’s second-most influential management thinker and one of _Fortune’_ s 40 Under 40. Grant received his BA from Harvard University and his PhD from the University of Michigan, and he is a former Junior Olympic springboard diver and magician. He lives in Philadelphia with his wife, Allison Sweet Grant, a novelist and poet; their two cats (who don’t get along); and their three children (who mostly do).

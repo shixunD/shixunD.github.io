@@ -1,5 +1,12 @@
 [
   {
+    "book_id": "vibe",
+    "title": "Vibe",
+    "author": "Adam Grant",
+    "cover_image": "books_src/vibe/assets/9798217059713_cover.jpg",
+    "meta_path": "books_src/vibe/meta.json"
+  },
+  {
     "book_id": "nonviolent-communication-a-language-of-life-3rd-ed",
     "title": "Nonviolent Communication: A Language of Life, 3rd Edition: Life-Changing Tools for Healthy Relationships (Nonviolent Communication Guides)",
     "author": "Marshall B. Rosenberg",
