@@ -12,6 +12,8 @@
 
     const LS_LAST_SEEN = 'teachingPanel.updateMeta.lastSeenTag';
     const DEPLOY_TAG_URL = '/deploy-tag.json';
+    // 只清本应用的缓存（与 service-worker.js 的 CACHE_PREFIX 一致），同域名下别的 PWA 的缓存不能动
+    const CACHE_PREFIX = 'teaching-panel-';
 
     function getLastSeen() { return Utils.lsGet(LS_LAST_SEEN, null); }
     function setLastSeen(v) { Utils.lsSet(LS_LAST_SEEN, v); }
@@ -95,12 +97,12 @@
     async function applyUpdate() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            const reg = await navigator.serviceWorker.getRegistration();
+            const reg = await navigator.serviceWorker.getRegistration('./');
             if (reg && reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
             if (reg && reg.active) reg.active.postMessage({ type: 'CLEAR_CACHE' });
             if ('caches' in window) {
                 const names = await caches.keys();
-                await Promise.all(names.map((n) => caches.delete(n)));
+                await Promise.all(names.map((n) => n.startsWith(CACHE_PREFIX) && caches.delete(n)));
             }
         } catch (e) { /* 忽略 */ }
     }

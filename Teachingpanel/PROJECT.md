@@ -28,7 +28,7 @@ index.html
   → styles/*.css
   → scripts/*.js（IIFE 模块，每个文件挂一个 window.Xxx；<script> 顺序 = 依赖顺序）
   → app.js 的 DOMContentLoaded → init()：
-      1. 注册 service-worker.js（{updateViaCache:'none'}）
+      1. 注册 service-worker.js（{scope:'./', updateViaCache:'none'}）
       2. AppState.load()（IndexedDB → 内存；首次运行建"默认班级"+语数英三科）
       3. Navigation.init()，渲染班级切换器，恢复上次打开的页面
       4. AppState.subscribe：数据变化 → 重绘当前页 + 班级切换器 + 背诵提醒角标 + 打开中的学生档案
@@ -141,7 +141,7 @@ state = {
 
 ```
 index.html                         页面骨架 + 四个页面容器 + <script> 依赖顺序
-manifest.json                      PWA 元数据（192/512 any + 512 maskable 三条 icons）
+manifest.json                      PWA 元数据（固定 id "teaching-panel"；192/512 any + 512 maskable 三条 icons）
 service-worker.js                  全部资源 cache-first；/deploy-tag.json 永远走网络
 version.json                       semver + changelog（只用于更新弹窗展示，不参与判重）
 wrangler.jsonc / .assetsignore     Cloudflare Workers 静态资源部署配置
@@ -212,6 +212,20 @@ scripts/app.js                     启动入口（最后加载）
 - `/deploy-tag.json` 用绝对路径是**故意的**（应用可能挂在子路径，指纹在宿主根目录）。
 - 设置页"检查更新"传 `{force:true}`，拿不到指纹时 Toast 报错，不会静默无反应。
 - SW 预缓存和兜底请求都 `cache:'no-store'`；注册带 `updateViaCache:'none'`。
+
+### PWA 独立性（不和同域名下的其他应用冲突）
+
+浏览器按**源**（协议+主机+端口）隔离存储和 Service Worker，同一个源里再按 manifest `id` 区分应用。
+本应用可能和别的 PWA 部署在同一个域名下（挂子路径），本地调试时也可能和别的项目共用 `localhost:端口`，所以：
+
+- manifest `id` 固定为 `"teaching-panel"`（不再用 `./index.html`：别的应用如果也写 `./index.html` 并部署在同一路径，浏览器会当成同一个应用，安装时互相覆盖）。
+  **不要再改 `id`**，改了之后已安装的用户会被当成另一个应用，需要卸载重装。
+- SW 注册显式 `scope:'./'`，只接管本应用目录。
+- 缓存名统一 `teaching-panel-` 前缀（`service-worker.js` 与 `updateChecker.js` 各有一份 `CACHE_PREFIX`，要同步）。
+  SW activate、`CLEAR_CACHE`、更新弹窗的清缓存**只删这个前缀的缓存**，不能 `caches.keys()` 全删，否则会清掉别的应用的离线缓存。
+- localStorage 键统一 `teachingPanel.` 前缀，IndexedDB 库名 `teaching-panel-db`，新增存储键也要带前缀。
+- 本地调试用专用端口 8791。如果某个端口以前跑过别的 PWA，它的 SW 会一直接管这个端口，表现为打开的是别的应用或旧文件。
+  这时在 DevTools → Application → Storage 里点 Clear site data，或者换个端口。
 
 ## 七、OneDrive 云备份（单向快照）
 

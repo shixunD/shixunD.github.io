@@ -29,8 +29,10 @@
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.3rem; text-align: left;
     border: 1px solid var(--border-color); background: #fff; border-radius: 8px; padding: 0.35rem 0.5rem;
     cursor: pointer; font-family: inherit; font-size: 0.88rem; color: var(--text-primary);
+    position: relative; overflow: hidden; padding-left: 0.7rem;
 }
-.plan-stu i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+/* 状态色：卡片最左侧一条细线 */
+.plan-stu i { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .plan-stu small { width: 100%; font-size: 0.68rem; color: var(--text-secondary); }
 .plan-stu.selected { border-color: #2e9e48; background: rgba(46, 158, 72, 0.12); box-shadow: inset 0 0 0 1px #2e9e48; }
 

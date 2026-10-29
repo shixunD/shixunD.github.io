@@ -9,7 +9,8 @@
         window.addEventListener('load', () => {
             // updateViaCache:'none'：拉取 service-worker.js 本身也绕过浏览器 HTTP 缓存，
             // 否则 SW 脚本可能一直是旧版且不报错，改了 SW 逻辑却"跟没改一样"
-            navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).catch((err) => {
+            // scope 显式限定在本应用目录，不去接管同域名下别的路径（别的 PWA）
+            navigator.serviceWorker.register('./service-worker.js', { scope: './', updateViaCache: 'none' }).catch((err) => {
                 console.warn('[app] Service Worker 注册失败:', err);
             });
         });

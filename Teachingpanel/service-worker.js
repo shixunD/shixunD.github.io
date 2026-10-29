@@ -1,7 +1,10 @@
 // 学情看板 Service Worker —— 全部资源 cache-first，是否更新由 /deploy-tag.json 判重（见 updateChecker.js）
 // CACHE_NAME 不需要每次发版修改：更新时由页面发 CLEAR_CACHE 清空缓存后刷新，所有资源 cache miss 后重新拉取。
 // 新增/改名文件时记得同步 URLS_TO_CACHE（否则该文件离线不可用；在线时首次请求会自动补进缓存）。
-const CACHE_NAME = 'teaching-panel-cache-v1';
+// Cache Storage 按源共享：同域名下可能还有别的 PWA，清理缓存只动 CACHE_PREFIX 开头的（本应用自己的），
+// 不能 caches.keys() 全删，否则会把别的应用的离线缓存一起清掉。updateChecker.js 里有同名前缀，改名要两边同步。
+const CACHE_PREFIX = 'teaching-panel-';
+const CACHE_NAME = CACHE_PREFIX + 'cache-v1';
 const DEPLOY_TAG_PATH = '/deploy-tag.json';
 
 const URLS_TO_CACHE = [
@@ -88,7 +91,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys()
-            .then((names) => Promise.all(names.map((n) => n !== CACHE_NAME && caches.delete(n))))
+            .then((names) => Promise.all(names.map((n) => n.startsWith(CACHE_PREFIX) && n !== CACHE_NAME && caches.delete(n))))
             .then(() => self.clients.claim())
     );
 });
@@ -123,6 +126,6 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
     if (event.data && event.data.type === 'CLEAR_CACHE') {
-        event.waitUntil(caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))));
+        event.waitUntil(caches.keys().then((names) => Promise.all(names.map((n) => n.startsWith(CACHE_PREFIX) && caches.delete(n)))));
     }
 });
