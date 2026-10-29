@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用说明 · 学情看板</title>
+    <link rel="icon" type="image/png" href="../icon-192.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary-color: #ff8a3d; --primary-dark: #e06a1f;
+            --bg-color: #faf6f2; --card-bg: #fff; --text-primary: #2b2420; --text-secondary: #7a6f68;
+            --border-color: #ece4dc; --shadow: 0 2px 8px rgba(60, 40, 20, 0.07);
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg-color); color: var(--text-primary); line-height: 1.75; }
+        .topbar { position: sticky; top: 0; z-index: 100; background: var(--card-bg); box-shadow: var(--shadow); padding: 0.8rem 1.5rem; display: flex; align-items: center; gap: 0.6rem; }
+        .topbar img { width: 28px; height: 28px; border-radius: 8px; }
+        .topbar .title { font-weight: 800; font-size: 1.15rem; color: var(--primary-dark); }
+        .topbar .subtitle { color: var(--text-secondary); font-size: 0.85rem; }
+        .topbar a.back-link { margin-left: auto; font-size: 0.85rem; color: var(--text-secondary); text-decoration: none; padding: 0.35rem 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); white-space: nowrap; }
+        .topbar a.back-link:hover { color: var(--primary-dark); border-color: var(--primary-color); }
+        .layout { max-width: 1100px; margin: 0 auto; padding: 1.5rem; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+        nav.toc { position: sticky; top: 76px; background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); padding: 1rem; font-size: 0.88rem; }
+        nav.toc a { display: block; color: var(--text-secondary); text-decoration: none; padding: 0.2rem 0.4rem; border-radius: 6px; }
+        nav.toc a:hover, nav.toc a.active { color: var(--primary-dark); background: rgba(255,138,61,0.1); }
+        nav.toc a.sub { padding-left: 1.1rem; font-size: 0.82rem; }
+        main section { background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; scroll-margin-top: 76px; }
+        h1 { font-size: 1.6rem; margin-bottom: 0.6rem; }
+        h2 { font-size: 1.25rem; margin-bottom: 0.7rem; color: var(--primary-dark); }
+        h3 { font-size: 1.02rem; margin: 1rem 0 0.4rem; scroll-margin-top: 76px; }
+        p, li { font-size: 0.94rem; }
+        ul, ol { padding-left: 1.4rem; margin: 0.4rem 0; }
+        code, kbd { background: var(--bg-color); border-radius: 4px; padding: 0 5px; font-size: 0.88em; }
+        pre { background: var(--bg-color); border-radius: 8px; padding: 0.7rem 1rem; font-size: 0.88rem; margin: 0.5rem 0; }
+        .tip { background: #fff4e8; border-left: 4px solid var(--primary-color); border-radius: 8px; padding: 0.6rem 0.9rem; margin: 0.6rem 0; font-size: 0.9rem; }
+        .warn { background: #fdecea; border-left-color: #d93025; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 0.5rem 0; }
+        th, td { border-bottom: 1px solid var(--border-color); padding: 0.4rem 0.6rem; text-align: left; }
+        .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+        @media (max-width: 760px) {
+            .layout { grid-template-columns: 1fr; padding: 1rem; }
+            nav.toc { position: static; }
+            main section { padding: 1.1rem; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topbar">
+        <img src="../icon-192.png" alt="">
+        <span class="title">学情看板</span><span class="subtitle">使用说明</span>
+        <a class="back-link" href="../index.html">← 返回应用</a>
+    </div>
+
+    <div class="layout">
+        <nav class="toc">
+            <a href="#start">快速开始</a>
+            <a href="#home">主页</a>
+            <a class="sub" href="#students">学生名单</a>
+            <a class="sub" href="#classes">多班级</a>
+            <a class="sub" href="#phrases">comment 快捷词</a>
+            <a class="sub" href="#data">数据备份</a>
+            <a href="#homework">作业情况</a>
+            <a href="#recitation">背诵情况</a>
+            <a class="sub" href="#plan">计划背诵</a>
+            <a class="sub" href="#reminder">提醒</a>
+            <a href="#exams">考试情况</a>
+            <a class="sub" href="#txt">TXT 成绩格式</a>
+            <a href="#profile">学生档案</a>
+            <a href="#install">安装与更新</a>
+            <a href="#faq">常见问题</a>
+        </nav>
+
+        <main>
+            <section id="start">
+                <h1>快速开始</h1>
+                <ol>
+                    <li>在「主页 → 学生名单」点 <b>批量添加</b>，把「学号 姓名」两列从 Excel 复制粘贴进去。</li>
+                    <li>每天在「作业」里 <b>新建作业</b>，只需点出没完成的同学（默认全班都是完成）。</li>
+                    <li>在「背诵」里建一个 <b>轮次</b>（一篇课文/一组古诗），每天抽查几个人并登记结果。</li>
+                    <li>考完试在「考试」里新建考试，粘贴「姓名 成绩」即可导入。</li>
+                    <li>定期在主页点 <b>导出全部数据</b> 备份一次。</li>
+                </ol>
+                <div class="tip">所有数据只保存在你当前使用的这个浏览器里，不会上传到任何服务器（除非你主动使用 OneDrive 备份）。</div>
+            </section>
+
+            <section id="home">
+                <h2>主页</h2>
+                <p>顶部四个概览卡片：今天的背诵计划、已逾期的背诵计划、作业未补上的项数、今天布置的作业数。点击卡片直接跳到对应页面。</p>
+                <h3 id="students">学生名单</h3>
+                <ul>
+                    <li>名单始终 <b>按学号从小到大</b> 排列。</li>
+                    <li><b>姓名在同一个班里必须唯一</b>（成绩导入靠姓名匹配）。重名学生请加后缀区分，例如「张三B」。</li>
+                    <li>批量添加支持「学号 姓名」「姓名 学号」或只写姓名（自动接着最大学号编号）；已存在的姓名会跳过。</li>
+                    <li>点击任何地方的学生姓名都会打开该生的 <a href="#profile">学生档案</a>。</li>
+                    <li>删除学生会同时删除他的全部作业、背诵、考试记录。</li>
+                </ul>
+                <h3 id="classes">多班级</h3>
+                <p>顶部导航栏的「🏫 班级名 ▾」可以切换、新建、重命名、删除班级。每个班级的学生和记录相互独立。</p>
+                <h3 id="phrases">comment 快捷词</h3>
+                <ul>
+                    <li>主页「💬 comment 快捷词」卡片里可以添加、删除、调整顺序（↑↓）。<b>作业和背诵是两套独立的快捷词</b>。</li>
+                    <li>背诵默认有：复习体系混乱、复习体系有条理、书写有一定问题、格式需要改善；作业默认为空，按需添加。</li>
+                    <li>登记作业状态或背诵检查时，点一下快捷词就会 <b>追加</b> 到 comment 末尾（自动用「；」隔开），还可以继续手动输入。</li>
+                </ul>
+                <h3 id="data">数据备份</h3>
+                <ul>
+                    <li><b>📤 导出数据库（.db）</b>：得到一个数据库文件（文件名是导出时间，如 <code>2026-10-29--14-30-05.db</code>），包含所有班级、学生、作业、背诵、考试、计划和设置。换电脑时在新电脑上点 <b>📥 导入数据库</b> 选择这个文件即可完整恢复。</li>
+                    <li>这个 .db 是标准的 SQLite 数据库，可以用免费的 <b>DB Browser for SQLite</b> 等工具直接打开，按表（students 学生、homework 作业、homework_records 作业登记、rec_checks 背诵检查、rec_plans 背诵计划、exam_scores 成绩……）查看数据。</li>
+                    <li><b>导入</b>会 <b>覆盖</b> 当前全部数据，导入前建议先导出一份。选错文件（不是本应用导出的数据库）时会提示错误，当前数据不会被改动。</li>
+                    <li><b>OneDrive 云备份</b>：每次上传都是一份新的带时间戳的 .db 快照，可在历史列表中选择任一份恢复（覆盖本地）。它不是自动双向同步。首次使用需要管理员完成 OneDrive 配置。</li>
+                </ul>
+            </section>
+
+            <section id="homework">
+                <h2>作业情况</h2>
+                <table>
+                    <tr><th>颜色</th><th>含义</th></tr>
+                    <tr><td><span class="sw" style="background:#1e8e3e"></span>深绿</td><td>完全完成（新作业默认）</td></tr>
+                    <tr><td><span class="sw" style="background:#d93025"></span>红</td><td>未完成</td></tr>
+                    <tr><td><span class="sw" style="background:#f48fb1"></span>粉红</td><td>未按要求完成</td></tr>
+                    <tr><td><span class="sw" style="background:#1a4fa3"></span>深蓝</td><td>已补交（原来未完成，已补上）</td></tr>
+                    <tr><td><span class="sw" style="background:#7fb8f0"></span>浅蓝</td><td>已补改（原来未按要求完成，已改好补上）</td></tr>
+                </table>
+                <h3>登记</h3>
+                <ul>
+                    <li>点 <b>新建作业</b>，日期直接点 <b>本周一～日、下周一～日</b> 的日期块（默认今天，找不到再用日历框），填标题（可留空自动命名）。</li>
+                    <li>点击学生卡片 → 选择状态并写 <b>comment</b>（可以点快捷词快速填入）。</li>
+                    <li><b>刷子模式</b>：选中「刷：未完成」等按钮后，点一下学生就直接改成该状态，不弹窗，适合快速登记。</li>
+                    <li>红色/粉色卡片右上角的 <b>「补」</b>：学生补交后点一下，自动变成对应的蓝色；点错了可以点提示条上的「撤销」。</li>
+                </ul>
+                <h3>总览</h3>
+                <p>学生 × 作业的色块表，一眼看出谁经常没完成。可按时间范围筛选；带白色小角的格子有 comment；最右列是"未补上"数量。</p>
+                <h3>欠交清单</h3>
+                <p>按 <b>作业</b> 分组列出还没补上的同学（红/粉），最新的作业在最前面；点作业标题可跳到该作业的登记页。</p>
+                <p>学生补交后点「已补上」，<b>确认</b> 后才会生效；之后页面顶部会出现提示条，8 秒内点「撤销」即可恢复原状态（comment 也会保留）。</p>
+                <h3>学生趋势</h3>
+                <p>某个学生的按时完成率、最终完成率（含补交）、各状态次数、时间轴色条、每周完成率折线和全部 comment。</p>
+            </section>
+
+            <section id="recitation">
+                <h2>背诵情况</h2>
+                <p>背诵按 <b>轮次</b> 管理：一个轮次就是一项背诵任务（例如「第三单元古诗两首」），不分日期——每天能查几个就查几个，每次检查都会记录日期。</p>
+                <table>
+                    <tr><th>颜色</th><th>含义</th></tr>
+                    <tr><td><span class="sw" style="background:#e5e7eb"></span>灰</td><td>还没检查</td></tr>
+                    <tr><td><span class="sw" style="background:#1e8e3e"></span>绿</td><td>过关</td></tr>
+                    <tr><td><span class="sw" style="background:#f2b705"></span>黄</td><td>需要重新过关</td></tr>
+                    <tr><td><span class="sw" style="background:#d93025"></span>红</td><td>未过关</td></tr>
+                    <tr><td><span class="sw" style="background:#b9e8b0"></span>浅绿</td><td>已安排计划背诵（卡片上显示计划日期和星期）</td></tr>
+                    <tr><td><span class="sw" style="background:#fff;outline:2px solid #ff4f9a"></span>粉色边框</td><td>今天需要检查（今天有背诵计划——不管是第一次背还是重新过关）</td></tr>
+                </table>
+                <h3>检查</h3>
+                <ul>
+                    <li>左侧选轮次，点学生卡片登记：结果（过关 / 需重新过关 / 未过关，再点一次可取消）、检查日期、备注；也可以同时打开 🗓️ 计划背诵。</li>
+                    <li><b>需重新过关 / 未过关只是一个状态</b>，不带日期。选了它们时会自动展开「🗓️ 计划背诵」，可以顺便点选哪天再背（可多选，会加入背诵计划）；不选日期也能直接保存。</li>
+                    <li><b>日期都用日期块点选</b>：弹窗里直接列出 <b>本周一～日、下周一～日</b> 的日期块（标注具体日期和星期），点一下即可；实在不在这两周内，再用最下面「其他」的日历框选。检查日期默认就是今天，只能选今天及以前。</li>
+                    <li>学生的当前颜色 = 最近一次检查的结果（有未完成的计划时底色浅绿，状态用小圆点标出）；卡片上同时显示状态、最近检查日期和计划日期（多个计划时显示 +N）。弹窗底部能看到本轮所有检查记录：登记错了可以点 <b>编辑</b>（修改结果、检查日期、备注，保存后回到检查弹窗），或点 <b>删除</b>。</li>
+                    <li>筛选按钮可以只看未检查、需重新过关、未过关、已过关的同学。背完的轮次可以 <b>归档</b>，不再显示在列表和提醒里。</li>
+                </ul>
+                <h3 id="plan">计划背诵</h3>
+                <p>提前安排某个同学哪天来背。有两种方式：</p>
+                <ul>
+                    <li>点学生卡片，在检查弹窗里点 <b>🗓️ 计划背诵</b>，再选日期（<b>可以选多个</b>）。它和检查结果互不影响：可以只加计划，也可以同时登记过关/重背/未过关并加计划。</li>
+                    <li>背诵页顶部的 <b>🗓️ 计划背诵</b> 子标签（检查页轮次右上角的同名按钮也会跳过去）：选轮次 → 点日期 → 点学生，就加入这天的计划；再点一次取消，自动保存。
+                        <b>选中某一天时，这天要检查的同学会标成绿色</b>；日期块下方的数字是这天已计划几人。还有「把未过关的都加进来」「清空这天的计划」，下方按日期列出本轮全部计划，点日期可跳过去。</li>
+                </ul>
+                <p>日期可以直接点 <b>本周一～日、下周一～日</b> 共 14 天（按钮上写着具体日期和星期，已经过去的日子不能选），也可以自选其他日期。</p>
+                <p>在「🗓️ 计划背诵」子标签里，每个学生块上都会列出 TA 在本轮已有的 <b>全部计划日期</b>（当前选中的那天加粗，已检查的带 ✓），不管现在选的是哪一天；没有计划的显示「暂无计划」。</p>
+                <p>安排后学生卡片变成 <b>浅绿色</b>，并显示计划日期；到了那天卡片会加 <b>粉色边框</b>。<b>登记检查结果不会删除计划</b>，状态和计划可以同时存在。到了计划那天（或之后）登记过检查，这条计划就算完成：不再提醒、卡片不再显示，但仍保留在检查弹窗的「背诵计划」里（标注 ✓ 已检查）。不需要的计划可以在检查弹窗或时间看板里手动取消。</p>
+                <h3>⏰ 时间看板</h3>
+                <p>默认显示 <b>所有未来的背诵计划</b>，也可以切换为只看未来 7/14/30 天。<b>已逾期</b>的（计划日期已过还没检查）排最上面，然后按日期列出；每条后面标出该同学当前的状态。每条都可以直接点「检查」登记，或「取消计划」。</p>
+                <h3>总览 / 学生趋势</h3>
+                <p>总览：学生 × 轮次色块表。每个格子按这个同学在该轮 <b>所有检查</b> 的结果数量分成几段：<span class="sw" style="background:#1e8e3e"></span>过关、<span class="sw" style="background:#f2b705"></span>需重新过关、<span class="sw" style="background:#d93025"></span>未过关，从左到右排列，次数越多那一段越宽（例如过关 1 次、未过关 2 次：绿占 1/3、红占 2/3）；中间的数字是检查次数，灰色表示还没检查。最右一列是按当前状态统计的过关数。学生趋势：该生每个轮次的状态、检查次数、首次过关日期和用时，以及完整检查历史。</p>
+                <h3 id="reminder">提醒</h3>
+                <ul>
+                    <li>导航栏「背诵」上的数字角标 = 今天的背诵计划 + 已逾期的计划人次（有逾期时为红色）。</li>
+                    <li>每天第一次打开应用时会弹出提示；在主页「设置」里开启 <b>背诵计划系统通知</b> 后还会弹出系统通知。</li>
+                </ul>
+                <div class="tip warn">提醒只会在 <b>打开应用（或切回应用窗口）时</b> 出现，应用关闭时无法推送。建议每天上课前打开一次看板。</div>
+            </section>
+
+            <section id="exams">
+                <h2>考试情况</h2>
+                <ul>
+                    <li><b>新建考试</b>：名称、日期、满分。</li>
+                    <li><b>录入成绩</b>：按学号逐个输入，按 <kbd>Enter</kbd> 跳到下一个，留空表示缺考。</li>
+                    <li><b>导入 TXT</b>：粘贴文本或选择 .txt 文件，先显示预览（匹配成功几人、哪些姓名名单里没有、哪些行无法识别），确认后才写入。</li>
+                    <li><b>导出 TXT</b>：同样的「姓名 成绩」格式，按学号排序。</li>
+                    <li>每场考试显示参考人数、平均分、最高/最低分、及格率（及格线在主页设置，默认 60%）、分数段分布和排名。</li>
+                    <li><b>学生看板</b>：某个学生历次考试的得分率（或原始分）折线，与班级平均对比，以及每次名次。</li>
+                </ul>
+                <h3 id="txt">TXT 成绩格式</h3>
+                <pre>杨迪 101
+罗门 103</pre>
+                <p>每行一个学生，姓名和成绩之间用空格（全角空格、Tab、逗号也可以）。姓名要与名单完全一致。</p>
+            </section>
+
+            <section id="profile">
+                <h2>学生档案</h2>
+                <p>点击任何地方的学生姓名（或「查看完整档案」按钮），右侧会滑出该生档案，分作业 / 背诵 / 考试三栏汇总，适合家长会、个别谈话时使用。从哪个页面点进来就默认打开哪一栏（在作业页点开是「作业」，背诵页是「背诵」，考试页是「考试」；从主页点开则沿用上次看的那一栏）。按 <kbd>Esc</kbd> 或点空白处关闭。</p>
+            </section>
+
+            <section id="install">
+                <h2>安装与更新</h2>
+                <ul>
+                    <li>主页「应用」里点 <b>安装到桌面</b>（Chrome/Edge 地址栏右侧也有安装图标），之后可以像普通软件一样从桌面打开，断网也能使用。</li>
+                    <li>发布新版本后，打开应用会弹出更新提示：<b>点此完成更新</b> 立即刷新到新版；<b>稍后再说</b> 下次打开再提醒；<b>跳过此版本</b> 这个版本不再提示。更新不会影响你的数据。</li>
+                    <li>主页「检查更新」可以随时查看当前版本的更新内容。</li>
+                </ul>
+            </section>
+
+            <section id="faq">
+                <h2>常见问题</h2>
+                <h3>日期怎么显示？</h3>
+                <p>界面上的日期都写成 <code>10-29(星期四)</code> 这种格式，月-日后面括号标注星期几。</p>
+                <h3>数据会丢吗？</h3>
+                <p>数据保存在浏览器本地，应用会申请"持久化存储"（主页显示状态）。但清除浏览器数据、换浏览器/电脑都会看不到原来的数据，请定期导出数据库（.db）或上传 OneDrive。</p>
+                <h3>两台电脑能同时用吗？</h3>
+                <p>可以各自使用，但数据不会自动同步。需要转移时：在 A 电脑导出（或上传 OneDrive），在 B 电脑导入（或恢复）——会覆盖 B 上的数据。</p>
+                <h3>学生改名了怎么办？</h3>
+                <p>在名单里点「编辑」直接改名，历史记录都会保留。</p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // 根据滚动位置高亮当前目录项（锦上添花，去掉不影响使用）
+        (function () {
+            const links = Array.from(document.querySelectorAll('nav.toc a'));
+            const targets = links.map((a) => document.querySelector(a.getAttribute('href')));
+            function update() {
+                let idx = 0;
+                targets.forEach((t, i) => { if (t && t.getBoundingClientRect().top < 120) idx = i; });
+                links.forEach((a, i) => a.classList.toggle('active', i === idx));
+            }
+            window.addEventListener('scroll', update, { passive: true });
+            update();
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,12 @@
+// Cloudflare Workers 纯静态资源部署配置（无 Worker 脚本）
+// Workers Builds 设置（Settings → Build）：
+//   Build command:  echo "{\"sha\":\"$WORKERS_CI_COMMIT_SHA\",\"builtAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > deploy-tag.json
+//   Deploy command: npx wrangler deploy（默认）
+// deploy-tag.json 是更新检测的判重指纹，见 PROJECT.md「更新检测」
+{
+    "name": "teaching-panel",
+    "compatibility_date": "2026-10-01",
+    "assets": {
+        "directory": "./"
+    }
+}

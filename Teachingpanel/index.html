@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学情看板</title>
+    <meta name="description" content="学生作业、背诵、考试情况登记与追踪看板">
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon.png">
+    <link rel="apple-touch-icon" href="./icon.png">
+    <meta name="theme-color" content="#ff8a3d">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="./styles/base.css">
+    <link rel="stylesheet" href="./styles/navbar.css">
+    <link rel="stylesheet" href="./styles/layout.css">
+    <link rel="stylesheet" href="./styles/board.css">
+    <link rel="stylesheet" href="./styles/settings.css">
+    <link rel="stylesheet" href="./styles/recitation.css">
+    <link rel="stylesheet" href="./styles/charts.css">
+    <link rel="stylesheet" href="./styles/profile.css">
+    <link rel="stylesheet" href="./styles/quickPhrases.css">
+    <link rel="stylesheet" href="./styles/dayPicker.css">
+    <link rel="stylesheet" href="./styles/onedrive.css">
+    <link rel="stylesheet" href="./styles/update.css">
+    <link rel="stylesheet" href="./styles/responsive.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-brand-container">
+            <div class="nav-brand" id="nav-brand-home-btn" title="访问网站主页">
+                <img src="./icon.png" alt="">
+                <span>学情看板</span>
+            </div>
+            <span class="nav-homepagedirector" id="site-credit" title="访问网站主页">by Shixun</span>
+        </div>
+        <div class="nav-class" id="nav-class-switcher"></div>
+        <div class="nav-links">
+            <button class="nav-btn active" data-page="home">🏠 主页</button>
+            <button class="nav-btn" data-page="homework">📝 作业</button>
+            <button class="nav-btn" data-page="recitation">📖 背诵</button>
+            <button class="nav-btn" data-page="exams">📊 考试</button>
+        </div>
+    </nav>
+
+    <div class="page active" id="home-page"><div class="container" id="home-page-body"></div></div>
+    <div class="page" id="homework-page"><div class="container" id="homework-page-body"></div></div>
+    <div class="page" id="recitation-page"><div class="container" id="recitation-page-body"></div></div>
+    <div class="page" id="exams-page"><div class="container" id="exams-page-body"></div></div>
+
+    <!-- 脚本顺序 = 依赖顺序：无依赖工具 → 组件 → state → 业务模型 → 依赖它们的组件/横切模块 → 页面 → app.js -->
+    <script src="./scripts/utils.js"></script>
+    <script src="./scripts/components/toast.js"></script>
+    <script src="./scripts/components/modal.js"></script>
+    <script src="./scripts/state.js"></script>
+    <script src="./scripts/models/homework.js"></script>
+    <script src="./scripts/models/recitation.js"></script>
+    <script src="./scripts/models/exams.js"></script>
+    <script src="./scripts/components/ui.js"></script>
+    <script src="./scripts/components/quickPhrases.js"></script>
+    <script src="./scripts/components/dayPicker.js"></script>
+    <script src="./scripts/components/svgChart.js"></script>
+    <script src="./scripts/components/classSwitcher.js"></script>
+    <script src="./scripts/components/studentProfile.js"></script>
+    <script src="./scripts/navigation.js"></script>
+    <script src="./scripts/reminders.js"></script>
+    <script src="./scripts/updateChecker.js"></script>
+    <script src="./scripts/persistence.js"></script>
+    <script src="./scripts/dbFile.js"></script>
+    <script src="./scripts/importExport.js"></script>
+    <script src="./scripts/pwaInstall.js"></script>
+    <script src="./scripts/onedrive/msalAuth.js"></script>
+    <script src="./scripts/onedrive/onedriveApi.js"></script>
+
+    <script src="./scripts/pages/roster.js"></script>
+    <script src="./scripts/pages/settings.js"></script>
+    <script src="./scripts/pages/homework/statusPicker.js"></script>
+    <script src="./scripts/pages/homework/homeworkPage.js"></script>
+    <script src="./scripts/pages/homework/matrix.js"></script>
+    <script src="./scripts/pages/homework/student.js"></script>
+    <script src="./scripts/pages/recitation/checkDialog.js"></script>
+    <script src="./scripts/pages/recitation/recitationPage.js"></script>
+    <script src="./scripts/pages/recitation/planView.js"></script>
+    <script src="./scripts/pages/recitation/overview.js"></script>
+    <script src="./scripts/pages/recitation/student.js"></script>
+    <script src="./scripts/pages/exams/examDialogs.js"></script>
+    <script src="./scripts/pages/exams/examsPage.js"></script>
+    <script src="./scripts/pages/exams/examStudent.js"></script>
+
+    <script src="./scripts/app.js"></script>
+</body>
+
+</html>

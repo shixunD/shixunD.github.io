@@ -1,0 +1,68 @@
+/* 背诵：复查日期选择、时间看板 */
+
+.next-dates { margin-top: 0.4rem; }
+.next-dates[hidden] { display: none; }
+.date-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; min-height: 26px; align-items: center; }
+.date-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem; background: #fff4cf; color: #6b4e00;
+    border-radius: 999px; padding: 0.15rem 0.4rem 0.15rem 0.7rem; font-size: 0.8rem; font-weight: 600;
+}
+.date-chip button { border: none; background: transparent; cursor: pointer; color: inherit; font-size: 0.75rem; border-radius: 50%; width: 18px; height: 18px; }
+.date-chip button:hover { background: rgba(0,0,0,0.08); }
+
+.timeline-day { padding: 0.8rem 1rem; }
+.timeline-day.overdue { border-left: 5px solid var(--danger-color); }
+.timeline-day.today { border-left: 5px solid var(--warning-color); }
+.timeline-day-head { font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+.timeline-count { background: var(--bg-color); border-radius: 999px; padding: 0 0.55rem; font-size: 0.78rem; color: var(--text-secondary); }
+.timeline-items { display: flex; flex-direction: column; gap: 0.35rem; }
+.timeline-item {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.4rem 0.5rem; border-radius: 8px; background: #fcf9f6; font-size: 0.88rem;
+}
+.timeline-round { flex: 1; min-width: 140px; }
+
+/* 计划背诵弹窗 */
+.plan-quick { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.plan-students { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.35rem; margin-top: 0.5rem; max-height: 280px; overflow-y: auto; }
+.plan-stu {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.3rem; text-align: left;
+    border: 1px solid var(--border-color); background: #fff; border-radius: 8px; padding: 0.35rem 0.5rem;
+    cursor: pointer; font-family: inherit; font-size: 0.88rem; color: var(--text-primary);
+}
+.plan-stu i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.plan-stu small { width: 100%; font-size: 0.68rem; color: var(--text-secondary); }
+.plan-stu.selected { border-color: #2e9e48; background: rgba(46, 158, 72, 0.12); box-shadow: inset 0 0 0 1px #2e9e48; }
+
+/* 今天需要检查的学生（今天有计划，或复查日期是今天）：粉色边框 */
+.stu-card.due-today { outline: 3px solid #ff4f9a; outline-offset: 2px; }
+.due-legend { background: #fff !important; outline: 2px solid #ff4f9a; }
+.status-options-4 { grid-template-columns: repeat(4, 1fr); margin-top: 0.8rem; }
+[data-plan-wrap][hidden], [data-date-row][hidden], [data-note-wrap][hidden] { display: none; }
+.progress-hint { background: #fff4cf; color: #6b4e00; border-radius: 6px; padding: 0.05rem 0.5rem; font-size: 0.8rem; }
+.stu-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: 0; box-shadow: 0 0 0 1px rgba(255,255,255,0.8); }
+.stu-card-plan { font-weight: 700; }
+.record-list li.plan-done { opacity: 0.65; }
+
+/* 计划背诵子标签 */
+.plan-day-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; }
+.plan-day-head .section-title { margin: 0.4rem 0; }
+.plan-stu.selected { background: #b9e8b0; border-color: #2e9e48; box-shadow: inset 0 0 0 1px #2e9e48; color: #1f5214; font-weight: 700; }
+.plan-stu.selected small { color: #1f5214; }
+.plan-stu.done { opacity: 0.6; cursor: default; }
+.plan-date-row { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: wrap; padding: 0.45rem 0.5rem; border-radius: 8px; }
+.plan-date-row + .plan-date-row { border-top: 1px dashed var(--border-color); }
+.plan-date-row.current { background: rgba(46, 158, 72, 0.08); }
+.plan-date-btn { border: none; background: none; cursor: pointer; font-family: inherit; font-weight: 700; color: var(--text-primary); padding: 0.1rem 0; min-width: 9.5rem; text-align: left; }
+.plan-date-btn:hover { color: #2e9e48; text-decoration: underline; }
+.plan-date-people { display: flex; flex-wrap: wrap; gap: 0.3rem; flex: 1; }
+.plan-person { display: inline-flex; align-items: center; gap: 0.2rem; background: #b9e8b0; color: #1f5214; border-radius: 999px; padding: 0.05rem 0.3rem 0.05rem 0.6rem; font-size: 0.84rem; font-weight: 600; }
+.plan-person.done { background: #eee; color: var(--text-secondary); padding-right: 0.6rem; font-weight: normal; }
+.plan-person button { border: none; background: transparent; cursor: pointer; color: inherit; font-size: 0.72rem; border-radius: 50%; width: 18px; height: 18px; }
+.plan-person button:hover { background: rgba(0,0,0,0.08); }
+
+/* 计划背诵子标签：学生块上列出该生全部计划日期 */
+.plan-students.plan-students-wide { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); max-height: none; }
+.plan-stu-dates { line-height: 1.4; }
+.plan-stu-dates b { color: #1f5214; }
+[data-edit-next-wrap][hidden] { display: none; }

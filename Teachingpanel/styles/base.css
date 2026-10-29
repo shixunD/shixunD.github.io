@@ -1,0 +1,218 @@
+/* 基础样式：CSS 变量、reset、通用按钮/表单/弹窗/滚动条
+ *
+ * z-index 层叠表（新增浮层先查这张表，不要凭感觉写数字）：
+ *   顶部导航栏 .navbar                     1000
+ *   下拉面板 .class-switcher-panel         2000（在导航栏层叠上下文内）
+ *   业务表单弹窗 .dialog-overlay           6000
+ *   学生档案 .profile-overlay              6500
+ *   云备份面板 .onedrive-overlay           7000
+ *   通用二次确认 .modal-overlay            7500  ← 必须高于所有可能从中触发它的弹窗
+ *   提示条 #toast-container                9500
+ *   新版本更新弹窗 .update-overlay         9999
+ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --primary-color: #ff8a3d;
+    --primary-dark: #e06a1f;
+    --primary-soft: rgba(255, 138, 61, 0.12);
+    --danger-color: #d93025;
+    --success-color: #1e8e3e;
+    --warning-color: #f2b705;
+    --bg-color: #faf6f2;
+    --card-bg: #ffffff;
+    --text-primary: #2b2420;
+    --text-secondary: #7a6f68;
+    --border-color: #ece4dc;
+    --shadow: 0 2px 8px rgba(60, 40, 20, 0.07);
+    --shadow-hover: 0 6px 20px rgba(60, 40, 20, 0.13);
+    --radius: 12px;
+}
+
+html, body { min-height: 100%; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.page { display: none; animation: fadeIn 0.18s ease-out; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.container { margin: 0 auto; padding: 1.25rem 1.5rem 3rem; max-width: 1280px; }
+
+h1 { font-size: 1.6rem; color: var(--text-primary); }
+h2 { font-size: 1.12rem; margin-bottom: 0.8rem; color: var(--text-primary); }
+code { background: var(--bg-color); border-radius: 4px; padding: 0 4px; font-size: 0.85em; }
+
+/* 通用按钮 */
+.btn-primary, .btn-secondary, .btn-danger {
+    border: none;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.btn-primary { background: var(--primary-color); color: #fff; font-weight: 600; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { background: #f3c9a8; cursor: not-allowed; }
+.btn-secondary { background: #f4ede6; color: var(--text-primary); }
+.btn-secondary:hover { background: #ebe1d7; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger { background: var(--danger-color); color: #fff; }
+.btn-danger:hover { background: #b9271d; }
+.btn-danger-text { color: var(--danger-color); }
+.btn-sm { padding: 0.4rem 0.85rem; font-size: 0.85rem; }
+.btn-link { display: inline-block; text-align: center; text-decoration: none; }
+
+.btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+.btn-icon:hover { background: var(--bg-color); color: var(--primary-color); }
+.btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 开关型按钮：button + .btn-toggle-on 状态类（不要和 checkbox 混用在同一排） */
+.btn-toggle {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.84rem;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.btn-toggle:hover { border-color: var(--primary-color); color: var(--primary-dark); }
+.btn-toggle.btn-toggle-on { background: var(--primary-color); border-color: var(--primary-color); color: #fff; font-weight: 600; }
+
+.link-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--primary-dark); font-size: 0.85rem; padding: 0 0.25rem; font-family: inherit;
+}
+.link-btn:hover { text-decoration: underline; }
+.link-btn.danger { color: var(--danger-color); }
+
+.card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.1rem 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.empty-message { color: var(--text-secondary); text-align: center; padding: 2rem 1rem; font-size: 0.92rem; }
+.hint { color: var(--text-secondary); font-size: 0.82rem; font-weight: normal; }
+.text-danger { color: var(--danger-color); }
+
+/* 表单 */
+input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    width: 100%;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: #fff;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+textarea { resize: vertical; }
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+label { font-size: 0.86rem; color: var(--text-secondary); }
+.checkbox-label-inline { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; color: var(--text-primary); white-space: nowrap; }
+.form-grid { display: flex; flex-direction: column; gap: 0.45rem; }
+.field-label { display: block; margin: 0.8rem 0 0.35rem; }
+
+/* 确认弹窗（Modal.confirm） */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(30, 20, 10, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    z-index: 7500;
+}
+.modal-box {
+    width: min(420px, 100%);
+    max-height: 85vh; overflow-y: auto;
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(30, 20, 10, 0.25);
+    padding: 1.4rem;
+}
+.modal-text { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; white-space: pre-line; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; }
+
+/* 业务表单弹窗（Modal.open） */
+.dialog-overlay {
+    position: fixed; inset: 0;
+    background: rgba(30, 20, 10, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    z-index: 6000;
+}
+.dialog-box {
+    width: min(480px, 100%);
+    max-height: 90vh; overflow-y: auto;
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(30, 20, 10, 0.25);
+    padding: 1.2rem 1.4rem 1.4rem;
+}
+.dialog-box.dialog-wide { width: min(760px, 100%); }
+.dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
+.dialog-header h2 { margin: 0; font-size: 1.08rem; }
+.dialog-close-btn {
+    background: transparent; border: none; font-size: 1.1rem; cursor: pointer;
+    color: var(--text-secondary); width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+}
+.dialog-close-btn:hover { background: var(--bg-color); }
+.dialog-meta { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.8rem; flex-wrap: wrap; }
+.dialog-body textarea, .dialog-body input[type="file"] { margin-top: 0.5rem; }
+
+/* Toast */
+#toast-container {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 9500;
+    display: flex; flex-direction: column; gap: 8px; align-items: center;
+    pointer-events: none;
+}
+.toast {
+    color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 0.88rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    opacity: 0; transform: translateY(-8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    max-width: 86vw; text-align: center;
+}
+.toast.toast-in { opacity: 1; transform: translateY(0); }
+.toast-info { background: #4a6cf7; }
+.toast-action { display: flex; align-items: center; gap: 0.8rem; pointer-events: auto; }
+.toast-action button {
+    border: 1px solid rgba(255,255,255,0.8); background: transparent; color: #fff; border-radius: 6px;
+    padding: 0.15rem 0.7rem; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.toast-action button:hover { background: rgba(255,255,255,0.18); }
+.toast-success { background: var(--success-color); }
+.toast-error { background: var(--danger-color); }
+.toast-warning { background: #c98a00; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-color); }
+::-webkit-scrollbar-thumb { background: #ddcfc2; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-color); }
