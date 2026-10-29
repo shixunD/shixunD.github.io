@@ -40,6 +40,7 @@
 .stu-card.due-today { outline: 3px solid #ff4f9a; outline-offset: 2px; }
 .due-legend { background: #fff !important; outline: 2px solid #ff4f9a; }
 .status-options-4 { grid-template-columns: repeat(4, 1fr); margin-top: 0.8rem; }
+.status-options-5 { grid-template-columns: repeat(5, 1fr); margin-top: 0.8rem; }
 [data-plan-wrap][hidden], [data-date-row][hidden], [data-note-wrap][hidden] { display: none; }
 .progress-hint { background: #fff4cf; color: #6b4e00; border-radius: 6px; padding: 0.05rem 0.5rem; font-size: 0.8rem; }
 .stu-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: 0; box-shadow: 0 0 0 1px rgba(255,255,255,0.8); }

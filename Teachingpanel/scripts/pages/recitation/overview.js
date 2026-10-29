@@ -107,7 +107,7 @@
                                 return `<th class="matrix-col-head" title="${esc(r.title)}">
                                     <button type="button" class="matrix-head-btn" data-open-round="${r.id}">
                                         <span class="mh-title">${esc(r.title)}</span>
-                                        <span class="mh-rate">${Utils.percent(c.pass, students.length)}</span>
+                                        <span class="mh-rate">${Utils.percent(c.passed, students.length)}</span>
                                     </button></th>`;
                             }).join('')}
                             <th>过关</th>
@@ -118,14 +118,14 @@
                                 const cells = rounds.map((r) => {
                                     const checks = RecitationModel.checksFor(r.id, stu.id);
                                     const key = RecitationModel.statusOf(r.id, stu.id);
-                                    if (key === 'pass') passed++;
-                                    // 色块按该生在这一轮所有检查记录的结果数量分段：过关(绿) / 需重新过关(黄) / 未过关(红)，从左到右按数量比例占宽度
-                                    const n = { pass: 0, retry: 0, fail: 0 };
+                                    if (RecitationModel.isPassed(key)) passed++;
+                                    // 色块按该生在这一轮所有检查记录的结果数量分段：超额完成(深绿) / 过关(绿) / 需重新过关(黄) / 未过关(红)，从左到右按数量比例占宽度
+                                    const n = { excel: 0, pass: 0, retry: 0, fail: 0 };
                                     checks.forEach((c) => { if (n[c.result] != null) n[c.result]++; });
-                                    const segs = ['pass', 'retry', 'fail'].filter((k) => n[k])
+                                    const segs = ['excel', 'pass', 'retry', 'fail'].filter((k) => n[k])
                                         .map((k) => `<span style="flex:${n[k]};background:${R[k].color}"></span>`).join('');
                                     const tip = checks.length
-                                        ? `过关 ${n.pass} · 需重新过关 ${n.retry} · 未过关 ${n.fail}（当前：${R[key].label}）`
+                                        ? `${n.excel ? `超额完成 ${n.excel} · ` : ''}过关 ${n.pass} · 需重新过关 ${n.retry} · 未过关 ${n.fail}（当前：${R[key].label}）`
                                         : '未检查';
                                     return `<td><button type="button" class="cell cell-text cell-bar ${checks.length ? '' : 'cell-empty'}"
                                         data-round="${r.id}" data-sid="${stu.id}" title="${esc(r.title)} · ${esc(tip)}">${segs}${checks.length ? `<b class="cell-count">${checks.length}</b>` : ''}</button></td>`;
@@ -135,13 +135,13 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="hint">每个色块按这个学生在该轮所有检查的结果数量分段：绿 = 过关、黄 = 需重新过关、红 = 未过关（数字是检查次数，灰色 = 未检查）；点击格子登记检查；点击列头进入该轮次；最右列按当前状态统计。</div>`;
+                <div class="hint">每个色块按这个学生在该轮所有检查的结果数量分段：深绿 = 超额完成、绿 = 过关、黄 = 需重新过关、红 = 未过关（数字是检查次数，灰色 = 未检查）；点击格子登记检查；点击列头进入该轮次；最右列按当前状态统计。</div>`;
         }
 
         view.innerHTML = `
             <div class="toolbar card">
                 <label class="checkbox-label-inline"><input type="checkbox" data-archived ${ui.includeArchived ? 'checked' : ''}> 包含已归档轮次</label>
-                ${UI.legend(['pass', 'retry', 'fail', 'none'].map((k) => ({ color: R[k].color, label: R[k].label })))}
+                ${UI.legend(['excel', 'pass', 'retry', 'fail', 'none'].map((k) => ({ color: R[k].color, label: R[k].label })))}
             </div>
             <div class="card">${body}</div>
         `;

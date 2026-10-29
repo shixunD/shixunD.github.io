@@ -15,7 +15,7 @@
 
         const today = Utils.today();
         const pg = RecitationModel.progressOf(roundId, studentId);
-        let result = null;          // 'pass' | 'retry' | 'fail' | null（再点一次已选的结果可以取消）
+        let result = null;          // 'excel' | 'pass' | 'retry' | 'fail' | null（再点一次已选的结果可以取消）
         let checkDate = today;
         let planOn = false;         // 「🗓️ 计划背诵」开关，独立于检查结果
         let planDates = [];
@@ -27,7 +27,7 @@
             wide: true,
             html: `
                 <div class="dialog-meta">当前：${statusPill(pg.status)}</div>
-                <div class="status-options status-options-4">
+                <div class="status-options status-options-5">
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option" data-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}
@@ -164,7 +164,7 @@
             wide: true,
             html: `
                 <div class="dialog-meta">原记录：${statusPill(check.result)} ${Utils.formatDate(check.date)}</div>
-                <div class="status-options status-options-3">
+                <div class="status-options status-options-4">
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option ${r.key === result ? 'selected' : ''}" data-edit-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}

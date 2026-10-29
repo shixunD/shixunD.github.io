@@ -3,7 +3,7 @@
     "short_name": "学情看板",
     "description": "学生作业、背诵、考试情况登记与追踪看板",
     "id": "teaching-panel",
-    "start_url": "./index.html",
+    "start_url": "./",
     "scope": "./",
     "display": "standalone",
     "background_color": "#faf6f2",

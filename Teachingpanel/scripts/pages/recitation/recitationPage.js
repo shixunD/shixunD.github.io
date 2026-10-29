@@ -19,7 +19,8 @@
         { key: 'none', label: '未检查' },
         { key: 'retry', label: '需重新过关' },
         { key: 'fail', label: '未过关' },
-        { key: 'pass', label: '已过关' }
+        { key: 'pass', label: '已过关' },
+        { key: 'excel', label: '超额完成' }
     ];
 
     const ui = {
@@ -89,7 +90,7 @@
                                     ${r.archived ? '<div class="side-item-top"><span class="side-item-date">已归档</span></div>' : ''}
                                     <div class="side-item-title">${esc(r.title)}</div>
                                     <div class="mini-bar">${miniBar(c)}</div>
-                                    <div class="side-item-sub">过关 ${c.pass}/${students.length}${c.retry + c.fail ? ` · 未过关 ${c.retry + c.fail}` : ''}</div>
+                                    <div class="side-item-sub">过关 ${c.passed}/${students.length}${c.retry + c.fail ? ` · 未过关 ${c.retry + c.fail}` : ''}</div>
                                 </button>`;
                         }).join('') : '<div class="empty-message">还没有背诵轮次，点击「新建轮次」开始</div>'}
                     </div>
@@ -112,7 +113,7 @@
 
     function miniBar(c) {
         const R = RecitationModel.RESULT_MAP;
-        return ['pass', 'retry', 'fail', 'none'].map((k) => c[k] ? `<span style="flex:${c[k]};background:${R[k].color}"></span>` : '').join('');
+        return ['excel', 'pass', 'retry', 'fail', 'none'].map((k) => c[k] ? `<span style="flex:${c[k]};background:${R[k].color}"></span>` : '').join('');
     }
 
     function checkDetail(round, students) {
@@ -136,10 +137,10 @@
                 </div>
                 <div class="seg-bar">${miniBar(c)}</div>
                 <div class="seg-legend">
-                    ${['pass', 'retry', 'fail', 'none'].map((k) => `<span><i style="background:${R[k].color}"></i>${esc(R[k].label)} <b>${c[k]}</b></span>`).join('')}
+                    ${['excel', 'pass', 'retry', 'fail', 'none'].map((k) => `<span><i style="background:${R[k].color}"></i>${esc(R[k].label)} <b>${c[k]}</b></span>`).join('')}
                     <span><i style="background:${RecitationModel.PLAN.color}"></i>已计划</span>
                     <span><i class="due-legend"></i>今天要检查</span>
-                    <span class="seg-rate">过关率 ${Utils.percent(c.pass, students.length)}</span>
+                    <span class="seg-rate">过关率 ${Utils.percent(c.passed, students.length)}</span>
                 </div>
                 <div class="brush-bar">
                     ${FILTERS.map((f) => `<button type="button" class="btn-toggle ${ui.filter === f.key ? 'btn-toggle-on' : ''}" data-filter="${f.key}">${esc(f.label)}</button>`).join('')}

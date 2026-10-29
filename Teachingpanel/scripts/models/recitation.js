@@ -2,7 +2,8 @@
 // 全局命名空间：window.RecitationModel
 //
 // 轮次（round）= 一项背诵任务，不绑定日期；老师每天抽查一部分人，每次检查新增一条 recCheck。
-// 学生在某轮次的"当前状态" = 最新一条检查记录的结果（过关 / 需重新过关 / 未过关），没有记录 = 未检查。
+// 学生在某轮次的"当前状态" = 最新一条检查记录的结果（超额完成 / 过关 / 需重新过关 / 未过关），没有记录 = 未检查。
+// "超额完成"= 过关里做得特别好的（深绿），所有"算不算过关"的统计都把它算作过关，用 isPassed() 判断。
 // "需重新过关 / 未过关"只是状态，不带日期（1.9.0 起）；"哪天再背"统一用背诵计划（recPlan）表示。
 // 背诵计划（recPlan）= "计划某天让这个学生背"，与检查状态互不影响、可以同时存在（一个学生可有多个计划日期）。
 //   登记检查不会删除计划；安排之后登记的、日期在计划日当天或之后的检查，会让这条计划算"已完成"
@@ -12,6 +13,7 @@
     'use strict';
 
     const RESULTS = [
+        { key: 'excel', label: '超额完成', color: '#0b5c2a', text: '#fff' },
         { key: 'pass', label: '过关', color: '#1e8e3e', text: '#fff' },
         { key: 'retry', label: '需重新过关', color: '#f2b705', text: '#4a3500' },
         { key: 'fail', label: '未过关', color: '#d93025', text: '#fff' }
@@ -23,6 +25,9 @@
     RESULTS.forEach((r) => { RESULT_MAP[r.key] = r; });
 
     function state() { return AppState.getState(); }
+
+    // 超额完成也算过关
+    function isPassed(key) { return key === 'pass' || key === 'excel'; }
 
     // ---------- 轮次 ----------
 
@@ -82,17 +87,17 @@
     }
 
     // 当前状态（所有地方的状态都从这里取）：返回 { status, check, passedOn, attemptsToPass }
-    //   status          'none' | 'pass' | 'retry' | 'fail' —— 最新一条检查记录的结果
+    //   status          'none' | 'excel' | 'pass' | 'retry' | 'fail' —— 最新一条检查记录的结果
     //   check           最新一条检查记录（没有为 null）
     //   passedOn        当前处于"过关"时，这一段连续过关的第一次过关日期；attemptsToPass 到那次为止共检查了几次
     function progressOf(roundId, studentId) {
         const checks = checksFor(roundId, studentId);
         if (!checks.length) return { status: 'none', check: null, passedOn: null, attemptsToPass: null };
         const last = checks[checks.length - 1];
-        if (last.result !== 'pass') return { status: last.result, check: last, passedOn: null, attemptsToPass: null };
+        if (!isPassed(last.result)) return { status: last.result, check: last, passedOn: null, attemptsToPass: null };
         let i = checks.length - 1;
-        while (i > 0 && checks[i - 1].result === 'pass') i--;
-        return { status: 'pass', check: last, passedOn: checks[i].date, attemptsToPass: i + 1 };
+        while (i > 0 && isPassed(checks[i - 1].result)) i--;
+        return { status: last.result, check: last, passedOn: checks[i].date, attemptsToPass: i + 1 };
     }
 
     function statusOf(roundId, studentId) {
@@ -130,10 +135,11 @@
         return AppState._commit((s) => { s.recChecks = s.recChecks.filter((c) => c.id !== id); });
     }
 
-    // 单轮次的状态统计
+    // 单轮次的状态统计；passed = 超额完成 + 过关
     function roundSummary(roundId, students) {
-        const counts = { pass: 0, retry: 0, fail: 0, none: 0 };
+        const counts = { excel: 0, pass: 0, retry: 0, fail: 0, none: 0 };
         (students || AppState.getStudents()).forEach((stu) => { counts[statusOf(roundId, stu.id)]++; });
+        counts.passed = counts.excel + counts.pass;
         return counts;
     }
 
@@ -244,7 +250,7 @@
     }
 
     window.RecitationModel = {
-        RESULTS, RESULT_MAP, NONE, PLAN,
+        RESULTS, RESULT_MAP, NONE, PLAN, isPassed,
         rounds, getRound, createRound, updateRound, removeRound,
         checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
         plansFor, pendingPlans, isPlanDone, addPlans, removePlan,

@@ -26,6 +26,7 @@
     .pending-grid { grid-template-columns: 1fr; }
     .status-options-3 { grid-template-columns: 1fr 1fr 1fr; }
     .status-options-4 { grid-template-columns: 1fr 1fr; }
+    .status-options-5 { grid-template-columns: 1fr 1fr; }
     .dp-week { grid-template-columns: repeat(var(--dp-cols), minmax(0, 1fr)); gap: 0.2rem; }
     .dp-week-label { grid-column: 1 / -1; }
     .dp-day { padding: 0.25rem 0; }

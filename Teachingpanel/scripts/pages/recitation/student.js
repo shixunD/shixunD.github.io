@@ -28,7 +28,7 @@
     function summaryHtml(studentId, full) {
         const rows = RecitationModel.studentOverview(studentId);
         if (!rows.length) return '<div class="empty-message">暂无背诵轮次</div>';
-        const passed = rows.filter((r) => r.status === 'pass').length;
+        const passed = rows.filter((r) => RecitationModel.isPassed(r.status)).length;
         const pending = rows.filter((r) => r.status === 'retry' || r.status === 'fail').length;
         const unchecked = rows.filter((r) => r.status === 'none').length;
         const passedRows = rows.filter((r) => r.firstPassDate);

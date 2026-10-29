@@ -88,7 +88,7 @@
             else await RecitationModel.addPlans(ui.roundId, [sid], ui.day);
         }));
         view.querySelector('[data-add-unpassed]').addEventListener('click', async () => {
-            const ids = students.filter((s) => RecitationModel.statusOf(ui.roundId, s.id) !== 'pass').map((s) => s.id);
+            const ids = students.filter((s) => !RecitationModel.isPassed(RecitationModel.statusOf(ui.roundId, s.id))).map((s) => s.id);
             const added = await RecitationModel.addPlans(ui.roundId, ids, ui.day);
             Toast.success(`已加入 ${added} 人`);
         });
