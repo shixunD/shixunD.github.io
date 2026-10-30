@@ -1,27 +1,22 @@
-// student.js —— 背诵「学生趋势」视图；summaryHtml() 同时供学生档案（StudentProfile）复用
+// student.js —— 背诵「学生趋势」视图
 // 全局命名空间：window.RecitationStudent
 
 (function () {
     'use strict';
 
     const esc = (s) => Utils.escapeHtml(s);
-    const ui = { studentId: null };
-
     function render(view) {
         const students = AppState.getStudents();
         if (!students.length) { view.innerHTML = `<div class="card">${UI.emptyStudentsHint()}</div>`; return; }
-        if (!students.some((s) => s.id === ui.studentId)) ui.studentId = students[0].id;
+        const id = StudentTrend.currentId();
 
         view.innerHTML = `
-            <div class="toolbar card">
-                <select data-f-student>${UI.studentOptions(ui.studentId)}</select>
-                <button type="button" class="btn-secondary btn-sm" data-profile-id="${ui.studentId}">查看完整档案</button>
-            </div>
-            <div class="card">${summaryHtml(ui.studentId, true)}</div>
+            ${StudentTrend.pickerHtml('recitation')}
+            <div class="card">${summaryHtml(id, true)}</div>
         `;
-        view.querySelector('[data-f-student]').addEventListener('change', (e) => { ui.studentId = e.target.value; render(view); });
+        StudentTrend.bind(view, () => render(view));
         view.querySelectorAll('[data-check-round]').forEach((btn) => {
-            btn.addEventListener('click', () => RecitationDialogs.openCheck(btn.dataset.checkRound, ui.studentId));
+            btn.addEventListener('click', () => RecitationDialogs.openCheck(btn.dataset.checkRound, id));
         });
     }
 
@@ -61,11 +56,17 @@
                     </tr>`).join('')}
                 </tbody>
             </table>
-            ${full ? `<h3 class="section-title">检查历史</h3>
-                ${allChecks.length ? `<ul class="record-list">${allChecks.map(({ round, check }) => `
-                    <li>${RecitationDialogs.statusPill(check.result)} <span class="record-date">${Utils.formatDate(check.date)}</span> ${esc(round.title)}
-                        ${check.note ? `<div class="record-comment">💬 ${esc(check.note)}</div>` : ''}</li>`).join('')}</ul>`
-                    : '<div class="hint">还没有检查记录</div>'}` : ''}
+            <h3 class="section-title">检查历史</h3>
+            ${allChecks.length ? `<ul class="check-timeline">${allChecks.map(({ round, check }) => `
+                <li class="check-item" style="--dot-color:${(R[check.result] || {}).color || '#9aa0a6'}">
+                    <div class="check-item-head">
+                        ${RecitationDialogs.statusPill(check.result)}
+                        <span class="check-item-round">${esc(round.title)}</span>
+                        <span class="record-date">${Utils.formatDate(check.date)}</span>
+                    </div>
+                    ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
+                </li>`).join('')}</ul>`
+                : '<div class="hint">还没有检查记录</div>'}
         `;
     }
 

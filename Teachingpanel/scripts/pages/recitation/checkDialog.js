@@ -56,6 +56,7 @@
                 ${historyHtml(roundId, studentId)}
             `,
             onMount(body, close) {
+                StudentTrend.linkDialogTitle(body, stu, round.title, close);
                 QuickPhrases.bind(body, body.querySelector('[data-note]'));
                 const saveBtn = body.querySelector('[data-save]');
                 const show = (sel, on) => { body.querySelector(sel).hidden = !on; };

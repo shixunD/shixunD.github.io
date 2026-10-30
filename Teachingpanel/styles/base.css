@@ -4,7 +4,6 @@
  *   顶部导航栏 .navbar                     1000
  *   下拉面板 .class-switcher-panel         2000（在导航栏层叠上下文内）
  *   业务表单弹窗 .dialog-overlay           6000
- *   学生档案 .profile-overlay              6500
  *   云备份面板 .onedrive-overlay           7000
  *   通用二次确认 .modal-overlay            7500  ← 必须高于所有可能从中触发它的弹窗
  *   提示条 #toast-container                9500

@@ -69,3 +69,13 @@
 .plan-stu-dates { line-height: 1.4; }
 .plan-stu-dates b { color: #1f5214; }
 [data-edit-next-wrap][hidden] { display: none; }
+
+/* 检查历史时间线（含老师评语） */
+.check-timeline { list-style: none; position: relative; display: flex; flex-direction: column; gap: 0.7rem; padding-left: 1.1rem; }
+.check-timeline::before { content: ''; position: absolute; left: 0.28rem; top: 0.4rem; bottom: 0.4rem; width: 2px; background: #eadfd3; border-radius: 2px; }
+.check-item { position: relative; }
+.check-item::before { content: ''; position: absolute; left: -1.1rem; top: 0.32rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--dot-color); box-shadow: 0 0 0 3px #fff; }
+.check-item-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; font-size: 0.86rem; }
+.check-item-round { font-weight: 600; }
+.check-comment { margin-top: 0.35rem; padding: 0.5rem 0.7rem; background: #fcf9f6; border-left: 3px solid var(--dot-color); border-radius: 0 8px 8px 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.check-comment-icon { margin-right: 0.35rem; }

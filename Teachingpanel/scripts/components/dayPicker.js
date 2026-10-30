@@ -1,7 +1,7 @@
 // dayPicker.js —— 日期块选择器：本周 / 下周的日期块一键点选，找不到再用日历框
 // 全局命名空间：window.DayPicker
 // 用于背诵检查日期（单选）、计划背诵日期（多选）、作业日期（单选）。
-// 每个块标注"本周一"+ 具体日期和星期；超出 min/max 范围的块禁用。
+// 每个块标注"本周一"+ 具体日期；超出 min/max 范围的块禁用。
 //
 //   DayPicker.html(key, { count: 7|5, min, max, color, marked })   返回 HTML
 //     marked: { 'YYYY-MM-DD': '3人' } —— 这些日期块下方显示一行小字（例如这天已计划几人），不改变颜色
@@ -13,11 +13,9 @@
 
     const esc = (s) => Utils.escapeHtml(s);
 
+    // 块里只写 MM-DD：星期已经在上一行的「本周一」里了
     function dayLabel(d) {
-        // '10-29(星期四)' 拆成两段：只允许在"("前换行，"(星期四)"整体不折断
-        const text = Utils.formatDate(d);
-        const i = text.indexOf('(');
-        return `${esc(text.slice(0, i))}<wbr><i class="dp-wd">${esc(text.slice(i))}</i>`;
+        return esc(Utils.formatDate(d).replace(/\(.*\)$/, ''));
     }
 
     function html(key, opts) {

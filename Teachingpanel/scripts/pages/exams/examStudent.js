@@ -1,28 +1,26 @@
 // examStudent.js —— 考试「学生看板」：某学生历次成绩折线（对比班级平均）+ 排名表
-// summaryHtml() 同时供学生档案（StudentProfile）复用
 // 全局命名空间：window.ExamStudent
 
 (function () {
     'use strict';
 
     const esc = (s) => Utils.escapeHtml(s);
-    const ui = { studentId: null, mode: 'percent' };
+    const ui = { mode: 'percent' };
 
     function render(view) {
         const students = AppState.getStudents();
         if (!students.length) { view.innerHTML = `<div class="card">${UI.emptyStudentsHint()}</div>`; return; }
-        if (!students.some((s) => s.id === ui.studentId)) ui.studentId = students[0].id;
+        const id = StudentTrend.currentId();
 
         view.innerHTML = `
+            ${StudentTrend.pickerHtml('exams')}
             <div class="toolbar card">
-                <select data-f-student>${UI.studentOptions(ui.studentId)}</select>
                 <button type="button" class="btn-toggle ${ui.mode === 'percent' ? 'btn-toggle-on' : ''}" data-mode="percent">得分率</button>
                 <button type="button" class="btn-toggle ${ui.mode === 'raw' ? 'btn-toggle-on' : ''}" data-mode="raw">原始分</button>
-                <button type="button" class="btn-secondary btn-sm" data-profile-id="${ui.studentId}">查看完整档案</button>
             </div>
-            <div class="card">${summaryHtml(ui.studentId, {}, ui.mode)}</div>
+            <div class="card">${summaryHtml(id, {}, ui.mode)}</div>
         `;
-        view.querySelector('[data-f-student]').addEventListener('change', (e) => { ui.studentId = e.target.value; render(view); });
+        StudentTrend.bind(view, () => render(view));
         view.querySelectorAll('[data-mode]').forEach((btn) => btn.addEventListener('click', () => { ui.mode = btn.dataset.mode; render(view); }));
     }
 

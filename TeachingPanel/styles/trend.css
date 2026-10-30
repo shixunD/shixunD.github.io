@@ -1,0 +1,17 @@
+/* 学生趋势：类型快速切换 + 学号姓名小块选择器 */
+
+.trend-picker { padding: 0.7rem 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.trend-kinds { display: flex; gap: 0.3rem; background: #f1e9e1; padding: 3px; border-radius: 9px; align-self: flex-start; }
+.trend-kind {
+    border: none; background: transparent; padding: 0.3rem 0.8rem; border-radius: 7px; cursor: pointer;
+    font-family: inherit; font-size: 0.85rem; color: var(--text-secondary);
+}
+.trend-kind:hover { color: var(--text-primary); }
+.trend-kind.active { background: #fff; color: var(--primary-dark); font-weight: 700; box-shadow: var(--shadow); }
+.trend-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.trend-chip {
+    border: 1px solid var(--border-color); background: #fcf9f6; color: var(--text-primary);
+    padding: 0.1rem 0.45rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.76rem; line-height: 1.5;
+}
+.trend-chip:hover { border-color: var(--primary-color); }
+.trend-chip.active { background: var(--primary-color); border-color: var(--primary-color); color: #fff; font-weight: 700; }

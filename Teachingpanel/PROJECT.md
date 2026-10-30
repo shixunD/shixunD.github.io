@@ -18,8 +18,8 @@
 | 背诵 | `recitation-page` | `RecitationPage` | 检查 / 时间看板 / 总览 / 学生趋势 |
 | 考试 | `exams-page` | `ExamsPage` | 考试（列表+详情） / 学生看板 |
 
-另有跨页面的**学生档案**（`StudentProfile`）：任何带 `data-profile-id` 的元素被点击都会打开右侧抽屉，汇总该生三类数据。
-默认标签跟随当前页面（`Navigation.getCurrent()`：作业/背诵/考试页 → 对应标签；主页 → 沿用上次）。
+另有跨页面的**学生趋势跳转**（`StudentTrend`）：任何带 `data-profile-id` 的元素（学生姓名）被点击，都会跳到该生的「学生趋势」页（当前在作业/背诵/考试页就留在该类，主页则沿用上次）。
+三类趋势页顶部共用 `StudentTrend.pickerHtml()`：作业/背诵/考试趋势快速切换 + 全班「学号 姓名」小块选择器，选中的学生在三类之间共享。
 
 ## 二、整体架构
 
@@ -31,7 +31,7 @@ index.html
       1. 注册 service-worker.js（{scope:'./', updateViaCache:'none'}）
       2. AppState.load()（IndexedDB → 内存；首次运行建"默认班级"+语数英三科）
       3. Navigation.init()，渲染班级切换器，恢复上次打开的页面
-      4. AppState.subscribe：数据变化 → 重绘当前页 + 班级切换器 + 背诵提醒角标 + 打开中的学生档案
+      4. AppState.subscribe：数据变化 → 重绘当前页 + 班级切换器 + 背诵提醒角标
       5. Reminders.init()（角标 + 每天一次的到期提醒）
       6. SettingsPage.init()（读取版本号、监听 PWA 可安装状态）
       7. Persistence.requestPersistence()、UpdateChecker.check()
@@ -157,7 +157,7 @@ styles/board.css                   学生色块卡片、状态按钮、分段条
 styles/settings.css                主页布局
 styles/recitation.css              计划日期 chips、计划背诵子标签、时间看板
 styles/charts.css                  SVG 图表
-styles/profile.css                 学生档案抽屉
+styles/trend.css                   学生趋势选择器（类型切换 + 学生小块）
 styles/quickPhrases.css            快捷词按钮条与编辑卡片
 styles/dayPicker.css               日期块选择器
 styles/onedrive.css / update.css   云备份面板 / 更新弹窗
@@ -175,7 +175,7 @@ scripts/components/quickPhrases.js QuickPhrases：弹窗内快捷词按钮条（
 scripts/components/dayPicker.js    DayPicker：本周/下周日期块（单选/多选）+ 日历框兜底
 scripts/components/svgChart.js     SvgChart.line / bars（手写 SVG）
 scripts/components/classSwitcher.js 班级切换器（导航栏常驻）
-scripts/components/studentProfile.js 学生档案抽屉（全局 data-profile-id 委托）
+scripts/components/studentTrend.js  学生趋势共享：选中学生、小块选择器、类型切换（全局 data-profile-id 委托）
 scripts/navigation.js              页面切换
 scripts/reminders.js               背诵计划角标 / 每日一次提醒 / 系统通知
 scripts/updateChecker.js           部署指纹判重 + 更新弹窗
@@ -194,16 +194,15 @@ scripts/pages/exams/*.js           examDialogs / examsPage / examStudent
 scripts/app.js                     启动入口（最后加载）
 ```
 
-各学生趋势模块的 `summaryHtml()` 同时被学生档案复用——改其中 HTML 时注意档案面板里也会显示。
 
 ## 五、UI 约定
 
 - 主色 `--primary-color: #ff8a3d` / `--primary-dark: #e06a1f`，同步在 `<meta name="theme-color">` 与 manifest。
 - 开关型按钮统一 `.btn-toggle` + `.btn-toggle-on`（刷子模式、筛选、提醒开关）。
 - 所有拼进 innerHTML 的用户文本必须 `Utils.escapeHtml`。
-- 全局 document 监听只在模块顶层注册一次（班级切换器外部点击、学生档案委托）。
+- 全局 document 监听只在模块顶层注册一次（班级切换器外部点击、学生趋势跳转委托）。
 - `Modal.open` 同时只保留一个表单弹窗；`Modal.confirm` 的 Esc 用 capture 阶段，只关确认框本身。
-- **z-index 表**（见 `styles/base.css` 顶部注释）：导航 1000 < 下拉 2000 < 表单弹窗 6000 < 学生档案 6500 < 云备份 7000 < 确认框 7500 < toast 9500 < 更新弹窗 9999。
+- **z-index 表**（见 `styles/base.css` 顶部注释）：导航 1000 < 下拉 2000 < 表单弹窗 6000 < 云备份 7000 < 确认框 7500 < toast 9500 < 更新弹窗 9999。
 - 表单字段取值用 `form.elements.xxx`，**不要用 `form.title`/`form.name`**——会命中 `<form>` 自身的同名属性。
 
 ## 六、更新检测（部署指纹）

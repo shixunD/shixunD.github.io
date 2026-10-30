@@ -33,6 +33,7 @@
                     <button type="button" class="btn-primary" data-save>保存</button>
                 </div>`,
             onMount(body, close) {
+                StudentTrend.linkDialogTitle(body, stu, hw.title, close);
                 QuickPhrases.bind(body, body.querySelector('[data-comment]'));
                 body.querySelector('.status-options').addEventListener('click', (e) => {
                     const btn = e.target.closest('[data-status]');

@@ -3,6 +3,24 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.11.3 — 2026-10-30
+
+- 变更：`DayPicker` 日期块第二行只显示 `MM-DD`，去掉 `(星期X)` 和 `.dp-wd` 样式，字号 0.62rem → 0.7rem
+
+## 1.11.2 — 2026-10-30
+
+- 新增：作业登记弹窗（`openStatus`）标题姓名可点击跳转学生趋势；背诵检查弹窗同逻辑抽成 `StudentTrend.linkDialogTitle()`
+
+## 1.11.1 — 2026-10-30
+
+- 新增：背诵检查弹窗（`openCheck`）标题姓名改为 `.student-link`，点击关闭弹窗并 `StudentTrend.open(id)`
+
+## 1.11.0 — 2026-10-30
+
+- 变更：删除学生档案抽屉（`studentProfile.js`、`profile.css`）；`data-profile-id` 点击改为跳到该生「学生趋势」页（新 `StudentTrend`，`studentTrend.js` / `trend.css`）
+- 新增：三类学生趋势页顶部 `StudentTrend.pickerHtml()`：作业/背诵/考试趋势快速切换 + 全班「学号 姓名」小块，选中学生三类共享；`UI.studentOptions` 删除
+- 变更：背诵学生趋势检查历史改为时间线 `.check-timeline`，评语 `.check-comment` 色条气泡
+
 ## 1.10.0 — 2026-10-29
 
 - 新增：背诵结果「超额完成」`excel`（深绿 #0b5c2a），算作过关；新增 `RecitationModel.isPassed()`，`roundSummary()` 增加 `excel` / `passed`

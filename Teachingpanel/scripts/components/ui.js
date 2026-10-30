@@ -13,7 +13,7 @@
         `).join('')}</div>`;
     }
 
-    // 学生姓名：点击打开学生档案（全局委托监听在 studentProfile.js 顶层注册一次）
+    // 学生姓名：点击跳到该生的学生趋势（全局委托监听在 studentTrend.js 顶层注册一次）
     function studentLink(stu) {
         return `<button type="button" class="student-link" data-profile-id="${stu.id}">${esc(stu.name)}</button>`;
     }
@@ -22,12 +22,6 @@
         return `<div class="legend">${items.map((it) => `
             <span class="legend-item"><i style="background:${it.color}"></i>${esc(it.label)}</span>
         `).join('')}</div>`;
-    }
-
-    function studentOptions(selectedId) {
-        return AppState.getStudents().map((s) => `
-            <option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${esc(s.studentNo ? s.studentNo + ' ' : '')}${esc(s.name)}</option>
-        `).join('');
     }
 
     function emptyStudentsHint() {
@@ -42,5 +36,5 @@
         </div>`;
     }
 
-    window.UI = { subTabs, studentLink, legend, studentOptions, emptyStudentsHint, statTile };
+    window.UI = { subTabs, studentLink, legend, emptyStudentsHint, statTile };
 })();

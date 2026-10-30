@@ -9,8 +9,7 @@
     cursor: pointer; font-family: inherit; color: var(--text-primary); text-align: center;
 }
 .dp-day b { font-size: 0.8rem; white-space: nowrap; }
-.dp-day span { font-size: 0.62rem; color: var(--text-secondary); line-height: 1.3; }
-.dp-wd { font-style: normal; white-space: nowrap; }
+.dp-day span { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.3; }
 .dp-day.is-today { border-color: var(--dp-color); border-width: 2px; }
 .dp-day:hover:not(:disabled) { border-color: var(--dp-color); }
 .dp-day.selected { background: var(--dp-color); border-color: var(--dp-color); color: #fff; }

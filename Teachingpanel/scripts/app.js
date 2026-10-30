@@ -49,12 +49,11 @@
         Navigation.onPageChange(renderCurrentPage);
         renderClassSwitcher();
 
-        // 数据变化：重绘当前页面 + 班级切换器 + 提醒角标 + 打开中的学生档案
+        // 数据变化：重绘当前页面 + 班级切换器 + 提醒角标
         AppState.subscribe(() => {
             renderCurrentPage(Navigation.getCurrent());
             renderClassSwitcher();
             Reminders.updateBadge();
-            StudentProfile.refresh();
         });
 
         Navigation.goTo(Navigation.getInitialPage());

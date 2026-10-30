@@ -1,28 +1,23 @@
-// student.js —— 作业「学生趋势」视图；summaryHtml() 同时供学生档案（StudentProfile）复用
+// student.js —— 作业「学生趋势」视图
 // 全局命名空间：window.HomeworkStudent
 
 (function () {
     'use strict';
 
     const esc = (s) => Utils.escapeHtml(s);
-    const ui = { studentId: null };
-
     function render(view) {
         const students = AppState.getStudents();
         if (!students.length) { view.innerHTML = `<div class="card">${UI.emptyStudentsHint()}</div>`; return; }
-        if (!students.some((s) => s.id === ui.studentId)) ui.studentId = students[0].id;
+        const id = StudentTrend.currentId();
 
         view.innerHTML = `
-            <div class="toolbar card">
-                <select data-f-student>${UI.studentOptions(ui.studentId)}</select>
-                <button type="button" class="btn-secondary btn-sm" data-profile-id="${ui.studentId}">查看完整档案</button>
-            </div>
-            <div class="card">${summaryHtml(ui.studentId, {}, true)}</div>
+            ${StudentTrend.pickerHtml('homework')}
+            <div class="card">${summaryHtml(id, {}, true)}</div>
         `;
-        view.querySelector('[data-f-student]').addEventListener('change', (e) => { ui.studentId = e.target.value; render(view); });
+        StudentTrend.bind(view, () => render(view));
     }
 
-    // full 参数保留给调用方区分页面视图/学生档案（目前两者内容相同）
+    // full 参数目前未使用，保留签名
     function summaryHtml(studentId, filter, full) {
         const st = HomeworkModel.studentStats(studentId, filter);
         if (!st.total) return '<div class="empty-message">暂无作业记录</div>';
@@ -59,7 +54,5 @@
         `;
     }
 
-    function setStudent(id) { ui.studentId = id; }
-
-    window.HomeworkStudent = { render, summaryHtml, setStudent };
+    window.HomeworkStudent = { render, summaryHtml };
 })();
