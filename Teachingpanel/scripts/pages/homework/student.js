@@ -23,7 +23,7 @@
         if (!st.total) return '<div class="empty-message">暂无作业记录</div>';
         const S = HomeworkModel.STATUS_MAP;
         const weekly = HomeworkModel.weeklyRates(studentId, filter);
-        const comments = st.timeline.filter((x) => x.rec.comment || x.rec.status !== 'done').reverse();
+        const comments = st.timeline.filter((x) => x.rec.comment || x.rec.photoIds.length || x.rec.status !== 'done').reverse();
 
         return `
             <div class="stat-row">
@@ -49,7 +49,8 @@
                 const s = S[rec.status];
                 return `<li><span class="status-pill" style="background:${s.color};color:${s.text}">${esc(s.short)}</span>
                     <span class="record-date">${Utils.formatDate(hw.date)}</span> ${esc(hw.title)}
-                    ${rec.comment ? `<div class="record-comment">💬 ${esc(rec.comment)}</div>` : ''}</li>`;
+                    ${rec.comment ? `<div class="record-comment">💬 ${esc(rec.comment)}</div>` : ''}
+                    ${Photos.viewHtml(rec.photoIds)}</li>`;
             }).join('')}</ul>` : '<div class="hint">没有问题记录，表现很好 👍</div>'}
         `;
     }

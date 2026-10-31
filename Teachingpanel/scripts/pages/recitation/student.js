@@ -65,6 +65,7 @@
                         <span class="record-date">${Utils.formatDate(check.date)}</span>
                     </div>
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
+                    ${Photos.viewHtml(check.photoIds)}
                 </li>`).join('')}</ul>`
                 : '<div class="hint">还没有检查记录</div>'}
         `;

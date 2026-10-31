@@ -35,6 +35,30 @@
             .sort((a, b) => (b.date.localeCompare(a.date)) || ((b.createdAt || 0) - (a.createdAt || 0)));
     }
 
+    // 作业页侧栏的显示顺序：没手动排过（无 order）的在最前，按日期新→旧；拖动排过的按 order 升序跟在后面。
+    // 只用于侧栏——list() 仍按日期，趋势/统计依赖这个时间顺序，不能被手动顺序打乱
+    function sideList() {
+        const classId = AppState.getActiveClassId();
+        return state().homework
+            .filter((h) => h.classId === classId)
+            .sort((a, b) => {
+                const ha = a.order != null, hb = b.order != null;
+                if (ha && hb) return a.order - b.order;
+                if (ha !== hb) return ha ? 1 : -1;
+                return (b.date.localeCompare(a.date)) || ((b.createdAt || 0) - (a.createdAt || 0));
+            });
+    }
+
+    // 拖动排序：把 id 的作业移到 beforeId 之前（beforeId 为 null = 移到最后），按完整顺序重新编号
+    function moveHomework(id, beforeId) {
+        const moving = get(id);
+        if (!moving) return Promise.resolve();
+        const rest = sideList().filter((h) => h.id !== id);
+        const at = beforeId ? rest.findIndex((h) => h.id === beforeId) : -1;
+        rest.splice(at < 0 ? rest.length : at, 0, moving);
+        return AppState._commit(() => { rest.forEach((h, i) => { h.order = i; }); });
+    }
+
     function get(id) { return state().homework.find((h) => h.id === id) || null; }
 
     function create(data) {
@@ -69,24 +93,27 @@
         return {
             status: rec && rec.status ? rec.status : 'done',
             comment: rec && rec.comment ? rec.comment : '',
-            madeUpAt: rec && rec.madeUpAt ? rec.madeUpAt : null
+            madeUpAt: rec && rec.madeUpAt ? rec.madeUpAt : null,
+            photoIds: rec && Array.isArray(rec.photoIds) ? rec.photoIds : []
         };
     }
 
-    function writeRecord(hw, studentId, status, comment) {
+    function writeRecord(hw, studentId, status, comment, photoIds) {
         const prev = hw.records[studentId] || {};
-        if (status === 'done' && !comment) {
+        const photos = photoIds != null ? photoIds : (prev.photoIds || []);
+        if (status === 'done' && !comment && !photos.length) {
             delete hw.records[studentId];
             return;
         }
         const rec = { status, comment: comment || '' };
+        if (photos.length) rec.photoIds = photos.slice();
         if (status === 'missing_fixed' || status === 'poor_fixed') {
             rec.madeUpAt = prev.madeUpAt && (prev.status === status) ? prev.madeUpAt : Utils.today();
         }
         hw.records[studentId] = rec;
     }
 
-    // patch: {status?, comment?}，未提供的字段保持原值
+    // patch: {status?, comment?, photoIds?}，未提供的字段保持原值
     function setRecord(hwId, studentId, patch) {
         return AppState._commit(() => {
             const hw = get(hwId);
@@ -94,7 +121,8 @@
             const cur = getRecord(hw, studentId);
             writeRecord(hw, studentId,
                 patch.status != null ? patch.status : cur.status,
-                patch.comment != null ? patch.comment : cur.comment);
+                patch.comment != null ? patch.comment : cur.comment,
+                patch.photoIds);
         });
     }
 
@@ -192,7 +220,7 @@
 
     window.HomeworkModel = {
         STATUSES, STATUS_MAP, FIX_MAP,
-        list, get, create, update, remove,
+        list, sideList, moveHomework, get, create, update, remove,
         getRecord, setRecord, markFixed, snapshotRecord, restoreRecord, isProblem, isOutstanding,
         summarize, outstanding, countOutstanding, studentStats, weeklyRates
     };

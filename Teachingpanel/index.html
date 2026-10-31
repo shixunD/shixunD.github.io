@@ -27,6 +27,7 @@
     <link rel="stylesheet" href="./styles/trend.css">
     <link rel="stylesheet" href="./styles/quickPhrases.css">
     <link rel="stylesheet" href="./styles/dayPicker.css">
+    <link rel="stylesheet" href="./styles/photos.css">
     <link rel="stylesheet" href="./styles/onedrive.css">
     <link rel="stylesheet" href="./styles/update.css">
     <link rel="stylesheet" href="./styles/responsive.css">
@@ -47,6 +48,7 @@
             <button class="nav-btn" data-page="homework">📝 作业</button>
             <button class="nav-btn" data-page="recitation">📖 背诵</button>
             <button class="nav-btn" data-page="exams">📊 考试</button>
+            <button class="nav-btn" data-page="trend">🗂️ 其它</button>
         </div>
     </nav>
 
@@ -54,6 +56,7 @@
     <div class="page" id="homework-page"><div class="container" id="homework-page-body"></div></div>
     <div class="page" id="recitation-page"><div class="container" id="recitation-page-body"></div></div>
     <div class="page" id="exams-page"><div class="container" id="exams-page-body"></div></div>
+    <div class="page" id="trend-page"><div class="container" id="trend-page-body"></div></div>
 
     <!-- 脚本顺序 = 依赖顺序：无依赖工具 → 组件 → state → 业务模型 → 依赖它们的组件/横切模块 → 页面 → app.js -->
     <script src="./scripts/utils.js"></script>
@@ -63,11 +66,13 @@
     <script src="./scripts/models/homework.js"></script>
     <script src="./scripts/models/recitation.js"></script>
     <script src="./scripts/models/exams.js"></script>
+    <script src="./scripts/models/remarks.js"></script>
     <script src="./scripts/components/ui.js"></script>
     <script src="./scripts/components/quickPhrases.js"></script>
     <script src="./scripts/components/dayPicker.js"></script>
     <script src="./scripts/components/svgChart.js"></script>
     <script src="./scripts/components/classSwitcher.js"></script>
+    <script src="./scripts/components/photos.js"></script>
     <script src="./scripts/components/studentTrend.js"></script>
     <script src="./scripts/navigation.js"></script>
     <script src="./scripts/reminders.js"></script>
@@ -93,6 +98,8 @@
     <script src="./scripts/pages/exams/examDialogs.js"></script>
     <script src="./scripts/pages/exams/examsPage.js"></script>
     <script src="./scripts/pages/exams/examStudent.js"></script>
+    <script src="./scripts/pages/trend/otherRecords.js"></script>
+    <script src="./scripts/pages/trend/trendPage.js"></script>
 
     <script src="./scripts/app.js"></script>
 </body>

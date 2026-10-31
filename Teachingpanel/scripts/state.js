@@ -8,21 +8,23 @@
 //   classes[]   { id, name }
 //   students[]  { id, classId, name, studentNo, note }     姓名在同一班级内唯一
 //   homework[]  { id, classId, date, title, note, createdAt, records: { [studentId]: {status, comment, madeUpAt} } }
-//   recRounds[] { id, classId, title, content, createdAt, archived }
+//   recRounds[] { id, classId, title, content, createdAt, archived, order? }   order：手动拖动排序后才有（可选，无需迁移）
 //   recChecks[] { id, roundId, studentId, date, result, note, createdAt }          （v4 起不再有 nextDates）
 //   recPlans[]  { id, roundId, studentId, date, createdAt }   计划某天背诵（还没检查），检查后自动消耗
 //   exams[]     { id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }
+//   remarks[]   { id, studentId, date, text, photoIds?, createdAt }   「其他」页：对学生的学情记录（v5 新增）
 //   settings    { reminderNotify, passPercent, quickPhrases: { homework[], recitation[] } }
 
 (function () {
     'use strict';
 
     const DB_NAME = 'teaching-panel-db';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;               // v2（1.14.0）：新增 photos 存储
     const STORE_NAME = 'app-state';
+    const PHOTO_STORE = 'photos';       // 照片单独存放（key = 照片 id，value = { blob, createdAt }），不进 state 整份存储
     const STATE_KEY = 'main';
 
-    const SCHEMA_VERSION = 4;
+    const SCHEMA_VERSION = 5;
     const APP_ID = 'TeachingPanel';
 
     const DEFAULT_SETTINGS = {
@@ -39,7 +41,7 @@
     };
     const PHRASE_KINDS = Object.keys(DEFAULT_QUICK_PHRASES);
 
-    const COLLECTIONS = ['classes', 'students', 'homework', 'recRounds', 'recChecks', 'recPlans', 'exams'];
+    const COLLECTIONS = ['classes', 'students', 'homework', 'recRounds', 'recChecks', 'recPlans', 'exams', 'remarks'];
 
     let state = emptyState();
     let db = null;
@@ -50,7 +52,7 @@
         return {
             schemaVersion: SCHEMA_VERSION,
             classes: [], students: [],
-            homework: [], recRounds: [], recChecks: [], recPlans: [], exams: [],
+            homework: [], recRounds: [], recChecks: [], recPlans: [], exams: [], remarks: [],
             activeClassId: null,
             settings: defaultSettings()
         };
@@ -69,6 +71,7 @@
             req.onupgradeneeded = () => {
                 const database = req.result;
                 if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME);
+                if (!database.objectStoreNames.contains(PHOTO_STORE)) database.createObjectStore(PHOTO_STORE);
             };
             req.onsuccess = () => { db = req.result; resolve(db); };
             req.onerror = () => reject(req.error);
@@ -92,6 +95,63 @@
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         }));
+    }
+
+    // ---------- 照片（IndexedDB 单独的 photos 存储） ----------
+    // 记录（作业登记 / 背诵检查 / 其他记录）只存 photoIds: string[]，照片本体在这里。
+    // 没有任何记录引用的照片由 gcPhotos() 清理（刚存进去不满 1 分钟的不动，避免"先存照片、后提交记录"之间被误删）。
+
+    function photoTx(mode, fn) {
+        return openDb().then((database) => new Promise((resolve, reject) => {
+            const tx = database.transaction(PHOTO_STORE, mode);
+            const store = tx.objectStore(PHOTO_STORE);
+            let result;
+            fn(store, (v) => { result = v; });
+            tx.oncomplete = () => resolve(result);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+        }));
+    }
+    function reqValue(req, set) { req.onsuccess = () => set(req.result); }
+
+    function photoPut(id, blob, createdAt) {
+        return photoTx('readwrite', (store) => { store.put({ blob, createdAt: createdAt || Date.now() }, id); });
+    }
+    function photoGet(id) {
+        return photoTx('readonly', (store, set) => reqValue(store.get(id), set)).then((rec) => (rec ? rec.blob : null));
+    }
+    // 全部照片 [{ id, blob, createdAt }]，导出 .db 用
+    function photoList() {
+        return photoTx('readonly', (store, set) => {
+            const keysReq = store.getAllKeys();
+            const valsReq = store.getAll();
+            valsReq.onsuccess = () => set(keysReq.result.map((id, i) => Object.assign({ id }, valsReq.result[i])));
+        });
+    }
+    function photoClear() { return photoTx('readwrite', (store) => { store.clear(); }); }
+
+    function collectPhotoIds(s) {
+        const ids = new Set();
+        const add = (list) => (Array.isArray(list) ? list : []).forEach((id) => ids.add(id));
+        s.homework.forEach((h) => Object.keys(h.records || {}).forEach((sid) => add(h.records[sid] && h.records[sid].photoIds)));
+        s.recChecks.forEach((c) => add(c.photoIds));
+        s.remarks.forEach((r) => add(r.photoIds));
+        return ids;
+    }
+
+    async function gcPhotos() {
+        const keys = await photoTx('readonly', (store, set) => reqValue(store.getAllKeys(), set));
+        const refs = collectPhotoIds(state);
+        const orphans = keys.filter((k) => !refs.has(k));
+        if (!orphans.length) return;
+        await photoTx('readwrite', (store) => {
+            orphans.forEach((k) => {
+                store.get(k).onsuccess = (e) => {
+                    const rec = e.target.result;
+                    if (rec && Date.now() - (rec.createdAt || 0) > 60000) store.delete(k);
+                };
+            });
+        });
     }
 
     // ---------- 迁移 / 规范化 ----------
@@ -127,6 +187,7 @@
             });
             data.recPlans = plans;
         }
+        // v4 -> v5：新增 remarks（「其他」页的学情记录）。无需转换，normalize() 会把缺失的集合补成空数组
         data.schemaVersion = SCHEMA_VERSION;
         return data;
     }
@@ -204,6 +265,7 @@
         const result = mutator(state);
         await persist();
         notify();
+        gcPhotos().catch((e) => console.warn('[AppState] 清理照片失败', e));
         return result;
     }
 
@@ -216,9 +278,14 @@
 
     async function replaceState(data) {
         if (!validateSnapshot(data)) throw new Error('数据格式无效（缺少 classes/students 字段）');
-        const next = normalize(JSON.parse(JSON.stringify(data)));
+        const photos = Array.isArray(data._photos) ? data._photos : [];
+        const next = normalize(JSON.parse(JSON.stringify(Object.assign({}, data, { _photos: undefined }))));
         delete next.app;
         delete next.exportedAt;
+        delete next._photos;
+        // 导入 = 整体替换：照片也以导入文件为准（旧版本的 .db 没有照片，等于清空）
+        await photoClear();
+        for (const p of photos) await photoPut(p.id, p.blob, p.createdAt);
         state = next;
         await persist();
         notify();
@@ -252,7 +319,9 @@
             if (s.classes.length <= 1) return;
             const roundIds = new Set(s.recRounds.filter((r) => r.classId === id).map((r) => r.id));
             s.classes = s.classes.filter((c) => c.id !== id);
+            const studentIds = new Set(s.students.filter((x) => x.classId === id).map((x) => x.id));
             s.students = s.students.filter((x) => x.classId !== id);
+            s.remarks = s.remarks.filter((x) => !studentIds.has(x.studentId));
             s.homework = s.homework.filter((x) => x.classId !== id);
             s.recRounds = s.recRounds.filter((x) => x.classId !== id);
             s.recChecks = s.recChecks.filter((x) => !roundIds.has(x.roundId));
@@ -323,6 +392,7 @@
             s.homework.forEach((h) => { delete h.records[id]; });
             s.recChecks = s.recChecks.filter((c) => c.studentId !== id);
             s.recPlans = s.recPlans.filter((p) => p.studentId !== id);
+            s.remarks = s.remarks.filter((r) => r.studentId !== id);
             s.exams.forEach((e) => { delete e.scores[id]; });
         });
     }
@@ -394,6 +464,7 @@
         SCHEMA_VERSION,
         load, subscribe, getState, exportSnapshot, replaceState, validateSnapshot,
         _commit: commit,
+        photoPut, photoGet, photoList, gcPhotos,
         getClasses, getActiveClass, getActiveClassId, addClass, renameClass, removeClass, switchClass,
         getStudents, getStudent, findStudentByName, addStudent, updateStudent, removeStudent, bulkAddStudents,
         updateSettings, getQuickPhrases, addQuickPhrase, removeQuickPhrase, moveQuickPhrase

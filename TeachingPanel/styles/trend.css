@@ -15,3 +15,31 @@
 }
 .trend-chip:hover { border-color: var(--primary-color); }
 .trend-chip.active { background: var(--primary-color); border-color: var(--primary-color); color: #fff; font-weight: 700; }
+
+/* 其他情况：记录表单与列表 */
+.remark-form { margin: 0.8rem 0 1rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--border-color); }
+.remark-form textarea, .dialog-body textarea { width: 100%; box-sizing: border-box; font-family: inherit; resize: vertical; }
+.remark-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.remark-item { position: relative; border: 1px solid var(--border-color); border-radius: 10px; padding: 0.6rem 0.8rem; }
+.remark-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
+.remark-date { font-size: 0.82rem; color: var(--text-secondary); font-weight: 600; }
+/* 编辑 / 删除：右上角的小号半透明灰按钮，鼠标移到这条记录上才出现（触屏没有悬停，常显） */
+.remark-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; opacity: 0; transition: opacity 0.15s; }
+.remark-item:hover .remark-actions, .remark-item:focus-within .remark-actions { opacity: 1; }
+@media (hover: none) { .remark-actions { opacity: 1; } }
+.remark-btn {
+    border: none; border-radius: 3px; padding: 1px 7px; font-family: inherit; font-size: 0.72rem; line-height: 1.5;
+    background: rgba(120, 110, 105, 0.14); color: #6b625c; cursor: pointer;
+}
+.remark-btn:hover { background: rgba(120, 110, 105, 0.28); color: var(--text-primary); }
+.remark-btn-danger:hover { background: rgba(217, 48, 37, 0.16); color: var(--danger-color); }
+.remark-text { white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+
+/* 其他情况：左右两栏（左：记录；右：该生以前的记录，自带滚动） */
+.other-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.other-right { position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow-y: auto; }
+@media (max-width: 1000px) {
+    .other-split { grid-template-columns: 1fr; }
+    .other-right { position: static; max-height: none; }
+}
+.other-left .remark-form { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }

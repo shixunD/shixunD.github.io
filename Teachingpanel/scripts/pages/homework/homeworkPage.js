@@ -66,7 +66,7 @@
 
     function renderRegister(view) {
         const students = AppState.getStudents();
-        const list = HomeworkModel.list();
+        const list = HomeworkModel.sideList();
         if (!list.some((h) => h.id === ui.selectedId)) ui.selectedId = list.length ? list[0].id : null;
         const hw = ui.selectedId ? HomeworkModel.get(ui.selectedId) : null;
 
@@ -81,7 +81,7 @@
                             const c = HomeworkModel.summarize(h, students);
                             const problems = students.length - c.done;
                             return `
-                                <button type="button" class="side-item ${h.id === ui.selectedId ? 'active' : ''}" data-select="${h.id}">
+                                <button type="button" class="side-item ${h.id === ui.selectedId ? 'active' : ''}" data-select="${h.id}" draggable="true" title="按住拖动可调整顺序">
                                     <div class="side-item-top"><span class="side-item-date">${Utils.formatDate(h.date)}</span></div>
                                     <div class="side-item-title">${esc(h.title)}</div>
                                     <div class="side-item-sub">${problems ? `<span class="dot" style="background:#d93025"></span>${c.missing + c.poor} 未补 · ${c.missing_fixed + c.poor_fixed} 已补` : '全部完成'}</div>
@@ -101,6 +101,7 @@
         view.querySelectorAll('[data-select]').forEach((btn) => {
             btn.addEventListener('click', () => { ui.selectedId = btn.dataset.select; render(); });
         });
+        UI.bindSideDrag(view, async (id, beforeId) => { await HomeworkModel.moveHomework(id, beforeId); render(); });
         if (hw) bindDetail(view, hw);
     }
 
@@ -167,7 +168,7 @@
             const fixBtn = e.target.closest('[data-fix]');
             if (fixBtn) {
                 e.stopPropagation();
-                await HomeworkDialogs.markFixed(hw.id, fixBtn.dataset.fix);
+                await HomeworkDialogs.markFixed(hw.id, fixBtn.dataset.fix, { confirm: true });
                 return;
             }
             const card = e.target.closest('[data-sid]');

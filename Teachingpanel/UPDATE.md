@@ -3,6 +3,57 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.14.0 — 2026-11-01
+
+- 变更：导航第五项由「其他」改为「🗂️ 其它」（`#trend-page`，`TrendPage`，`pages/trend/trendPage.js`），页面内容就是「🗂️ 其他情况」（`OtherRecords`，原 1.13.0 的学情记录，`pages/trend/otherRecords.js`）。作业/背诵/考试页下原有的「📈 学生趋势」子标签保留；`StudentTrend.KINDS` 增加 `other`（导航页），点作业/背诵/考试趋势按钮仍走各页的 `openTab('student')`，点「其他情况」走 `Navigation.goTo('trend')`；`styles/other.css` 并入 `trend.css`
+- 新增：照片。`Photos` 组件（`components/photos.js`，`styles/photos.css`）：弹窗内「📷 拍照 / 🖼️ 上传」编辑块（`capture=environment` + 普通文件选择，canvas 压缩到最长边 1600px、JPEG 0.8）、记录里的缩略图（全局 `MutationObserver` 自动补 `<img data-photo>` 的 src）、点击放大（`.photo-lightbox`，z-index 8000）
+- 新增：记录字段 `photoIds?: string[]`，用在作业 `records[studentId]`、`recChecks`、`remarks`；照片本体在 IndexedDB 新的 `photos` 存储（`DB_VERSION` 1→2，`AppState.photoPut/photoGet/photoList/gcPhotos`）。可选字段，`SCHEMA_VERSION` 不变。作业记录改回「完全完成」时只有无 comment 且无照片才删除记录
+- 新增：`AppState.gcPhotos()` 在每次 `_commit` 之后清理无人引用的照片（不满 1 分钟的不动，避免「先存照片、后提交记录」之间误删）
+- 新增：.db 导出新增 `photos(id, mime, data BLOB, created_at)` 表；导入时没有这张表（旧备份）视为无照片，`replaceState` 整体替换照片（`data._photos`）。`exportBytes` 内部自己读取照片
+- 变更：「其他情况」分成左右两栏（`.other-split`）：左边新增记录（表单），右边「以前的记录」（`.other-right` 自带滚动，该生全部记录，可编辑/删除），写新记录时可对照；窄屏变单栏
+- 新增：作业页侧栏的作业可拖动排序（`HomeworkModel.sideList()/moveHomework()`，`homework` 新增可选字段 `order`，无需迁移；无 order 的新作业排最前按日期新→旧，拖过之后全部重新编号）。`list()` 仍按日期，趋势统计不受影响；拖动逻辑抽成 `UI.bindSideDrag`，背诵轮次侧栏同用
+- 变更：所有 `<input type="date">`（记录日期、考试日期、日历框等）点击输入框任意位置即弹出日历（`ui.js` 里全局 click 委托调用 `showPicker()`，不支持时静默忽略）
+- 变更：其他情况记录卡片的「编辑 / 删除」改成右上角小号半透明灰色方角按钮（`.remark-btn`，圆角 3px），鼠标移到该条记录上才出现；触屏（`hover: none`）和键盘聚焦时常显
+- 变更：照片编辑块里点缩略图右上角「✕」先 `Modal.confirm` 确认，确认后弹 `Toast.action`「撤销」（放回原位）；新拍照片被移除后暂不释放 object URL，保存时统一释放
+- 修复：「📷 拍照」在电脑上只弹文件选择框。现在手机/平板（`pointer: coarse`）仍用 `capture` 调系统相机，电脑改用 `getUserMedia` 页内相机（`Photos` 的 `openCamera`，连拍 + 切换摄像头，失败退回选文件）
+- 变更：考试页「📈 学生看板」标签改名「📈 学生趋势」，与作业、背诵页一致
+- 变更：其他情况的记录内容和照片至少要有一样；背诵检查弹窗的照片块随「备注」一起，选了检查结果才显示
+
+## 1.13.0 — 2026-11-01
+
+- 变更：「其他」页左侧名单改为三列（`.other-stu-grid` 三等分，侧栏 330px），小块收紧到能宽松放下四字姓名
+- 新增：第五个主页面「其他」（`#other-page`，`OtherPage`，`scripts/pages/other/otherPage.js`，样式 `styles/other.css`）：左侧 `.other-stu-grid` 两列学号+姓名名单（带记录条数角标），右侧选中学生的记录：新增表单（日期默认今天 + 内容）、列表（日期倒序）、编辑弹窗（日期 + 内容）、删除确认
+- 新增：数据集合 `remarks[] { id, studentId, date, text, createdAt }`，业务模型 `RemarkModel`（`scripts/models/remarks.js`）；`SCHEMA_VERSION` 4 → 5（`migrate()` 无需转换，`normalize()` 补空数组）；删除学生 / 删除班级级联删除其记录
+- 新增：`dbFile.js` 的 `TABLES` 加 `remarks` 表；该表列入 `OPTIONAL_TABLES`，旧版本导出的 .db 没有它也能导入（视为空）
+- 变更：`Navigation.PAGES` 加 `other`；`app.js` 的 `renderCurrentPage`、`index.html`、`service-worker.js` 的 `URLS_TO_CACHE` 同步；PROJECT.md、Handbook 已更新
+
+## 1.12.1 — 2026-10-31
+
+- 变更：作业登记页学生卡片的 `.stu-card-fix`（「补」）点击时调用 `HomeworkDialogs.markFixed(..., { confirm: true })`，先 `Modal.confirm` 再执行（与矩阵页「已补上」一致）；"补上"画笔模式仍不确认
+
+## 1.12.0 — 2026-10-31
+
+- 新增：背诵检查结果 `cond`「有条件过关」（`#b9e8b0` 浅绿，排在 `pass` 后），`isPassed()` 与 `roundSummary().passed` 均计入；筛选、总览分段/图例、趋势统计同步
+- 变更：`RecitationModel.PLAN`（已计划）颜色改为浅天蓝 `#bfe3f7`，计划视图选中态/计划人员胶囊同步；Handbook、PROJECT.md 已更新
+- 新增：轮次侧栏拖动排序（HTML5 DnD，`RecitationModel.moveRound`）。`recRounds` 新增可选字段 `order`，无 order 的新轮次排最前（按创建时间），拖过之后全部重新编号；可选字段无需迁移，SCHEMA_VERSION 不变
+- 变更：`studentCard` 每个未完成计划日期各占一行（去掉 `+N`），逾期的单行标红；卡片靠 grid 默认拉伸，同行等高
+- 变更：`studentCard` 计划行文案缩短为 `🗓️ MM-DD(星期X)`（只去掉「计划」，星期保持全称，不缩写成「周X」），避免窄卡片放不下
+- 变更：`openCheck` 默认 `result='pass'`、`planOn=true`（取代上一条"选了结果才出现日期"的初始隐藏，显隐逻辑本身不变）
+- 变更：`openCheck` 的 `planDates` 初始 = `pendingPlans()` 的日期（`existingDates`）；保存时按差集处理：新选的 `addPlans`，取消的从 `recPlans` 删除，仅在「计划背诵」打开时生效
+- 变更：`DayPicker` 新增 `textColor` 选项和 `setColor(color, text)` 方法（CSS 变量 `--dp-text`）；计划日期选择器用 `PLAN` 颜色（原来是写死的绿 `#2e9e48`），检查日期选择器在选结果时跟随 `RESULT_MAP[result]` 颜色
+- 变更：`openCheck` 的 `[data-date-row]` / `[data-note-wrap]` 仅在已选检查结果时显示（原来只在"只选计划"时隐藏）
+- 变更：`DayPicker` 新增 `dimFuture`；检查日期选择器（`check` / `editCheck`）由 `max: today` 改为 `dimFuture: true`
+- 变更：检查登记弹窗的计划日期选择器（`checkDialog.js`）也由 `min: today` 改为 `dimPast: true`
+- 变更：`studentCard` 逾期计划去掉 `⚠ ` 前缀，改用 `.stu-card-plan.overdue`（红色）；`.stu-card-plan` 加 `overflow:hidden; text-overflow:ellipsis` 防止超出卡片
+- 变更：`studentCard` 重做——底色取 `progressOf().status` 的颜色；若最晚的未完成计划日期晚于最新检查日期（或没有检查）则用 `PLAN` 天蓝（已过关的也一样）；删除 `.stu-card-status` 行；日期每行一个（检查：`.stu-dot` 结果色圆点 + 💬；计划：🗓️，逾期红），按日期升序
+- 变更：`openCheck` 的 `checkDate` 默认 `null`（不再是今天），`DayPicker.bind` 新增 `allowClear`（单选再点取消）；只有「选了结果且选了日期」才 `addCheck`，否则只处理计划；保存按钮/提示相应调整
+- 变更：`.dp-day.is-today` 统一 `2px solid #8a8f98` 灰色粗边框（含选中、悬停时），不再用 `--dp-color`
+- 变更：卡片日期行的圆点 / 🗓️ 统一放进 `.dl-mark`（固定 1.4em 宽，圆点放大到 0.95em），日期文字左对齐
+- 规则：`addCheck` 同一学生/轮次/日期已有检查时改写原记录（不新增，`createdAt` 刷新）；`updateCheck` 改到已有记录的日期时替换掉那条；不迁移已有数据（历史里已存在的同日多条保持原样）；检查弹窗加 `[data-replace-hint]` 提示
+- 修复：`isPlanDone()` 对已过去的计划日期，那天本身（`c.date === plan.date`）有检查就算完成，不再要求检查晚于计划创建（否则补录历史计划会被误判逾期）；今天/未来的计划规则不变
+- 变更：计划视图名字卡左侧色条 `<i>`：有未完成计划且未过关（`!isPassed`）时用 `PLAN.accent`（`#5bb8ec` 天蓝），否则状态色；去掉 `.has-plan` 及整卡填色、光晕；`.selected` 只保留蓝边+粗体；日期列表 `.d-today` 加粗、`.d-overdue`（过去且未完成）标红，不再按选中日加粗
+- 变更：`DayPicker` 新增 `dimPast` 选项（过去日期变灰但可点）；计划视图不再用 `min: today` 禁用过去日期，已完成计划的名字卡/列表也可点击或 ✕ 取消
+
 ## 1.11.3 — 2026-10-30
 
 - 变更：`DayPicker` 日期块第二行只显示 `MM-DD`，去掉 `(星期X)` 和 `.dp-wd` 样式，字号 0.62rem → 0.7rem

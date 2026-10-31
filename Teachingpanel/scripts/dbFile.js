@@ -44,8 +44,14 @@
         {
             key: 'exams', table: 'exams', nested: ['scores'],
             cols: [['id', 'id', 'text'], ['classId', 'class_id', 'text'], ['name', 'name', 'text'], ['date', 'date', 'text'], ['fullScore', 'full_score', 'real'], ['createdAt', 'created_at', 'int']]
+        },
+        {
+            // 1.13.0 新增；旧版本导出的 .db 没有这张表，导入时视为空（见 OPTIONAL_TABLES）
+            key: 'remarks', table: 'remarks',
+            cols: [['id', 'id', 'text'], ['studentId', 'student_id', 'text'], ['date', 'date', 'text'], ['text', 'text', 'text'], ['createdAt', 'created_at', 'int']]
         }
     ];
+    const OPTIONAL_TABLES = new Set(['remarks']);
     const HW_RECORD_COLS = [['status', 'status', 'text'], ['comment', 'comment', 'text'], ['madeUpAt', 'made_up_at', 'text']];
     const SQL_TYPE = { text: 'TEXT', int: 'INTEGER', real: 'REAL', bool: 'INTEGER' };
 
@@ -64,11 +70,13 @@
             ...main,
             'CREATE TABLE homework_records (homework_id TEXT, student_id TEXT, status TEXT, comment TEXT, made_up_at TEXT, extra TEXT, PRIMARY KEY (homework_id, student_id));',
             'CREATE TABLE rec_check_dates (check_id TEXT, position INTEGER, date TEXT, PRIMARY KEY (check_id, position));',
-            'CREATE TABLE exam_scores (exam_id TEXT, student_id TEXT, score REAL, PRIMARY KEY (exam_id, student_id));'
+            'CREATE TABLE exam_scores (exam_id TEXT, student_id TEXT, score REAL, PRIMARY KEY (exam_id, student_id));',
+            // 1.14.0 新增：作业登记 / 背诵检查 / 其他记录上的照片（记录里只存 photoIds）。旧 .db 没有这张表，导入时视为没有照片
+            'CREATE TABLE photos (id TEXT PRIMARY KEY, mime TEXT, data BLOB, created_at INTEGER);'
         ].join('\n');
     }
 
-    const REQUIRED_TABLES = ['meta', 'settings', 'quick_phrases', 'homework_records', 'rec_check_dates', 'exam_scores'].concat(TABLES.map((t) => t.table));
+    const REQUIRED_TABLES = ['meta', 'settings', 'quick_phrases', 'homework_records', 'rec_check_dates', 'exam_scores'].concat(TABLES.map((t) => t.table).filter((t) => !OPTIONAL_TABLES.has(t)));
 
     // ---------- sql.js 按需加载 ----------
 
@@ -154,6 +162,7 @@
 
     async function exportBytes(snapshot) {
         const SQL = await load();
+        const photos = await AppState.photoList();
         const db = new SQL.Database();
         try {
             db.run('BEGIN;');
@@ -197,6 +206,12 @@
             const scoreRows = [];
             (snapshot.exams || []).forEach((e) => Object.keys(e.scores || {}).forEach((sid) => scoreRows.push([e.id, sid, e.scores[sid]])));
             insertAll(db, 'INSERT INTO exam_scores VALUES (?, ?, ?);', scoreRows);
+
+            const photoRows = [];
+            for (const p of photos) {
+                photoRows.push([p.id, p.blob.type || 'image/jpeg', new Uint8Array(await p.blob.arrayBuffer()), p.createdAt || 0]);
+            }
+            insertAll(db, 'INSERT INTO photos VALUES (?, ?, ?, ?);', photoRows);
 
             db.run('COMMIT;');
             return db.export();
@@ -251,6 +266,7 @@
             snap.settings = settings;
 
             TABLES.forEach((t) => {
+                if (!tables.has(t.table)) { snap[t.key] = []; return; }
                 snap[t.key] = selectAll(db, `SELECT * FROM ${t.table} ORDER BY rowid;`).map((row) => joinRow(row, t.cols));
             });
 
@@ -275,6 +291,12 @@
                 const e = examById[row.exam_id];
                 if (e) e.scores[row.student_id] = row.score;
             });
+
+            if (tables.has('photos')) {
+                snap._photos = selectAll(db, 'SELECT * FROM photos ORDER BY rowid;').map((row) => ({
+                    id: row.id, createdAt: row.created_at, blob: new Blob([row.data], { type: row.mime || 'image/jpeg' })
+                }));
+            }
 
             return snap;
         } finally {

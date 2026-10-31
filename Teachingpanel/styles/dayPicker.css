@@ -10,13 +10,17 @@
 }
 .dp-day b { font-size: 0.8rem; white-space: nowrap; }
 .dp-day span { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.3; }
-.dp-day.is-today { border-color: var(--dp-color); border-width: 2px; }
 .dp-day:hover:not(:disabled) { border-color: var(--dp-color); }
-.dp-day.selected { background: var(--dp-color); border-color: var(--dp-color); color: #fff; }
-.dp-day.selected span { color: rgba(255, 255, 255, 0.88); }
+/* --dp-color 选中 / 今天的底色，--dp-text 选中块上的文字色（浅色底要配深色字），由调用方按所属状态的颜色设置 */
+.dp-day.selected { background: var(--dp-color); border-color: var(--dp-color); color: var(--dp-text, #fff); }
+.dp-day.selected span { color: var(--dp-text, #fff); opacity: 0.9; }
+/* 今天：统一灰色粗边框，不跟随状态色（放在 selected / hover 之后、用更高优先级，选中或悬停时也保持灰色） */
+.dp-day.is-today, .dp-day.is-today:hover:not(:disabled), .dp-day.is-today.selected { border: 2px solid #8a8f98; }
 .dp-day:disabled { opacity: 0.35; cursor: not-allowed; }
+.dp-day.is-past:not(.selected) { opacity: 0.45; }
+.dp-day.is-past:not(.selected):hover { opacity: 0.8; }
 /* marked：日期块下方的小字提示（如"3人"），只做文字提示，不改颜色 */
 .dp-mark { font-size: 0.62rem; font-weight: 700; color: var(--text-secondary); line-height: 1.1; }
-.dp-day.selected .dp-mark { color: #fff; }
+.dp-day.selected .dp-mark { color: var(--dp-text, #fff); }
 .dp-other input[type="date"] { grid-column: span 3; width: 100%; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
 .dp-other [data-dp-picked] { grid-column: span calc(var(--dp-cols) - 3); align-self: center; }

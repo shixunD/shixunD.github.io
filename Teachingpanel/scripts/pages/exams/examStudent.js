@@ -1,4 +1,4 @@
-// examStudent.js —— 考试「学生看板」：某学生历次成绩折线（对比班级平均）+ 排名表
+// examStudent.js —— 考试「学生趋势」：某学生历次成绩折线（对比班级平均）+ 排名表
 // 全局命名空间：window.ExamStudent
 
 (function () {

@@ -20,7 +20,8 @@
         { key: 'retry', label: '需重新过关' },
         { key: 'fail', label: '未过关' },
         { key: 'pass', label: '已过关' },
-        { key: 'excel', label: '超额完成' }
+        { key: 'excel', label: '超额完成' },
+        { key: 'cond', label: '有条件过关' }
     ];
 
     const ui = {
@@ -86,7 +87,7 @@
                         ${rounds.length ? rounds.map((r) => {
                             const c = RecitationModel.roundSummary(r.id, students);
                             return `
-                                <button type="button" class="side-item ${r.id === ui.selectedId ? 'active' : ''} ${r.archived ? 'archived' : ''}" data-select="${r.id}">
+                                <button type="button" class="side-item ${r.id === ui.selectedId ? 'active' : ''} ${r.archived ? 'archived' : ''}" data-select="${r.id}" draggable="true" title="按住拖动可调整顺序">
                                     ${r.archived ? '<div class="side-item-top"><span class="side-item-date">已归档</span></div>' : ''}
                                     <div class="side-item-title">${esc(r.title)}</div>
                                     <div class="mini-bar">${miniBar(c)}</div>
@@ -108,12 +109,18 @@
         view.querySelectorAll('[data-select]').forEach((btn) => {
             btn.addEventListener('click', () => { ui.selectedId = btn.dataset.select; render(); });
         });
+        bindRoundDrag(view);
         if (round) bindDetail(view, round);
+    }
+
+    // 侧栏轮次拖动排序（UI.bindSideDrag）
+    function bindRoundDrag(view) {
+        UI.bindSideDrag(view, async (id, beforeId) => { await RecitationModel.moveRound(id, beforeId); render(); });
     }
 
     function miniBar(c) {
         const R = RecitationModel.RESULT_MAP;
-        return ['excel', 'pass', 'retry', 'fail', 'none'].map((k) => c[k] ? `<span style="flex:${c[k]};background:${R[k].color}"></span>` : '').join('');
+        return ['excel', 'pass', 'cond', 'retry', 'fail', 'none'].map((k) => c[k] ? `<span style="flex:${c[k]};background:${R[k].color}"></span>` : '').join('');
     }
 
     function checkDetail(round, students) {
@@ -137,7 +144,7 @@
                 </div>
                 <div class="seg-bar">${miniBar(c)}</div>
                 <div class="seg-legend">
-                    ${['excel', 'pass', 'retry', 'fail', 'none'].map((k) => `<span><i style="background:${R[k].color}"></i>${esc(R[k].label)} <b>${c[k]}</b></span>`).join('')}
+                    ${['excel', 'pass', 'cond', 'retry', 'fail', 'none'].map((k) => `<span><i style="background:${R[k].color}"></i>${esc(R[k].label)} <b>${c[k]}</b></span>`).join('')}
                     <span><i style="background:${RecitationModel.PLAN.color}"></i>已计划</span>
                     <span><i class="due-legend"></i>今天要检查</span>
                     <span class="seg-rate">过关率 ${Utils.percent(c.passed, students.length)}</span>
@@ -150,38 +157,40 @@
         `;
     }
 
-    // 学生卡片：状态和背诵计划同时显示、互不影响
-    //   底色：有未完成的计划 -> 浅绿；否则按状态（最新一次检查的结果）
-    //   第 3 行：状态（有计划时前面加状态色圆点，免得被浅绿底色盖住）
-    //   第 4 行：最近检查日期；第 5 行：🗓️ 计划日期（多个时 +N）
+    // 学生卡片（检查 + 计划同时显示、互不影响）
+    //   底色：看所有记录（检查 + 未完成的计划）的最后一天——
+    //         最后一天只有计划（日期晚于最新一次检查，或一次都没检查过）-> 统一天蓝（PLAN），哪怕之前已经过关；
+    //         最后一天有检查（同一天又有计划也算）-> 该检查的结果色；都没有 -> 灰（未检查）
+    //   不再显示状态文字行
+    //   日期：每行一个，按日期升序。检查记录：日期前加该结果色的小圆点；计划：日期前用 🗓️（逾期未检查的整行标红）
     //   今天需要检查（今天有计划）-> 粉色边框
     function studentCard(round, stu) {
         const R = RecitationModel.RESULT_MAP;
         const today = Utils.today();
-        const last = RecitationModel.latestCheck(round.id, stu.id);
         const pg = RecitationModel.progressOf(round.id, stu.id);
         const st = R[pg.status];
+        const checks = RecitationModel.checksFor(round.id, stu.id);
         const plans = RecitationModel.pendingPlans(round.id, stu.id);
-        const look = plans.length ? RecitationModel.PLAN : st;
+        // 所有记录里「最后一天」只有计划（比最新一次检查还晚）-> 天蓝；最后一天有检查（含同一天又有计划）-> 按该检查的结果色
+        const lastPlanDate = plans.length ? plans[plans.length - 1].date : '';
+        const planIsLast = lastPlanDate && (!pg.check || lastPlanDate > pg.check.date);
+        const look = planIsLast ? RecitationModel.PLAN : st;
         const due = RecitationModel.dueToday(round.id, stu.id);
-        const attempts = RecitationModel.checksFor(round.id, stu.id).length;
+        const attempts = checks.length;
 
-        const statusText = st.label;
-        const dateLine = last ? Utils.formatDate(last.date) : '';
-        let planLine = '';
-        if (plans.length) {
-            const overdue = plans.filter((p) => p.date < today);
-            const next = overdue.length ? overdue[0] : plans[0];
-            planLine = `${overdue.length ? '⚠ ' : ''}🗓️ 计划 ${Utils.formatDate(next.date)}${plans.length > 1 ? ` +${plans.length - 1}` : ''}`;
-        }
+        // 同一天既有检查又有计划时，检查在前
+        const rows = checks.map((c) => ({ date: c.date, order: 0, c }))
+            .concat(plans.map((p) => ({ date: p.date, order: 1, p })))
+            .sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
+        const dateLines = rows.map((r) => r.c
+            ? `<div class="stu-card-date"><span class="dl-mark"><i class="stu-dot" style="background:${(R[r.c.result] || RecitationModel.NONE).color}"></i></span>${esc(Utils.formatDate(r.date))}${r.c.note ? ' 💬' : ''}</div>`
+            : `<div class="stu-card-date stu-card-plan ${r.date < today ? 'overdue' : ''}"><span class="dl-mark">🗓️</span>${esc(Utils.formatDate(r.date))}</div>`).join('');
         return `
             <div class="stu-card ${due ? 'due-today' : ''}" data-sid="${stu.id}" style="--st-color:${look.color};--st-text:${look.text}"
                 title="${esc(st.label)}${plans.length ? ` · 计划：${plans.map((p) => Utils.formatDate(p.date)).join('、')}` : ''}${due ? ' · 今天需要检查' : ''}">
                 <div class="stu-card-no">${esc(stu.studentNo)}${attempts > 1 ? ` · 第${attempts}次` : ''}</div>
                 <div class="stu-card-name">${esc(stu.name)}</div>
-                <div class="stu-card-status">${plans.length ? `<i class="stu-dot" style="background:${st.color}"></i>` : ''}${esc(statusText)}${last && last.note ? ' 💬' : ''}</div>
-                ${dateLine ? `<div class="stu-card-date">${esc(dateLine)}</div>` : ''}
-                ${planLine ? `<div class="stu-card-date stu-card-plan">${esc(planLine)}</div>` : ''}
+                ${dateLines}
             </div>`;
     }
 

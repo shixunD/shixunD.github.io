@@ -27,6 +27,7 @@
                 <label class="field-label">情况说明（comment）</label>
                 ${QuickPhrases.chipsHtml('homework')}
                 <textarea rows="3" data-comment placeholder="如：缺第 3 题、字迹潦草、周五前补交…">${esc(rec.comment)}</textarea>
+                ${Photos.editorHtml()}
                 ${rec.madeUpAt ? `<div class="hint">补上日期：${Utils.formatDate(rec.madeUpAt)}</div>` : ''}
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
@@ -35,6 +36,7 @@
             onMount(body, close) {
                 StudentTrend.linkDialogTitle(body, stu, hw.title, close);
                 QuickPhrases.bind(body, body.querySelector('[data-comment]'));
+                const photoEditor = Photos.bindEditor(body, rec.photoIds);
                 body.querySelector('.status-options').addEventListener('click', (e) => {
                     const btn = e.target.closest('[data-status]');
                     if (!btn) return;
@@ -43,8 +45,9 @@
                 });
                 body.querySelector('[data-save]').addEventListener('click', async () => {
                     const comment = body.querySelector('[data-comment]').value.trim();
+                    const photoIds = await photoEditor.finalize();
                     close();
-                    await HomeworkModel.setRecord(hwId, studentId, { status: selected, comment });
+                    await HomeworkModel.setRecord(hwId, studentId, { status: selected, comment, photoIds });
                 });
             }
         });

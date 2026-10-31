@@ -15,29 +15,46 @@
     const RESULTS = [
         { key: 'excel', label: '超额完成', color: '#0b5c2a', text: '#fff' },
         { key: 'pass', label: '过关', color: '#1e8e3e', text: '#fff' },
+        { key: 'cond', label: '有条件过关', color: '#b9e8b0', text: '#1f5214' },
         { key: 'retry', label: '需重新过关', color: '#f2b705', text: '#4a3500' },
         { key: 'fail', label: '未过关', color: '#d93025', text: '#fff' }
     ];
     const NONE = { key: 'none', label: '未检查', color: '#e5e7eb', text: '#6b7280' };
-    // "计划背诵"的标识色（浅绿；不是检查结果，不进 RESULT_MAP）。有计划的学生卡片整体显示为这个颜色
-    const PLAN = { key: 'plan', label: '计划背诵', color: '#b9e8b0', text: '#1f5214' };
+    // "计划背诵"的标识色（浅天蓝；不是检查结果，不进 RESULT_MAP）。有计划的学生卡片整体显示为这个颜色
+    const PLAN = { key: 'plan', label: '计划背诵', color: '#bfe3f7', text: '#0d4a6b', accent: '#5bb8ec' };   // accent：窄色条用的天蓝（浅色在白底上太淡）
     const RESULT_MAP = { none: NONE };
     RESULTS.forEach((r) => { RESULT_MAP[r.key] = r; });
 
     function state() { return AppState.getState(); }
 
-    // 超额完成也算过关
-    function isPassed(key) { return key === 'pass' || key === 'excel'; }
+    // 超额完成、有条件过关（勉强过）也算过关
+    function isPassed(key) { return key === 'pass' || key === 'excel' || key === 'cond'; }
 
     // ---------- 轮次 ----------
 
+    // 排序：没有手动排过序（无 order）的新轮次在最前面，按创建时间新→旧；手动排过的按 order 升序跟在后面
     function rounds(opts) {
         const o = opts || {};
         const classId = AppState.getActiveClassId();
         return state().recRounds
             .filter((r) => r.classId === classId)
             .filter((r) => o.includeArchived || !r.archived)
-            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            .sort((a, b) => {
+                const ha = a.order != null, hb = b.order != null;
+                if (ha && hb) return a.order - b.order;
+                if (ha !== hb) return ha ? 1 : -1;
+                return (b.createdAt || 0) - (a.createdAt || 0);
+            });
+    }
+
+    // 拖动排序：把 id 的轮次移到 targetId 之前（targetId 为 null = 移到最后）；按含已归档的完整顺序重新编号
+    function moveRound(id, targetId) {
+        const list = rounds({ includeArchived: true }).filter((r) => r.id !== id);
+        const moving = getRound(id);
+        if (!moving) return Promise.resolve();
+        const at = targetId ? list.findIndex((r) => r.id === targetId) : -1;
+        list.splice(at < 0 ? list.length : at, 0, moving);
+        return AppState._commit(() => { list.forEach((r, i) => { r.order = i; }); });
     }
 
     function getRound(id) { return state().recRounds.find((r) => r.id === id) || null; }
@@ -87,7 +104,7 @@
     }
 
     // 当前状态（所有地方的状态都从这里取）：返回 { status, check, passedOn, attemptsToPass }
-    //   status          'none' | 'excel' | 'pass' | 'retry' | 'fail' —— 最新一条检查记录的结果
+    //   status          'none' | 'excel' | 'pass' | 'cond' | 'retry' | 'fail' —— 最新一条检查记录的结果
     //   check           最新一条检查记录（没有为 null）
     //   passedOn        当前处于"过关"时，这一段连续过关的第一次过关日期；attemptsToPass 到那次为止共检查了几次
     function progressOf(roundId, studentId) {
@@ -104,17 +121,28 @@
         return progressOf(roundId, studentId).status;
     }
 
+    // 同一个学生、同一轮次、同一天只保留一个检查状态：这天已有记录时，把它改成新的结果（不新增）。计划（recPlan）不受这条限制
     function addCheck(data) {
         return AppState._commit((s) => {
+            const date = data.date || Utils.today();
+            const same = s.recChecks.find((c) => c.roundId === data.roundId && c.studentId === data.studentId && c.date === date);
+            if (same) {
+                same.result = data.result;
+                same.note = data.note || '';
+                if (data.photoIds) same.photoIds = data.photoIds.slice();
+                same.createdAt = Date.now();
+                return same;
+            }
             const check = {
                 id: Utils.uid('chk'),
                 roundId: data.roundId,
                 studentId: data.studentId,
-                date: data.date || Utils.today(),
+                date,
                 result: data.result,
                 note: data.note || '',
                 createdAt: Date.now()
             };
+            if (data.photoIds && data.photoIds.length) check.photoIds = data.photoIds.slice();
             s.recChecks.push(check);
             return check;
         });
@@ -128,6 +156,10 @@
             c.result = patch.result;
             c.date = patch.date || c.date;
             c.note = patch.note || '';
+            if (patch.photoIds) c.photoIds = patch.photoIds.slice();
+            // 改到的那天如果已有另一条记录，按「同一天只有一个状态」用这条替换掉它
+            s.recChecks = s.recChecks.filter((x) => x.id === c.id
+                || !(x.roundId === c.roundId && x.studentId === c.studentId && x.date === c.date));
         });
     }
 
@@ -135,11 +167,11 @@
         return AppState._commit((s) => { s.recChecks = s.recChecks.filter((c) => c.id !== id); });
     }
 
-    // 单轮次的状态统计；passed = 超额完成 + 过关
+    // 单轮次的状态统计；passed = 超额完成 + 过关 + 有条件过关
     function roundSummary(roundId, students) {
-        const counts = { excel: 0, pass: 0, retry: 0, fail: 0, none: 0 };
+        const counts = { excel: 0, pass: 0, cond: 0, retry: 0, fail: 0, none: 0 };
         (students || AppState.getStudents()).forEach((stu) => { counts[statusOf(roundId, stu.id)]++; });
-        counts.passed = counts.excel + counts.pass;
+        counts.passed = counts.excel + counts.pass + counts.cond;
         return counts;
     }
 
@@ -154,9 +186,11 @@
 
     // 计划是否已完成：安排计划之后登记了一次检查，且检查日期在计划日期当天或之后
     // （"安排之后"用 createdAt 判断：今天已经查过、又给今天加计划时，之前那次检查不算完成这条新计划）
+    // 例外：计划日期已经过去时，那天本身有检查就算完成，不看先后（补录历史计划时，那天早就检查过的也应该打勾）
     function isPlanDone(plan) {
+        const past = plan.date < Utils.today();
         return state().recChecks.some((c) => c.roundId === plan.roundId && c.studentId === plan.studentId
-            && c.date >= plan.date && (c.createdAt || 0) >= (plan.createdAt || 0));
+            && c.date >= plan.date && ((c.createdAt || 0) >= (plan.createdAt || 0) || (past && c.date === plan.date)));
     }
 
     // 还没完成的计划（待办），按日期正序
@@ -250,7 +284,7 @@
     }
 
     window.RecitationModel = {
-        RESULTS, RESULT_MAP, NONE, PLAN, isPassed,
+        RESULTS, RESULT_MAP, NONE, PLAN, isPassed, moveRound,
         rounds, getRound, createRound, updateRound, removeRound,
         checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
         plansFor, pendingPlans, isPlanDone, addPlans, removePlan,

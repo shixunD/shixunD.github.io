@@ -1,10 +1,10 @@
-// navigation.js —— 四个主页面（主页/作业/背诵/考试）切换
+// navigation.js —— 五个主页面（主页/作业/背诵/考试/学生趋势）切换
 // 全局命名空间：window.Navigation
 
 (function () {
     'use strict';
 
-    const PAGES = ['home', 'homework', 'recitation', 'exams'];
+    const PAGES = ['home', 'homework', 'recitation', 'exams', 'trend'];
     const LS_KEY = 'teachingPanel.ui.page';
     const listeners = [];
     let current = 'home';

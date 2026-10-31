@@ -46,7 +46,7 @@
             </div>
             <div class="card">
                 <label class="field-label">选择日期（块下方的数字 = 这天已计划几人）</label>
-                ${DayPicker.html('planTab', { count: 7, min: today, color: '#2e9e48', marked })}
+                ${DayPicker.html('planTab', { count: 7, dimPast: true, color: RecitationModel.PLAN.color, textColor: RecitationModel.PLAN.text, marked })}
                 <div class="plan-day-head">
                     <h3 class="section-title">${Utils.formatDate(ui.day)} · ${Utils.relativeDay(ui.day)}：已计划 <b>${dayPlans.length}</b> 人</h3>
                     <div class="plan-quick">
@@ -59,14 +59,20 @@
                         const plan = byStudent[stu.id];
                         const done = plan && RecitationModel.isPlanDone(plan);
                         const st = R[RecitationModel.statusOf(ui.roundId, stu.id)];
-                        // 该生本轮全部计划日期（当前选中的那天加粗；已检查完成的带 ✓）
+                        // 该生本轮全部计划日期：今天加粗；已检查的带 ✓；已过去且没检查的标红；未来的维持原样
                         const mine = allPlans.filter((p) => p.studentId === stu.id).sort((a, b) => a.date.localeCompare(b.date));
                         const dateList = mine.map((p) => {
-                            const txt = `${Utils.formatDate(p.date)}${RecitationModel.isPlanDone(p) ? '✓' : ''}`;
-                            return p.date === ui.day ? `<b>${esc(txt)}</b>` : esc(txt);
+                            const isDone = RecitationModel.isPlanDone(p);
+                            const cls = [p.date === today ? 'd-today' : '', !isDone && p.date < today ? 'd-overdue' : ''].filter(Boolean).join(' ');
+                            const txt = `${Utils.formatDate(p.date)}${isDone ? '✓' : ''}`;
+                            return cls ? `<span class="${cls}">${esc(txt)}</span>` : esc(txt);
                         }).join('、');
-                        return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''}" data-plan-sid="${stu.id}" ${done ? 'disabled title="这天的计划已检查完成"' : ''}>
-                            <i style="background:${st.color}" title="${esc(st.label)}"></i><span class="row-no">${esc(stu.studentNo)}</span>${esc(stu.name)}
+                        // 左侧色条：有未完成的计划且还没过关 -> 天蓝；否则是状态色。卡片底色不填充。selected = 当前选中的那天有他的计划
+                        const planned = mine.some((p) => !RecitationModel.isPlanDone(p)) && !RecitationModel.isPassed(RecitationModel.statusOf(ui.roundId, stu.id));
+                        const stripColor = planned ? RecitationModel.PLAN.accent : st.color;
+                        const stripTitle = planned ? `${st.label}（已计划）` : st.label;
+                        return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''}" data-plan-sid="${stu.id}" ${done ? 'title="这天的计划已检查完成；点击会取消这条历史计划"' : ''}>
+                            <i style="background:${stripColor}" title="${esc(stripTitle)}"></i><span class="row-no">${esc(stu.studentNo)}</span>${esc(stu.name)}
                             <small>${plan ? (done ? '✓ 这天已检查' : '✓ 这天已计划') : esc(st.label)}</small>
                             <small class="plan-stu-dates">${mine.length ? `🗓️ ${dateList}` : '暂无计划'}</small>
                         </button>`;
@@ -121,7 +127,7 @@
                     <button type="button" class="plan-date-btn" data-go-day="${d}">${Utils.formatDate(d)} · ${Utils.relativeDay(d)}</button>
                     ${open && d < today ? '<span class="hint text-danger">已逾期</span>' : ''}
                     <div class="plan-date-people">
-                        ${list.map((x) => `<span class="plan-person ${x.done ? 'done' : ''}">${esc(x.stu.name)}${x.done ? ' ✓' : `<button type="button" data-rm-plan-id="${x.p.id}" title="取消计划">✕</button>`}</span>`).join('')}
+                        ${list.map((x) => `<span class="plan-person ${x.done ? 'done' : ''}">${esc(x.stu.name)}${x.done ? ' ✓' : ''}<button type="button" data-rm-plan-id="${x.p.id}" title="取消计划">✕</button></span>`).join('')}
                     </div>
                 </div>`;
         }).join('');

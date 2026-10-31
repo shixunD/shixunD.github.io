@@ -9,16 +9,17 @@
 老师用来登记、追踪学生的**作业完成情况、背诵过关情况、考试成绩**。数据全部保存在浏览器 IndexedDB，
 导入导出（以及 OneDrive 单向快照备份）用 **SQLite 数据库文件（.db）**，全量、按表存放。
 
-四个主页面（`index.html` 里 `.page` + `.active` 切换显隐，不是路由）：
+五个主页面（`index.html` 里 `.page` + `.active` 切换显隐，不是路由）：
 
 | 页面 | 容器 id | 模块 | 子视图 |
 |---|---|---|---|
 | 主页 | `home-page` | `SettingsPage` + `RosterSection` | 今日概览、学生名单、comment 快捷词、数据、设置、应用信息 |
 | 作业 | `homework-page` | `HomeworkPage` | 登记 / 总览矩阵 / 欠交清单 / 学生趋势 |
-| 背诵 | `recitation-page` | `RecitationPage` | 检查 / 时间看板 / 总览 / 学生趋势 |
-| 考试 | `exams-page` | `ExamsPage` | 考试（列表+详情） / 学生看板 |
+| 背诵 | `recitation-page` | `RecitationPage` | 检查 / 计划背诵 / 时间看板 / 总览 / 学生趋势 |
+| 考试 | `exams-page` | `ExamsPage` | 考试（列表+详情） / 学生趋势 |
+| 其它 | `trend-page` | `TrendPage` | 默认就是「其他情况」（学情记录，可增改删，可带照片）；顶部作业/背诵/考试趋势按钮跳到对应页的学生趋势标签，四类共用一个学生选择器 |
 
-另有跨页面的**学生趋势跳转**（`StudentTrend`）：任何带 `data-profile-id` 的元素（学生姓名）被点击，都会跳到该生的「学生趋势」页（当前在作业/背诵/考试页就留在该类，主页则沿用上次）。
+另有跨页面的**学生趋势跳转**（`StudentTrend`）：任何带 `data-profile-id` 的元素（学生姓名）被点击，都会跳到该生的「学生趋势」（当前在作业/背诵/考试页就留在该页的学生趋势标签，其他地方沿用上次看的那类，`localStorage` 记 kind；kind 为 `other` 时去导航页「🗂️ 其它」）。
 三类趋势页顶部共用 `StudentTrend.pickerHtml()`：作业/背诵/考试趋势快速切换 + 全班「学号 姓名」小块选择器，选中的学生在三类之间共享。
 
 ## 二、整体架构
@@ -49,7 +50,7 @@ index.html
 
 ```js
 state = {
-  schemaVersion: 3,
+  schemaVersion: 5,
   classes:   [{ id, name }],
   activeClassId,
   students:  [{ id, classId, name, studentNo, note }],    // 姓名在同一班级内唯一（addStudent/updateStudent/bulkAdd 校验）
@@ -59,6 +60,7 @@ state = {
   recChecks: [{ id, roundId, studentId, date, result, note, createdAt }],   // v4 起不带复查日期
   recPlans:  [{ id, roundId, studentId, date, createdAt }],   // 计划某天背诵（v3 新增）
   exams:     [{ id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }],
+  remarks:   [{ id, studentId, date, text, createdAt }],   // 「学生趋势 → 其他情况」的学情记录（v5 新增；photoIds? 见 3.5）
   settings:  { reminderNotify: false, passPercent: 60,
                quickPhrases: { homework: [], recitation: ['复习体系混乱', '复习体系有条理', '书写有一定问题', '格式需要改善'] } }
 }
@@ -73,7 +75,7 @@ state = {
 - `settings.quickPhrases`：comment 快捷词，作业/背诵两套独立。`normalize()` 对它做深合并——缺哪一组补默认值、过滤空串/重复项，所以旧数据和旧备份导入后也一定有这个字段（因此加它不需要升 schema）。
 - **schema 历史**：v1（1.0.0）带 `subjects` 列表和各记录的 `subjectId`；v2（1.1.0）`migrate()` 把它们删掉；
   v3（1.2.0）新增 `recPlans`（无需转换，`normalize()` 补空数组）；v4（1.9.0）把检查记录上的 `nextDates` 转成 `recPlans`
-  （计划 `createdAt` = 原检查记录的 `createdAt`，同一学生同一轮同一天不重复）并删除 `nextDates`。删除学生/轮次/班级都会级联删除计划。
+  （计划 `createdAt` = 原检查记录的 `createdAt`，同一学生同一轮同一天不重复）并删除 `nextDates`；v5（1.13.0）新增 `remarks`（无需转换，`normalize()` 补空数组）。删除学生/轮次/班级都会级联删除计划。
 - **迁移**：`load()` 和 `replaceState()`（本地导入、云端恢复共用）都走 `normalize()` → `migrate()`。
   以后改结构：递增 `SCHEMA_VERSION`，在 `migrate()` 里按版本逐级升级，并同步改 `validateSnapshot()`，
   然后**实际跑一遍"导出 → 导入"**确认旧备份仍能导入。
@@ -101,9 +103,11 @@ state = {
 
 - **轮次（round）不绑定日期**，每天抽查一部分人，每次检查新增一条 `recCheck`（历史全保留，可删单条）。
 - 学生在某轮次的**当前状态 = 最新一条检查记录的 result**（`progressOf()/statusOf()`；按 date，再按 createdAt 排序）；没记录 = 未检查。
-  result：`excel` 深绿（超额完成，1.10.0 新增）/ `pass` 绿 / `retry` 黄（需重新过关）/ `fail` 红（未过关）。
+  result：`excel` 深绿（超额完成，1.10.0 新增）/ `pass` 绿 / `cond` 浅绿（有条件过关=勉强过，1.12.0 新增，同样算过关）/ `retry` 黄（需重新过关）/ `fail` 红（未过关）。
   超额完成 = 过关里做得好的，凡是"算不算过关"的地方（过关率、过关数、连续过关、把未过关的加入计划）都用 `RecitationModel.isPassed()` 判断，
-  `roundSummary()` 另给 `passed = excel + pass`。新增结果值不需要迁移（result 本来就是自由文本字段）。
+  `roundSummary()` 另给 `passed = excel + pass + cond`。计划背诵标识色 1.12.0 起改为浅天蓝（`PLAN`）。
+  作业侧栏同理：`HomeworkModel.sideList()` / `moveHomework()`，可选字段 `order`；`list()` 保持按日期（趋势统计依赖时间顺序），拖动逻辑共用 `UI.bindSideDrag`。
+  轮次顺序：`rounds()` 无 `order` 的排最前（按创建时间新→旧），有 `order`（侧栏拖动后写入，`moveRound()`）的按升序跟在后面；`order` 是可选字段，无需迁移。新增结果值不需要迁移（result 本来就是自由文本字段）。
   **1.9.0 起"需重新过关 / 未过关"只是状态，不带日期**（用户要求与复查日期脱离关系）；"哪天再背"统一用背诵计划表示。
   原先 1.4.0 的"设了 N 个复查日期就要过关 N 次"规则随之取消。`progressOf()` 还给出 `passedOn`（这一段连续过关的第一次过关日期）
   与 `attemptsToPass`，供学生趋势"首次过关 / 用时 / 平均几次过关"使用。
@@ -130,6 +134,20 @@ state = {
 - 总览矩阵（`overview.js`）：每格是一条按数量分段的色块——该生在该轮所有检查记录中 超额完成 / 过关 / 需重新过关 / 未过关 的次数，
   按深绿、绿、黄、红从左到右、宽度按数量比例（`flex: n`）；中间数字 = 检查次数；没检查过 = 灰色空格；最右"过关"列按当前状态统计。
 
+### 3.4 其他情况：学情记录（`models/remarks.js`）
+
+- `remarks` 一条 = 对某学生的一次记录：`date`（记录日期，可改，界面用 `Utils.formatDate`）+ `text`（纯文本，显示时 `white-space: pre-wrap` 保留换行）。关联用 `studentId`，没有 classId（班级由学生决定）。
+- `RemarkModel.listFor(studentId)` 日期新→旧；`add/update/remove`；内容不能为空。删除学生、删除班级会级联删除记录。
+- 视图 `OtherRecords`（导航页「🗂️ 其它」的全部内容）：选中学生由 `StudentTrend` 共享；新增表单是页内 `<form>`，提交后整页重绘（输入内容随之清空），编辑走 `Modal.open`。内容和照片至少要有一样。
+
+### 3.5 照片（`components/photos.js`）
+
+- 作业登记（`records[studentId].photoIds`）、背诵检查（`recChecks[].photoIds`，含编辑检查）、学情记录（`remarks[].photoIds`）都可带照片；记录里只存 id 数组（可选字段，无需升 schema）。
+- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。保存前 canvas 压缩（最长边 1600px，JPEG 0.8）。
+- 「📷 拍照」按设备分两条路：主输入是触摸（`matchMedia('(pointer: coarse)')`，手机/平板）用 `<input capture=environment>` 拉起系统相机；电脑上 `capture` 无效（只会弹文件选择框），改用 `getUserMedia` 在页面里开摄像头预览（`openCamera`，z-index 8000，可连拍、切换前后置）。`getUserMedia` 要 https / localhost；无摄像头、被拒绝或非安全上下文时 Toast 提示并退回选文件。
+- 弹窗用 `Photos.editorHtml()` + `Photos.bindEditor(body, 已有ids)`；保存时先 `await editor.finalize()` 拿到最终 `photoIds` 再提交记录。展示用 `Photos.viewHtml(ids)`（`<img data-photo>` 由全局 MutationObserver 补 src，点击放大）。
+- 无人引用的照片由 `AppState.gcPhotos()` 在每次 `_commit` 后清理（存了不满 1 分钟的不动）。导入 .db = 整体替换，照片也以导入文件为准。
+
 ### 3.3 考试（`models/exams.js`）
 
 - TXT 格式：每行 `姓名 成绩`；分隔符兼容半角/全角空格、Tab、逗号；姓名可含空格以外字符，成绩取最后一段。
@@ -137,7 +155,7 @@ state = {
 - 读取 TXT 文件时 UTF-8 解码出现替换字符则回退 GB18030（兼容 Windows 记事本 ANSI）。
 - 导出：按学号顺序，无成绩的学生不输出。文件名 `日期_考试名.txt`。
 - 统计只算当前在册学生；名次并列同分同名次（1,2,2,4）；及格线 = 满分 × `settings.passPercent`%。
-- 学生看板默认用**得分率**作图（不同满分的考试可比），可切原始分。
+- 学生趋势默认用**得分率**作图（不同满分的考试可比），可切原始分。
 
 ## 四、模块与文件清单
 
@@ -157,8 +175,9 @@ styles/board.css                   学生色块卡片、状态按钮、分段条
 styles/settings.css                主页布局
 styles/recitation.css              计划日期 chips、计划背诵子标签、时间看板
 styles/charts.css                  SVG 图表
-styles/trend.css                   学生趋势选择器（类型切换 + 学生小块）
+styles/trend.css                   学生趋势选择器（类型切换 + 学生小块）、其他情况记录列表
 styles/quickPhrases.css            快捷词按钮条与编辑卡片
+styles/photos.css                  照片编辑块、缩略图、放大
 styles/dayPicker.css               日期块选择器
 styles/onedrive.css / update.css   云备份面板 / 更新弹窗
 styles/responsive.css              所有断点（1000px 单栏、720px 移动端）
@@ -168,6 +187,8 @@ scripts/state.js                   AppState：持久化/订阅/迁移/校验 + �
 scripts/models/homework.js         HomeworkModel
 scripts/models/recitation.js       RecitationModel
 scripts/models/exams.js            ExamModel
+scripts/models/remarks.js          RemarkModel（学生趋势「其他情况」的学情记录）
+scripts/components/photos.js       Photos：拍照/上传编辑块、缩略图、点击放大
 scripts/components/toast.js        Toast（含 Toast.action：带「撤销」等按钮的提示）
 scripts/components/modal.js        Modal.confirm / Modal.open（表单弹窗）/ Modal.prompt
 scripts/components/ui.js           UI：二级标签栏、学生链接、图例、统计块
@@ -191,6 +212,7 @@ scripts/pages/roster.js            学生名单卡片
 scripts/pages/homework/*.js        statusPicker（状态弹窗/作业表单/markFixed）/ homeworkPage（外壳+登记）/ matrix（总览+欠交）/ student
 scripts/pages/recitation/*.js      checkDialog（检查弹窗/轮次表单）/ recitationPage（外壳+检查）/ planView（计划背诵子标签）/ overview（时间看板+总览）/ student
 scripts/pages/exams/*.js           examDialogs / examsPage / examStudent
+scripts/pages/trend/*.js           trendPage（导航页「🗂️ 其它」外壳）/ otherRecords（其他情况）
 scripts/app.js                     启动入口（最后加载）
 ```
 
@@ -261,6 +283,8 @@ scripts/app.js                     启动入口（最后加载）
   rec_check_dates(check_id, position, date)      旧版本（schema ≤ 3）的复查日期；新导出为空表，导入旧 .db 时会迁移成计划
   rec_plans(id, round_id, student_id, date, created_at, extra)
   exams(id, class_id, name, date, full_score, created_at, extra)
+  remarks(id, student_id, date, text, created_at, extra)   1.13.0 新增；旧 .db 没有这张表，导入时视为空
+  photos(id, mime, data BLOB, created_at)                  1.14.0 新增；照片本体（记录的 photoIds 指向这里），旧 .db 没有则视为无照片
   exam_scores(exam_id, student_id, score)
   ```
 - **全量保证**：固定列之外的字段一律写进该行 `extra`（JSON），未知顶层字段写进 `meta` 的 `extra:*`，所以以后加字段不需要改表结构也不会丢；
