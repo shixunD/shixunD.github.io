@@ -1,13 +1,13 @@
 // msalAuth.js —— OneDrive 登录/登出/静默取 token（MSAL.js v2 PublicClientApplication）
 // 本项目需要独立注册一个 Azure App（与其他项目隔离：各自的 Client ID、各自的 OneDrive AppFolder）。
-// 配置步骤见 PROJECT.md「OneDrive 云备份」：注册后把 Client ID 填到下面的 MSAL_CLIENT_ID。
+// 配置步骤见 PROJECT.md「OneDrive 云备份」：Client ID 已填在下面的 MSAL_CLIENT_ID。
 // 未填写时 isConfigured() 返回 false，不加载 MSAL 脚本，备份面板显示"未配置"提示而不是报错。
 // 全局命名空间：window.MsalAuth
 
 (function () {
     'use strict';
 
-    const MSAL_CLIENT_ID = 'YOUR_AZURE_CLIENT_ID';
+    const MSAL_CLIENT_ID = 'de868c53-0d3c-4da7-b422-cdbc5f205cbc';
     const MSAL_SCOPES = ['Files.ReadWrite.AppFolder'];
 
     const MSAL_CDN_URLS = [

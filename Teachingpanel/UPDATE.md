@@ -3,6 +3,10 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.14.1 — 2026-11-01
+
+- 配置：OneDrive 云备份启用。`msalAuth.js` 的 `MSAL_CLIENT_ID` 填入已注册的 Azure 应用 `de868c53-0d3c-4da7-b422-cdbc5f205cbc`（个人账户 / SPA / `Files.ReadWrite.AppFolder`），`isConfigured()` 变为 true，备份面板不再显示「尚未配置」；PROJECT.md 第七节补充重定向 URI 规则，Handbook 数据备份说明同步
+
 ## 1.14.0 — 2026-11-01
 
 - 变更：导航第五项由「其他」改为「🗂️ 其它」（`#trend-page`，`TrendPage`，`pages/trend/trendPage.js`），页面内容就是「🗂️ 其他情况」（`OtherRecords`，原 1.13.0 的学情记录，`pages/trend/otherRecords.js`）。作业/背诵/考试页下原有的「📈 学生趋势」子标签保留；`StudentTrend.KINDS` 增加 `other`（导航页），点作业/背诵/考试趋势按钮仍走各页的 `openTab('student')`，点「其他情况」走 `Navigation.goTo('trend')`；`styles/other.css` 并入 `trend.css`

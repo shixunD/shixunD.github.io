@@ -1,6 +1,13 @@
 {
-    "semver": "1.14.0",
+    "semver": "1.14.1",
     "changelog": [
+        {
+            "semver": "1.14.1",
+            "date": "2026-11-01",
+            "items": [
+                "OneDrive 云备份可以用了：在主页点「☁️ OneDrive 云备份」，用个人 Microsoft 账户登录后即可上传备份、从历史备份恢复"
+            ]
+        },
         {
             "semver": "1.14.0",
             "date": "2026-11-01",

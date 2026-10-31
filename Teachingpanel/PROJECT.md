@@ -166,6 +166,7 @@ service-worker.js                  全部资源 cache-first；/deploy-tag.json �
 version.json                       semver + changelog（只用于更新弹窗展示，不参与判重）
 wrangler.jsonc / .assetsignore     Cloudflare Workers 静态资源部署配置
 Handbook/index.html                终端用户使用说明（独立单文件，自带样式）
+tools/sync-to-site.js              同步到个人站点仓库 + 路径大小写体检（不部署，已在 .assetsignore 排除）
 .claude/settings.json + hooks/     PostToolUse 提醒 hook（改源码后提醒 bump 版本、同步 Handbook）
 
 styles/base.css                    CSS 变量（主色 #ff8a3d）、按钮/表单/弹窗/toast、z-index 层叠表注释
@@ -243,7 +244,7 @@ scripts/app.js                     启动入口（最后加载）
 
 - manifest `id` 固定为 `"teaching-panel"`（不再用 `./index.html`：别的应用如果也写 `./index.html` 并部署在同一路径，浏览器会当成同一个应用，安装时互相覆盖）。
   **不要再改 `id`**，改了之后已安装的用户会被当成另一个应用，需要卸载重装。
-- manifest `start_url` 为 `./`（打开的是目录地址 `/TeachingPanel/`，不带 `index.html` 尾缀；SW 预缓存里有 `./`，离线也能打开）。
+- manifest `start_url` 为 `./`（打开的是目录地址 `/Teachingpanel/`，不带 `index.html` 尾缀；SW 预缓存里有 `./`，离线也能打开）。
 - SW 注册显式 `scope:'./'`，只接管本应用目录。
 - 缓存名统一 `teaching-panel-` 前缀（`service-worker.js` 与 `updateChecker.js` 各有一份 `CACHE_PREFIX`，要同步）。
   SW activate、`CLEAR_CACHE`、更新弹窗的清缓存**只删这个前缀的缓存**，不能 `caches.keys()` 全删，否则会清掉别的应用的离线缓存。
@@ -257,6 +258,9 @@ scripts/app.js                     启动入口（最后加载）
 2. 平台选 **单页应用程序 (SPA)**，重定向 URI 填生产域名（如 `https://xxx.workers.dev/`）以及本地调试用的 `http://localhost:<端口>/`。
 3. API 权限添加 Microsoft Graph 委托权限 `Files.ReadWrite.AppFolder`。
 4. 把"应用程序(客户端) ID"填进 `scripts/onedrive/msalAuth.js` 的 `MSAL_CLIENT_ID`。
+   **已注册**：Client ID `de868c53-0d3c-4da7-b422-cdbc5f205cbc`（1.14.1 起填入）。
+   重定向 URI 必须和 `buildConfig()` 算出的值逐字一致：localhost 上是 `origin + '/'`（本地调试即 `http://localhost:8791/`），
+   线上是页面所在目录（结尾带 `/`，如 `https://shixund.github.io/Teachingpanel/`，小写 p，Azure 比对路径区分大小写）。换部署域名/子路径时要回 Azure 补加，否则登录报 `AADSTS50011`。
 
 未填写时 `MsalAuth.isConfigured()` 为 false：不加载 MSAL，备份面板显示配置提示。
 备份路径：`/me/drive/special/approot:/TeachingPanel/<时间戳>.db`（与本地导出同一种 .db，历史列表只显示 .db）。
