@@ -331,7 +331,9 @@
         } catch (e) { logEv('手机读不了这张（' + e.name + '），发原图'); return file; }
     }
 
+    // 返回新加入队列的项（网页相机用它统计「已拍 / 已传」）
     function addFiles(files, from) {
+        const added = [];
         Array.from(files).forEach((file) => {
             logEv(`${from}得到照片：${file.name || '(无名)'}，类型 ${file.type || '(空)'}，${mb(file.size)}`);
             const el = document.createElement('div');
@@ -343,14 +345,18 @@
                 if (it && it.state === 'fail') { it.state = 'wait'; it.tries = 0; mark(it, '等待发送'); flush(); }
             });
             $('list').prepend(el);
-            queue.push({ id: 'p' + Date.now() + '-' + (seq++), file, el, state: 'wait', tries: 0 });
+            const it = { id: 'p' + Date.now() + '-' + (seq++), file, el, state: 'wait', tries: 0 };
+            queue.push(it);
+            added.push(it);
         });
         flush();
+        return added;
     }
 
     function mark(it, text, cls) {
         it.el.querySelector('.tag').textContent = text;
         it.el.className = 'item' + (cls ? ' ' + cls : '');
+        updateCamCount();
     }
 
     async function flush() {
@@ -363,8 +369,8 @@
                 it.state = 'sending';
                 it.tries++;
                 const started = Date.now();
-                mark(it, '发送中…');
-                const tick = setInterval(() => mark(it, `发送中… ${Math.round((Date.now() - started) / 1000)}s`), 1000);
+                mark(it, '发送中，等电脑确认…');
+                const tick = setInterval(() => mark(it, `等电脑确认… ${Math.round((Date.now() - started) / 1000)}s`), 1000);
                 try {
                     const blob = await prepare(it.file);
                     const buf = await blob.arrayBuffer();
@@ -379,7 +385,7 @@
                         conn.send({ type: 'photo', id: it.id, mime: blob.type || 'image/jpeg', buf });
                     });
                     it.state = 'sent';
-                    mark(it, '✓ 已发送', 'sent');
+                    mark(it, '✓ 电脑已收到', 'sent');
                     logEv(`✓ 电脑已收到（用时 ${((Date.now() - started) / 1000).toFixed(1)} 秒）`);
                 } catch (err) {
                     logEv('发送失败：' + (err.message || err.name || err));
@@ -390,10 +396,10 @@
                         showNote(`${err.message}。可以在手机相机设置里把照片格式改成「兼容性最佳」或「JPG」后再拍。`);
                     } else if (it.tries >= MAX_AUTO_TRIES) {
                         it.state = 'fail';
-                        mark(it, '失败，点我重发', 'fail');
+                        mark(it, '没发成功，点我重发', 'fail');
                     } else {
                         it.state = 'wait';   // 连接问题：重连后自动重发（电脑端按编号去重，不会重复添加）
-                        mark(it, '等待重发');
+                        mark(it, '没收到确认，等待重发');
                         if (err.timeout && connected) reconnectNow('照片发送超时，正在重连后重发…');
                     }
                 } finally {
@@ -405,13 +411,171 @@
         if (connected && queue.some((q) => q.state === 'wait')) flush();
     }
 
-    $('cam').addEventListener('click', () => { ssSet(SS_CAMERA, String(Date.now())); logEv('点了「拍照」，打开相机'); });
+    // ---------- 网页内相机（1.19.0） ----------
+    // 「系统相机」要跳到相机 App 再把照片交回网页，这一步由各家浏览器实现，部分浏览器（如狐猴）拍完不回传、或拍照期间把网页关掉。
+    // 网页内相机用 getUserMedia 在本页取景，不离开页面，连接也不会断；支持 ImageCapture 的浏览器（Chromium 系）用 takePhoto()
+    // 拍全分辨率照片（带自动对焦），否则截取取景画面（请求 4096×3072，实际看摄像头支持多少）。
+    const liveSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.isSecureContext);
+    if (!liveSupported) {
+        $('livecam').hidden = true;
+        $('syscam').classList.remove('alt');
+        logEv('这个浏览器不支持网页内相机，只能用系统相机');
+    }
+    let camStream = null;
+    let camTrack = null;
+    let camCaps = {};
+    let imageCapture = null;
+    let facing = 'environment';
+    let shooting = false;
+    let camOpen = false;
+    const camItems = [];   // 这次打开相机后拍的照片（统计已传几张）
+
+    function updateCamCount() {
+        if (!camOpen) return;
+        const sent = camItems.filter((it) => it.state === 'sent').length;
+        $('camcount').textContent = camItems.length ? `已拍 ${camItems.length} 张 · 已传 ${sent} 张` : '';
+    }
+
+    function camErrText(err) {
+        const n = err && err.name;
+        if (n === 'NotAllowedError' || n === 'SecurityError') return '没有摄像头权限（请在浏览器设置里允许本站使用摄像头）';
+        if (n === 'NotFoundError' || n === 'OverconstrainedError') return '没有找到摄像头';
+        if (n === 'NotReadableError') return '摄像头被其他应用占用';
+        return '打不开摄像头（' + (n || err) + '）';
+    }
+
+    function stopCam() {
+        if (camStream) camStream.getTracks().forEach((t) => t.stop());
+        camStream = camTrack = imageCapture = null;
+        $('camvideo').srcObject = null;
+    }
+
+    const applyCam = (c) => (camTrack ? camTrack.applyConstraints({ advanced: [c] }).catch(() => {}) : Promise.resolve());
+
+    async function startCam() {
+        stopCam();
+        camStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facing }, width: { ideal: 4096 }, height: { ideal: 3072 } }, audio: false
+        });
+        camTrack = camStream.getVideoTracks()[0];
+        $('camvideo').srcObject = camStream;
+        camCaps = (camTrack.getCapabilities && camTrack.getCapabilities()) || {};
+        if (Array.isArray(camCaps.focusMode) && camCaps.focusMode.includes('continuous')) applyCam({ focusMode: 'continuous' });
+        const zbox = $('camzoombox');
+        if (camCaps.zoom && camCaps.zoom.max > camCaps.zoom.min) {
+            const z = $('camzoom');
+            z.min = camCaps.zoom.min; z.max = camCaps.zoom.max; z.step = camCaps.zoom.step || 0.1;
+            z.value = (camTrack.getSettings().zoom) || camCaps.zoom.min;
+            $('camzoomval').textContent = Number(z.value).toFixed(1) + '×';
+            zbox.hidden = false;
+        } else {
+            zbox.hidden = true;
+        }
+        imageCapture = ('ImageCapture' in window) ? new window.ImageCapture(camTrack) : null;
+        const st = camTrack.getSettings();
+        $('camres').textContent = st.width ? `${st.width}×${st.height}` : '';
+        logEv(`网页相机已打开：取景 ${st.width}×${st.height}${imageCapture ? '，可拍全分辨率' : '，截取画面'}${zbox.hidden ? '' : '，可变焦'}`);
+    }
+
+    async function openCam() {
+        logEv('点了「拍照」（网页内相机）');
+        showNote('');
+        try {
+            await startCam();
+        } catch (err) {
+            logEv('网页相机打不开：' + (err.name || err));
+            showNote(camErrText(err) + '。可以改用「📱 用系统相机拍」或「🖼️ 从相册选」。');
+            return;
+        }
+        camItems.length = 0;
+        camOpen = true;
+        updateCamCount();
+        $('camview').hidden = false;
+    }
+
+    function closeCam() {
+        camOpen = false;
+        stopCam();
+        $('camview').hidden = true;
+        logEv('关闭网页相机');
+    }
+
+    async function grabFrame() {
+        const v = $('camvideo');
+        if (!v.videoWidth) return null;
+        const c = document.createElement('canvas');
+        c.width = v.videoWidth;
+        c.height = v.videoHeight;
+        c.getContext('2d').drawImage(v, 0, 0);
+        return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.95));
+    }
+
+    async function shoot() {
+        if (shooting || !camTrack) return;
+        shooting = true;
+        $('camshot').classList.add('busy');
+        const flash = $('camflash');
+        flash.classList.add('on');
+        setTimeout(() => flash.classList.remove('on'), 60);
+        let blob = null;
+        let how = '截取画面';
+        try {
+            if (imageCapture) {
+                // 部分手机的 takePhoto 会卡很久不返回：5 秒没结果就当失败，改为截取画面
+                const timeout = (ms) => new Promise((_, reject) => setTimeout(() => { const e = new Error('超时'); e.name = 'Timeout'; reject(e); }, ms));
+                const caps = await Promise.race([imageCapture.getPhotoCapabilities(), timeout(2000)]).catch(() => null);
+                const opts = caps && caps.imageWidth && caps.imageWidth.max ? { imageWidth: caps.imageWidth.max } : {};
+                blob = await Promise.race([imageCapture.takePhoto(opts), timeout(5000)]);
+                how = '全分辨率';
+            }
+        } catch (e) {
+            logEv('全分辨率拍照失败（' + (e.name || e) + '），这次改为截取画面');
+            imageCapture = null;   // 这次打开相机期间不再尝试（每张都先失败一次会拖慢连拍），下次打开再试
+            blob = null;
+        }
+        if (!blob) blob = await grabFrame();
+        $('camshot').classList.remove('busy');
+        shooting = false;
+        if (!blob) { logEv('没拍到画面（摄像头还没准备好）'); return; }
+        logEv(`网页相机拍到一张（${how}，${mb(blob.size)}）`);
+        const file = new File([blob], `cam_${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+        camItems.push(...addFiles([file], '网页相机'));
+        updateCamCount();
+    }
+
+    $('livecam').addEventListener('click', openCam);
+    $('camdone').addEventListener('click', closeCam);
+    $('camshot').addEventListener('click', shoot);
+    $('camflip').addEventListener('click', async () => {
+        facing = facing === 'environment' ? 'user' : 'environment';
+        try { await startCam(); } catch (err) { logEv('切换摄像头失败：' + (err.name || err)); showNote(camErrText(err)); }
+    });
+    $('camzoom').addEventListener('input', (e) => {
+        $('camzoomval').textContent = Number(e.target.value).toFixed(1) + '×';
+        applyCam({ zoom: Number(e.target.value) });
+    });
+    // 点画面重新对焦（支持单次对焦的摄像头）
+    $('camvideo').addEventListener('click', async () => {
+        if (!Array.isArray(camCaps.focusMode) || !camCaps.focusMode.includes('single-shot')) return;
+        await applyCam({ focusMode: 'single-shot' });
+        setTimeout(() => { if (camCaps.focusMode.includes('continuous')) applyCam({ focusMode: 'continuous' }); }, 1500);
+    });
+    // 切到别的应用时关掉摄像头（省电，也避免摄像头被占用），回来再打开
+    document.addEventListener('visibilitychange', () => {
+        if (!camOpen) return;
+        if (document.visibilityState === 'hidden') stopCam();
+        else startCam().catch((err) => { logEv('回到页面后重开摄像头失败：' + (err.name || err)); closeCam(); showNote(camErrText(err)); });
+    });
+
+    // ---------- 系统相机 / 相册 ----------
+
+    $('cam').addEventListener('click', () => { ssSet(SS_CAMERA, String(Date.now())); logEv('点了「用系统相机拍」，打开相机 App'); });
     $('album').addEventListener('click', () => logEv('点了「从相册选」'));
     ['cam', 'album'].forEach((id) => $(id).addEventListener('change', (e) => {
         ssSet(SS_CAMERA, '');
         showNote('');
-        if (!e.target.files.length) logEv((id === 'cam' ? '相机' : '相册') + '返回了，但没有照片');
-        addFiles(e.target.files, id === 'cam' ? '相机' : '相册');
+        if (!e.target.files.length) logEv((id === 'cam' ? '系统相机' : '相册') + '返回了，但没有照片');
+        addFiles(e.target.files, id === 'cam' ? '系统相机' : '相册');
         e.target.value = '';
     }));
     $('forget').addEventListener('click', () => {

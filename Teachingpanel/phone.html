@@ -26,7 +26,7 @@
         .item img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .item.sent { border-color: #1e8e3e; }
         .item.fail { border-color: #d93025; }
-        .item .tag { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.7rem; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 1px 0; }
+        .item .tag { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.64rem; line-height: 1.25; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 2px 3px; }
         details { margin: 0.8rem 0; font-size: 0.85rem; color: #555; }
         summary { cursor: pointer; color: #999; }
         .diag { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.8rem; margin-top: 0.4rem; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 0.5rem 0.7rem; }
@@ -34,6 +34,20 @@
         .loghead { display: flex; justify-content: space-between; align-items: center; margin-top: 0.6rem; }
         .evlog { white-space: pre-wrap; word-break: break-all; font-size: 0.72rem; line-height: 1.45; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 0.5rem 0.6rem; max-height: 16rem; overflow: auto; margin: 0.3rem 0 0; }
         .link { background: none; border: none; color: #999; text-decoration: underline; font-size: 0.85rem; padding: 0.3rem 0; }
+        label.big { position: relative; overflow: hidden; }
+        .vh { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        .cam { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; flex-direction: column; }
+        .cam video { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
+        .cam-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+        .cam-flash.on { opacity: 0.7; transition: none; }
+        .cam-top { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; justify-content: space-between; color: #fff; font-size: 0.85rem; pointer-events: none; }
+        .cam-top span:not(:empty) { background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.7rem; }
+        .cam-zoom { position: absolute; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 0.4rem; color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.3rem 0.9rem; font-size: 0.85rem; }
+        .cam-zoom input { width: 160px; }
+        .cam-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px calc(14px + env(safe-area-inset-bottom)); background: rgba(0, 0, 0, 0.75); }
+        .cam-btn { min-width: 64px; padding: 0.55rem 0.9rem; border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 999px; background: transparent; color: #fff; font-size: 1rem; }
+        .cam-shutter { width: 72px; height: 72px; border-radius: 50%; border: 5px solid #fff; background: rgba(255, 255, 255, 0.3); padding: 0; }
+        .cam-shutter:active, .cam-shutter.busy { background: #fff; }
         [hidden] { display: none !important; }
     </style>
 </head>
@@ -45,14 +59,16 @@
     <div class="banner" id="note" hidden></div>
 
     <div id="main" hidden>
-        <label class="big">📷 拍照
-            <input type="file" accept="image/*" capture="environment" hidden id="cam">
+        <button type="button" class="big" id="livecam">📷 拍照</button>
+        <!-- 上传控件不用 hidden（display:none）：部分安卓浏览器对不显示的 file 控件拍照后不回传照片，改成视觉隐藏 -->
+        <label class="big alt" id="syscam">📱 用系统相机拍
+            <input type="file" accept="image/*" capture="environment" class="vh" id="cam">
         </label>
         <label class="big alt">🖼️ 从相册选（可多选）
-            <input type="file" accept="image/*" multiple hidden id="album">
+            <input type="file" accept="image/*" multiple class="vh" id="album">
         </label>
         <div class="list" id="list"></div>
-        <p class="hint">用的是手机自带相机，对焦、变焦、画质都和平时拍照一样。拍完自动传到电脑，再点「拍照」继续拍下一张；没连上时拍的照片会先攒着，连上后自动发送。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
+        <p class="hint">「📷 拍照」在本页里直接打开摄像头，可以连拍，每拍一张马上传到电脑（不离开本页，最稳定）。「📱 用系统相机拍」会跳到手机自带的相机 App，有夜景、HDR 等效果，但部分手机拍完不会回到本页。没连上时拍的照片会先攒着，连上后自动发送。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
         <details>
             <summary>连接诊断</summary>
             <div class="diag" id="diag"></div>
@@ -62,6 +78,19 @@
         <button type="button" class="link" id="forget">忘记这台电脑</button>
     </div>
     <p class="hint" id="nopair" hidden>请在电脑上打开「📱 手机拍」，然后用手机扫描它显示的二维码。</p>
+
+    <!-- 网页内相机：全屏取景，可连拍；不离开本页，连接不会因为切到相机 App 而断开 -->
+    <div class="cam" id="camview" hidden>
+        <video id="camvideo" playsinline muted autoplay></video>
+        <div class="cam-flash" id="camflash"></div>
+        <div class="cam-top"><span id="camres"></span><span id="camcount"></span></div>
+        <div class="cam-zoom" id="camzoombox" hidden>🔍 <input type="range" id="camzoom"> <span id="camzoomval"></span></div>
+        <div class="cam-bar">
+            <button type="button" class="cam-btn" id="camdone">完成</button>
+            <button type="button" class="cam-shutter" id="camshot" aria-label="拍照"></button>
+            <button type="button" class="cam-btn" id="camflip" aria-label="切换前后摄像头">🔄</button>
+        </div>
+    </div>
 
     <script src="./scripts/vendor/peerjs.min.js"></script>
     <script src="./scripts/phoneConfig.js"></script>
