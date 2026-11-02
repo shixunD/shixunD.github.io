@@ -64,8 +64,8 @@
                             <button type="button" class="btn-toggle ${settings.reminderNotify ? 'btn-toggle-on' : ''}" data-notify>${settings.reminderNotify ? '已开启' : '已关闭'}</button>
                         </div>
                         <div class="setting-row">
-                            <div><div>照片画质</div><div class="hint">默认「画质优先」：保持原分辨率，小字和原图一样清楚，体积通常比「清晰」挡还小。需要严格控制每张大小时可改用下面几挡（会缩小分辨率）。只影响以后新拍/上传的照片</div></div>
-                            <select data-photo-quality>${Photos.PRESETS.map((p) => `<option value="${p.key}" ${p.key === Photos.getPreset().key ? 'selected' : ''}>${esc(p.label)}（${esc(p.desc)}）</option>`).join('')}</select>
+                            <div><div>照片压缩：默认预览档位</div><div class="hint">拍照 / 手机拍 / 上传的照片收到后会弹出预览框，可逐档（WebP 质量 0.1–1.0，每 0.1 一档，或不压缩）对比，点「确定」后只保留所选那一份，完整原图丢弃。这里选打开预览框时默认选中哪一档。只影响以后新拍/上传的照片</div></div>
+                            <select data-photo-quality>${Photos.LEVELS.map((l) => `<option value="${l.key}" ${l.key === Photos.getLevel().key ? 'selected' : ''}>${esc(l.desc)}</option>`).join('')}</select>
                         </div>
                         <div class="setting-row">
                             <div><div>考试及格线</div><div class="hint">占满分的百分比</div></div>
@@ -160,7 +160,7 @@
             }
             await AppState.updateSettings({ reminderNotify: on });
         });
-        q('[data-photo-quality]').addEventListener('change', (e) => Photos.setPreset(e.target.value));
+        q('[data-photo-quality]').addEventListener('change', (e) => Photos.setLevel(e.target.value));
         q('[data-pass-percent]').addEventListener('change', (e) => {
             const v = Math.max(1, Math.min(100, Number(e.target.value) || 60));
             AppState.updateSettings({ passPercent: v });

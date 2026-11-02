@@ -3,7 +3,7 @@
 .photo-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.3rem 0; }
 .photo-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.3rem; }
 .photo-thumb { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-color); }
-.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+.photo-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
 .photo-rm {
     position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: none; border-radius: 50%;
     background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.7rem; line-height: 20px; cursor: pointer; padding: 0;
@@ -67,11 +67,6 @@
 .camera-info { position: absolute; top: 12px; right: 12px; color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.78rem; }
 .camera-info:empty { display: none; }
 
-/* 缩略图左上角的「顺时针旋转」按钮（与右上角的移除按钮对称） */
-.photo-rot {
-    position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: none; border-radius: 50%;
-    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8rem; line-height: 20px; cursor: pointer; padding: 0;
-}
 
 /* 手机拍照接收面板（PhoneLink）：层级 8000，叠在登记弹窗之上 */
 .phonelink-overlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -93,3 +88,32 @@
 .phonelink-diag { font-size: 0.82rem; margin-bottom: 0.6rem; color: var(--text-secondary); }
 .phonelink-diag summary { cursor: pointer; }
 .phonelink-diag-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.8rem; margin-top: 0.4rem; }
+
+/* 收到照片后的压缩档位预览框：层级 8500，高于相机 / 手机接收面板 / 大图（8000），低于提示条 */
+.photo-choose-overlay { position: fixed; inset: 0; z-index: 8500; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 0.6rem; }
+.photo-choose-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1rem; width: min(900px, 100%); max-height: 96vh; display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; }
+.photo-choose-box h2 { margin: 0; font-size: 1.1rem; }
+.photo-choose-box h2 small { font-weight: normal; color: var(--text-secondary); margin-left: 0.5rem; font-size: 0.8rem; }
+.photo-choose-view { flex: 1; min-height: 200px; height: 52vh; overflow: auto; background: #111; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.photo-choose-view img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.photo-choose-view.actual { display: block; }
+.photo-choose-view.actual img { max-width: none; max-height: none; }
+.photo-choose-levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.photo-choose-lv { display: flex; flex-direction: column; align-items: center; min-width: 4.2rem; padding: 0.3rem 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: inherit; cursor: pointer; font-size: 0.9rem; }
+.photo-choose-lv span { font-size: 0.72rem; color: var(--text-secondary); }
+.photo-choose-lv.selected { border-color: #1a73e8; background: #e8f0fe; color: #174ea6; }
+.photo-choose-lv.selected span { color: #174ea6; }
+.photo-choose-info { font-size: 0.95rem; }
+.photo-choose-info b { color: #1a73e8; }
+
+/* 大图左右切换：贴着屏幕左右边的透明感应区，鼠标靠近才显示箭头；触屏设备（没有 hover）一直显示 */
+.photo-lightbox-nav {
+    position: absolute; top: 0; bottom: 0; width: 22vw; max-width: 160px; border: none; background: transparent;
+    color: #fff; font-size: 3rem; cursor: pointer; opacity: 0; transition: opacity 0.15s; z-index: 1;
+}
+.photo-lightbox-nav.nav-prev { left: 0; text-align: left; padding-left: 14px; }
+.photo-lightbox-nav.nav-next { right: 0; text-align: right; padding-right: 14px; }
+.photo-lightbox-nav:hover, .photo-lightbox-nav:focus-visible { opacity: 1; background: linear-gradient(to var(--nav-dir, right), rgba(0, 0, 0, 0.35), transparent); }
+.photo-lightbox-nav.nav-next { --nav-dir: left; }
+@media (hover: none) { .photo-lightbox-nav { opacity: 0.7; width: 56px; } }
+.photo-lightbox-count { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.1rem 0.8rem; font-size: 0.85rem; }

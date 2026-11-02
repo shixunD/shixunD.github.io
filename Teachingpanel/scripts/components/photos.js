@@ -6,7 +6,7 @@
 //   Photos.bindEditor(root, existingIds)        绑定，返回 { finalize() }：把新选的照片存起来，返回最终的 photoIds
 //   Photos.viewHtml(ids)                        只读缩略图（空数组返回空串）；<img data-photo> 由全局 MutationObserver 自动补 src
 // 拍照：手机/平板（pointer: coarse）用 <input capture> 拉起系统相机；电脑 capture 无效，改用 getUserMedia 页内相机（openCamera）。
-// 保存前按画质挡位（PRESETS，主页设置里选）缩小并自适应质量（WebP，不支持时 JPEG），保证每张不超过挡位的体积上限，避免手机原图（几 MB）撑爆存储和 .db 导出文件。
+// 收到照片后弹预览框，逐档（质量 0.1–1.0 每 0.1 一档 / 不压缩）对比，确定后只存所选那一份（WebP，不支持时 JPEG），原图丢弃；默认档在主页设置里选。
 
 (function () {
     'use strict';
@@ -23,25 +23,26 @@
         });
     }
 
-    // 画质挡位：最长边（像素）+ 起始质量 + 每张照片体积上限。体积超限时先降质量，降到底还超再缩小尺寸，保证每张不超过上限。
-    // 「画质优先」（1.18.0 起默认）：观感变差主要来自缩小分辨率和为了凑体积压低质量（而不是编码器），
-    // 所以它保持原分辨率（超过 4096 才缩）、质量固定 0.65（用户指定），体积上限 4 MB 只是防极端情况的保险，正常照片碰不到
-    const PRESETS = [
-        { key: 'best',   label: '画质优先', desc: '保持原分辨率，质量固定 65', side: 4096, quality: 0.65, maxBytes: 4 * 1024 * 1024 },
-        { key: 'ultra',  label: '超清',     desc: '最长边 3200，每张 ≤ 2 MB', side: 3200, maxBytes: 2 * 1024 * 1024 },
-        { key: 'high',   label: '清晰',     desc: '最长边 2400，每张 ≤ 1 MB', side: 2400, maxBytes: 1024 * 1024 },
-        { key: 'normal', label: '标准',     desc: '最长边 2000，每张 ≤ 600 KB', side: 2000, maxBytes: 600 * 1024 },
-        { key: 'low',    label: '省空间',   desc: '最长边 1600，每张 ≤ 300 KB', side: 1600, maxBytes: 300 * 1024 }
-    ];
-    const DEFAULT_PRESET = 'best';
-    const LS_QUALITY = 'teachingPanel.photoQuality';
-    const MIN_Q = 0.5, START_Q = 0.9;
+    // 压缩档位（1.22.0 起）：只调 WebP 质量，分辨率保持原样（最长边超过 MAX_SIDE 才等比缩小）。
+    // 拍照 / 上传 / 手机回传收到的照片先不保存，弹出预览框让用户逐档对比（chooseLevel），确定后只留所选档位那一份，完整原图丢弃。
+    // 「不压缩」= 原样保存收到的那份文件。默认选中的档位在主页「⚙️ 设置」里选。
+    // 质量 0.1–1.0 每 0.1 一档，外加「不压缩」
+    const LEVELS = Array.from({ length: 10 }, (_, i) => {
+        const q = (i + 1) / 10;
+        return { key: 'q' + (i + 1) * 10, label: q.toFixed(1), quality: q, desc: '质量 ' + q.toFixed(1) };
+    }).concat([{ key: 'raw', label: '不压缩', quality: null, desc: '不压缩（保留收到的原图）' }]);
+    const DEFAULT_LEVEL = 'q60';
+    const LS_LEVEL = 'teachingPanel.photoPreviewLevel';
+    const MAX_SIDE = 4096;       // 超过才缩小，防止超大图撑爆内存/存储
+    const ROTATE_Q = 0.92;       // 旋转时重新编码用的质量（默认档是「不压缩」时也用它）
 
-    function getPreset() {
-        const key = Utils.lsGet(LS_QUALITY, DEFAULT_PRESET);
-        return PRESETS.find((p) => p.key === key) || PRESETS.find((p) => p.key === DEFAULT_PRESET);
+    function getLevel() {
+        const key = Utils.lsGet(LS_LEVEL, DEFAULT_LEVEL);
+        return LEVELS.find((l) => l.key === key) || LEVELS.find((l) => l.key === DEFAULT_LEVEL);
     }
-    function setPreset(key) { if (PRESETS.some((p) => p.key === key)) Utils.lsSet(LS_QUALITY, key); }
+    function setLevel(key) { if (LEVELS.some((l) => l.key === key)) Utils.lsSet(LS_LEVEL, key); }
+    // 旋转要重新编码：不低于默认档质量，免得转一下反而更糊；默认档是「不压缩」就用 ROTATE_Q
+    function rotateQuality() { const q = getLevel().quality; return q ? Math.max(q, 0.6) : ROTATE_Q; }
 
     const toBlob = (canvas, type, q) => new Promise((resolve, reject) => {
         canvas.toBlob((bl) => (bl ? resolve(bl) : reject(new Error('图片处理失败'))), type, q);
@@ -60,48 +61,153 @@
         return toBlob(canvas, outType, q);
     }
 
-    // 读图（按 EXIF 摆正）→ 顺时针转 rot×90° → 按画质挡位缩小并压缩到体积上限以内。
-    // 旋转总是从原图重新压缩（而不是对压缩过的图再压一次），转几次画质都不会越来越差
-    async function compress(file, rot = 0) {
-        let bitmap;
+    // 读图（按 EXIF 摆正）
+    async function decode(file) {
         try {
-            bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+            return await createImageBitmap(file, { imageOrientation: 'from-image' });
         } catch (e) {
             throw new Error('无法读取这张图片，请换一张试试');
         }
-        const preset = getPreset();
-        const startQ = preset.quality || START_Q;
+    }
+
+    // 把位图画到 canvas：最长边超过 MAX_SIDE 才缩小，顺时针转 rot×90°
+    function drawToCanvas(bitmap, rot = 0) {
         const turned = rot % 2 === 1;
-        let scale = Math.min(1, preset.side / Math.max(bitmap.width, bitmap.height));
+        const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        const w = Math.max(1, Math.round(bitmap.width * scale));
+        const h = Math.max(1, Math.round(bitmap.height * scale));
         const canvas = document.createElement('canvas');
+        canvas.width = turned ? h : w;
+        canvas.height = turned ? w : h;
         const ctx = canvas.getContext('2d');
-        let blob = null;
-        for (let round = 0; round < 6; round++) {
-            const w = Math.max(1, Math.round(bitmap.width * scale));
-            const h = Math.max(1, Math.round(bitmap.height * scale));
-            canvas.width = turned ? h : w;    // 改尺寸会重置 context 状态，下面的设置每轮都要重新做
-            canvas.height = turned ? w : h;
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.imageSmoothingQuality = 'high';   // 缩小时用高质量重采样，默认的 low 会让小字边缘发虚、细线出锯齿
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate(rot * Math.PI / 2);
-            ctx.drawImage(bitmap, -w / 2, -h / 2, w, h);
-            blob = await encodeImage(canvas, startQ);
-            if (blob.size <= preset.maxBytes) break;
-            // 在 [MIN_Q, startQ] 里二分找「不超限的最高质量」；全都超限就缩小尺寸再来
-            let lo = MIN_Q, hi = startQ, best = null;
-            for (let i = 0; i < 5; i++) {
-                const mid = (lo + hi) / 2;
-                const b = await encodeImage(canvas, mid);
-                if (b.size <= preset.maxBytes) { best = b; lo = mid; } else { hi = mid; }
-            }
-            if (best) { blob = best; break; }
-            scale *= 0.85;
+        ctx.imageSmoothingQuality = 'high';   // 缩小时用高质量重采样，默认的 low 会让小字边缘发虚
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(rot * Math.PI / 2);
+        ctx.drawImage(bitmap, -w / 2, -h / 2, w, h);
+        return canvas;
+    }
+
+    // 旋转用：把一张已有的图转 rot×90° 后重新编码
+    async function rotateBlob(blob, rot) {
+        const bitmap = await decode(blob);
+        try {
+            return await encodeImage(drawToCanvas(bitmap, rot), rotateQuality());
+        } finally {
+            if (bitmap.close) bitmap.close();
         }
+    }
+
+    const fmtSize = (n) => (n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(2) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+
+    // 预览框：逐档对比，确定后返回所选那一档的 Blob；放弃这张返回 null。读不了图片时抛错
+    async function chooseLevel(file) {
+        const bitmap = await decode(file);
+        const canvas = drawToCanvas(bitmap, 0);
+        const info = `${bitmap.width}×${bitmap.height}`;
         if (bitmap.close) bitmap.close();
-        return blob;
+
+        const results = new Map();     // key -> { blob, url }
+        const put = (key, blob) => results.set(key, { blob, url: URL.createObjectURL(blob) });
+        put('raw', file);
+        let selected = getLevel().key;
+        let closed = false;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'photo-choose-overlay';
+        overlay.innerHTML = `
+            <div class="photo-choose-box" role="dialog" aria-modal="true">
+                <h2>选择压缩档位 <small>原图 ${info} · ${fmtSize(file.size)}</small></h2>
+                <div class="photo-choose-view" data-view><img alt="预览"></div>
+                <div class="photo-choose-info" data-info></div>
+                <div class="photo-choose-levels">${LEVELS.map((l) => `<button type="button" class="photo-choose-lv" data-lv="${l.key}"><b>${Utils.escapeHtml(l.label)}</b><span data-size>${l.key === 'raw' ? fmtSize(file.size) : '计算中…'}</span></button>`).join('')}</div>
+                <div class="hint">点档位对比效果；确定后只保留所选的一份，收到的完整原图会丢弃。数字是 WebP 质量，越大越清楚、文件越大。</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" data-zoom>放大到 100%</button>
+                    <button type="button" class="btn-secondary" data-skip>放弃这张</button>
+                    <button type="button" class="btn-primary" data-ok>确定</button>
+                </div>
+            </div>`;
+        const img = overlay.querySelector('img');
+        const okBtn = overlay.querySelector('[data-ok]');
+
+        function show() {
+            overlay.querySelectorAll('[data-lv]').forEach((b) => b.classList.toggle('selected', b.dataset.lv === selected));
+            const r = results.get(selected);
+            okBtn.disabled = !r;
+            const level = LEVELS.find((l) => l.key === selected);
+            const infoEl = overlay.querySelector('[data-info]');
+            if (r) {
+                img.src = r.url;
+                const pct = Math.round(r.blob.size / file.size * 100);
+                infoEl.innerHTML = `当前「${Utils.escapeHtml(level.label)}」：<b>${fmtSize(r.blob.size)}</b>` + (level.key === 'raw' ? '（原图大小）' : `（原图 ${fmtSize(file.size)}，为原图的 ${pct}%）`);
+            } else {
+                infoEl.textContent = `当前「${level.label}」：计算中…`;
+            }
+        }
+
+        return new Promise((resolve) => {
+            const finish = (value) => {
+                closed = true;
+                overlay.remove();
+                document.removeEventListener('keydown', onKey, true);
+                results.forEach((r, key) => { if (!value || r.blob !== value) URL.revokeObjectURL(r.url); });
+                resolve(value);
+            };
+            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(null); } };
+            document.addEventListener('keydown', onKey, true);
+            overlay.addEventListener('click', (e) => {
+                const lv = e.target.closest('[data-lv]');
+                if (lv) { selected = lv.dataset.lv; show(); return; }
+                if (e.target.closest('[data-zoom]')) {
+                    const on = overlay.querySelector('[data-view]').classList.toggle('actual');
+                    e.target.closest('[data-zoom]').textContent = on ? '适应窗口' : '放大到 100%';
+                } else if (e.target.closest('[data-skip]')) {
+                    finish(null);
+                } else if (e.target.closest('[data-ok]')) {
+                    const r = results.get(selected);
+                    if (r) finish(r.blob);
+                }
+            });
+            document.body.appendChild(overlay);
+            show();
+
+            // 默认档优先算，其余依次在后台算；全部共用同一张 canvas
+            (async () => {
+                const order = [selected].concat(LEVELS.map((l) => l.key).filter((k) => k !== selected && k !== 'raw'));
+                for (const key of order) {
+                    if (closed) return;
+                    const level = LEVELS.find((l) => l.key === key);
+                    if (!level || !level.quality) continue;
+                    try {
+                        put(key, await encodeImage(canvas, level.quality));
+                        if (closed) { URL.revokeObjectURL(results.get(key).url); return; }
+                        overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = fmtSize(results.get(key).blob.size);
+                        if (key === selected) show();
+                    } catch (e) {
+                        if (!closed) overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = '失败';
+                    }
+                }
+            })();
+        });
+    }
+
+    // 预览框排队：多张照片（连拍、多选、手机连传）一张一张预览；相机 / 手机接收面板还开着时先等着，不挡住拍照
+    const chooseQueue = [];
+    let draining = false;
+    async function drainChooseQueue() {
+        draining = true;
+        while (chooseQueue.length) {
+            while (document.querySelector('.camera-overlay, .phonelink-overlay')) await new Promise((r) => setTimeout(r, 400));
+            const job = chooseQueue.shift();
+            try { await job(); } catch (err) { Toast.error(err.message); }
+        }
+        draining = false;
+    }
+    function enqueueChoose(job) {
+        chooseQueue.push(job);
+        if (!draining) drainChooseQueue();
     }
 
     // ---------- 只读缩略图 ----------
@@ -127,25 +233,72 @@
 
     // ---------- 点击放大 ----------
 
-    function openLightbox(src) {
+    // 旋转是写回照片本身的：旋转后的图立刻存回 IndexedDB（同一个 id），所有缩略图和以后的大图都是这个方向
+    const pendingRotators = new WeakMap();   // 登记弹窗里的照片列表元素 -> (index, dir) => Promise<新 url>
+
+    async function rotateSaved(id, dir) {
+        const old = await AppState.photoGet(id);
+        if (!old) return null;
+        const blob = await rotateBlob(old, dir > 0 ? 1 : 3);
+        await AppState.photoPut(id, blob);
+        const url = URL.createObjectURL(blob);
+        const prev = urlCache.get(id);
+        urlCache.set(id, url);
+        document.querySelectorAll('img[data-photo]').forEach((im) => { if (im.dataset.photo === id) im.src = url; });
+        return { url, prev };
+    }
+
+    // items: [{ src, rotator }]，start 为当前张；同一条记录里的多张照片可左右切换。
+    // rotator(dir) -> Promise<新 url | null>；没有（手机传来的预览等）就不显示旋转按钮
+    function openLightbox(items, start) {
+        let cur = start;
         const overlay = document.createElement('div');
         overlay.className = 'photo-lightbox';
-        overlay.innerHTML = `<img src="${src}" alt="照片" draggable="false"><button type="button" class="photo-lightbox-close" title="关闭">✕</button>`
-            + '<div class="photo-lightbox-bar"><button type="button" data-lb="left" title="向左旋转 90°">↺ 左转</button><button type="button" data-lb="right" title="向右旋转 90°">↻ 右转</button><button type="button" data-lb="reset" title="还原">还原</button></div>';
+        overlay.innerHTML = `<img src="${items[cur].src}" alt="照片" draggable="false"><button type="button" class="photo-lightbox-close" title="关闭">✕</button>`
+            + (items.length > 1 ? '<button type="button" class="photo-lightbox-nav nav-prev" data-lb="prev" title="上一张（←）">‹</button><button type="button" class="photo-lightbox-nav nav-next" data-lb="next" title="下一张（→）">›</button><div class="photo-lightbox-count" data-count></div>' : '')
+            + '<div class="photo-lightbox-bar"><span data-rot-btns></span><button type="button" data-lb="reset" title="还原缩放和位置">复位</button></div>';
         const img = overlay.querySelector('img');
-        // 预览里的旋转/缩放/平移只改变当前查看效果，不改动已保存的照片
+        // 缩放/平移只是查看效果；旋转由 rotator 写回照片，转完图本身已是新方向，所以这里的 rot 恒为 0
+        let busy = false;
         let rot = 0, scale = 1, x = 0, y = 0, dragging = false, moved = false, sx = 0, sy = 0;
+        const countEl = overlay.querySelector('[data-count]');
+        const rotBtns = overlay.querySelector('[data-rot-btns]');
+        // 当前这张能旋转才显示旋转按钮
+        function refreshBar() {
+            rotBtns.innerHTML = items[cur].rotator ? '<button type="button" data-lb="left" title="向左旋转 90°（自动记住）">↺ 左转</button> <button type="button" data-lb="right" title="向右旋转 90°（自动记住）">↻ 右转</button>' : '';
+            if (countEl) countEl.textContent = `${cur + 1} / ${items.length}`;
+        }
+        function go(step) {
+            if (items.length < 2 || busy) return;
+            cur = (cur + step + items.length) % items.length;
+            img.src = items[cur].src;
+            scale = 1; x = 0; y = 0; apply();
+            refreshBar();
+        }
         const apply = () => { img.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${scale})`; };
         const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey, true); };
-        const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+        const onKey = (e) => {
+            if (e.key === 'Escape') { e.stopPropagation(); close(); }
+            else if (e.key === 'ArrowLeft') go(-1);
+            else if (e.key === 'ArrowRight') go(1);
+        };
         overlay.addEventListener('click', (e) => {
             if (moved) { moved = false; return; }
             const b = e.target.closest('button[data-lb]');
             if (b) {
-                if (b.dataset.lb === 'left') rot -= 90;
-                else if (b.dataset.lb === 'right') rot += 90;
-                else { rot = 0; scale = 1; x = 0; y = 0; }
-                apply();
+                if (b.dataset.lb === 'reset') { scale = 1; x = 0; y = 0; apply(); return; }
+                if (b.dataset.lb === 'prev') { go(-1); return; }
+                if (b.dataset.lb === 'next') { go(1); return; }
+                const it = items[cur];
+                if (busy || !it.rotator) return;
+                busy = true;
+                it.rotator(b.dataset.lb === 'left' ? -1 : 1).then((res) => {
+                    if (!res) return;
+                    const url = typeof res === 'string' ? res : res.url;
+                    it.src = url;
+                    img.src = url;
+                    if (res.prev) setTimeout(() => URL.revokeObjectURL(res.prev), 1000);
+                }).catch((err) => Toast.error('旋转失败：' + err.message)).finally(() => { busy = false; });
             } else if (e.target !== img) close();
         });
         overlay.addEventListener('wheel', (e) => {
@@ -167,11 +320,29 @@
         img.addEventListener('pointercancel', endDrag);
         document.addEventListener('keydown', onKey, true);
         document.body.appendChild(overlay);
+        refreshBar();
+    }
+
+    function lightboxItem(img) {
+        let rotator = null;
+        if (img.dataset.photo) {
+            const id = img.dataset.photo;
+            rotator = (dir) => rotateSaved(id, dir);
+        } else if (img.dataset.pending !== undefined) {
+            const fn = pendingRotators.get(img.closest('[data-photo-list]'));
+            const i = Number(img.dataset.pending);
+            if (fn) rotator = (dir) => fn(i, dir);
+        }
+        return { src: img.src, rotator };
     }
 
     document.addEventListener('click', (e) => {
         const img = e.target.closest('.photo-thumb img');
-        if (img && img.src) openLightbox(img.src);
+        if (!img || !img.src) return;
+        // 同一条记录（同一个缩略图容器）里已加载好的照片可左右切换
+        const box = img.closest('.photo-thumbs');
+        const imgs = box ? Array.from(box.querySelectorAll('.photo-thumb img')).filter((im) => im.src) : [img];
+        openLightbox(imgs.map(lightboxItem), Math.max(0, imgs.indexOf(img)));
     });
 
     // ---------- 相机 ----------
@@ -202,7 +373,9 @@
         let stream = null;
         async function start() {
             if (stream) stream.getTracks().forEach((t) => t.stop());
-            const video = { width: { ideal: 3840 }, height: { ideal: 2160 } };   // 尽量要最高分辨率，摄像头支持多少给多少
+            // 尽量要最高分辨率，摄像头支持多少给多少。只指定宽度、不指定高度（不强制任何比例）：
+            // 指定 16:9 或 4:3 都可能让摄像头把传感器裁成那个比例，照片就和实际取景不一致
+            const video = { width: { ideal: 4096 } };
             if (deviceId) video.deviceId = { exact: deviceId };
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
@@ -322,23 +495,30 @@
         const pending = [];   // { blob, url }
 
         function render() {
-            list.innerHTML = kept.map((id) => `<span class="photo-thumb"><img data-photo="${Utils.escapeHtml(id)}" alt="照片"><button type="button" class="photo-rot" data-rot-kept="${Utils.escapeHtml(id)}" title="顺时针旋转 90°">↻</button><button type="button" class="photo-rm" data-rm-kept="${Utils.escapeHtml(id)}" title="移除">✕</button></span>`).join('')
-                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rot" data-rot-pending="${i}" title="顺时针旋转 90°">↻</button><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
+            list.innerHTML = kept.map((id) => `<span class="photo-thumb"><img data-photo="${Utils.escapeHtml(id)}" alt="照片"><button type="button" class="photo-rm" data-rm-kept="${Utils.escapeHtml(id)}" title="移除">✕</button></span>`).join('')
+                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" data-pending="${i}" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
         }
 
-        // 返回成功加入的张数（手机回传用它判断要不要告诉手机「电脑读不了这张」）
+        // 返回成功接收的张数（手机回传用它判断要不要告诉手机「电脑读不了这张」）。
+        // 读得了的照片排进预览队列，由用户选档位后才加入；这里先试读一次，读不了立刻报错，不让手机白等回执
         async function addFiles(files, { quiet = false } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
-                    const blob = await compress(file);
-                    pending.push({ blob, url: URL.createObjectURL(blob), src: file, rot: 0 });   // src/rot：旋转时从原图重新压缩
+                    const probe = await decode(file);
+                    if (probe.close) probe.close();
                     added++;
+                    enqueueChoose(async () => {
+                        if (!document.body.contains(box)) return;    // 登记弹窗已经关了
+                        const blob = await chooseLevel(file);
+                        if (!blob) return;
+                        pending.push({ blob, url: URL.createObjectURL(blob) });
+                        render();
+                    });
                 } catch (err) {
                     if (!quiet) Toast.error(err.message);
                 }
             }
-            render();
             return added;
         }
 
@@ -368,34 +548,6 @@
         // 新拍的照片被移除后先不释放 object URL，撤销还要用；保存时（finalize）统一释放
         const discarded = [];
         list.addEventListener('click', async (e) => {
-            const rk = e.target.closest('[data-rot-kept]');
-            const rp = e.target.closest('[data-rot-pending]');
-            if (rk || rp) {
-                try {
-                    if (rp) {
-                        const p = pending[Number(rp.dataset.rotPending)];
-                        if (!p) return;
-                        p.rot = (p.rot + 1) % 4;
-                        const blob = await compress(p.src, p.rot);
-                        URL.revokeObjectURL(p.url);
-                        p.blob = blob;
-                        p.url = URL.createObjectURL(blob);
-                    } else {
-                        // 已保存的照片：转完当作新照片放进待保存列表（以存着的那张为原图），原来的那张在保存记录后由 gcPhotos 清理
-                        const id = rk.dataset.rotKept;
-                        const index = kept.indexOf(id);
-                        const old = await AppState.photoGet(id);
-                        if (index < 0 || !old) return;
-                        const blob = await compress(old, 1);
-                        kept.splice(index, 1);
-                        pending.push({ blob, url: URL.createObjectURL(blob), src: old, rot: 1 });
-                    }
-                    render();
-                } catch (err) {
-                    Toast.error('旋转失败：' + err.message);
-                }
-                return;
-            }
             const k = e.target.closest('[data-rm-kept]');
             const p = e.target.closest('[data-rm-pending]');
             if (!k && !p) return;
@@ -423,6 +575,18 @@
         });
         render();
 
+        // 大图里点旋转：还没保存的照片直接转当前这份，结果记在 pending 里，保存时一并存
+        pendingRotators.set(list, async (i, dir) => {
+            const p = pending[i];
+            if (!p) return null;
+            const blob = await rotateBlob(p.blob, dir > 0 ? 1 : 3);
+            URL.revokeObjectURL(p.url);
+            p.blob = blob;
+            p.url = URL.createObjectURL(blob);
+            render();
+            return p.url;
+        });
+
         return {
             // 把新选的照片写进存储，返回最终要记在记录上的 photoIds（旧的未被移除的 + 新的）
             async finalize() {
@@ -441,5 +605,5 @@
         };
     }
 
-    window.Photos = { editorHtml, bindEditor, viewHtml, PRESETS, getPreset, setPreset };
+    window.Photos = { editorHtml, bindEditor, viewHtml, LEVELS, getLevel, setLevel };
 })();
