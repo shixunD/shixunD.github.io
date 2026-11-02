@@ -373,14 +373,18 @@
         let stream = null;
         async function start() {
             if (stream) stream.getTracks().forEach((t) => t.stop());
-            // 尽量要最高分辨率，摄像头支持多少给多少。只指定宽度、不指定高度（不强制任何比例）：
-            // 指定 16:9 或 4:3 都可能让摄像头把传感器裁成那个比例，照片就和实际取景不一致
-            const video = { width: { ideal: 4096 } };
+            // 不写死期望值：先打开，再按摄像头自己报告的最大宽、高重新要求（见下面 applyConstraints），要的就是它实际能给的
+            const video = {};
             if (deviceId) video.deviceId = { exact: deviceId };
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
             } catch (err) {
                 throw new Error(cameraErrorText(err));
+            }
+            const t = stream.getVideoTracks()[0];
+            const cp = (t && t.getCapabilities && t.getCapabilities()) || {};
+            if (cp.width && cp.width.max && cp.height && cp.height.max) {
+                await t.applyConstraints({ width: { ideal: cp.width.max }, height: { ideal: cp.height.max } }).catch(() => {});
             }
         }
         await start();

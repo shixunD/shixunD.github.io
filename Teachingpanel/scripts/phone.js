@@ -455,9 +455,14 @@
     async function startCam() {
         stopCam();
         camStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facing }, width: { ideal: 4096 }, height: { ideal: 3072 } }, audio: false
+            video: { facingMode: { ideal: facing } }, audio: false
         });
         camTrack = camStream.getVideoTracks()[0];
+        // 不写死期望值：先打开，再按摄像头自己报告的最大宽、高（getCapabilities）重新要求，要的就是它实际能给的
+        const cp = (camTrack.getCapabilities && camTrack.getCapabilities()) || {};
+        if (cp.width && cp.width.max && cp.height && cp.height.max) {
+            await camTrack.applyConstraints({ width: { ideal: cp.width.max }, height: { ideal: cp.height.max } }).catch(() => {});
+        }
         $('camvideo').srcObject = camStream;
         camCaps = (camTrack.getCapabilities && camTrack.getCapabilities()) || {};
         if (Array.isArray(camCaps.focusMode) && camCaps.focusMode.includes('continuous')) applyCam({ focusMode: 'continuous' });
@@ -524,7 +529,10 @@
                 // 部分手机的 takePhoto 会卡很久不返回：5 秒没结果就当失败，改为截取画面
                 const timeout = (ms) => new Promise((_, reject) => setTimeout(() => { const e = new Error('超时'); e.name = 'Timeout'; reject(e); }, ms));
                 const caps = await Promise.race([imageCapture.getPhotoCapabilities(), timeout(2000)]).catch(() => null);
-                const opts = caps && caps.imageWidth && caps.imageWidth.max ? { imageWidth: caps.imageWidth.max } : {};
+                // 宽高都要给最大值：只给宽度时，有的手机按取景（可能是 21:9）的比例出图，会把上下裁掉
+                const opts = {};
+                if (caps && caps.imageWidth && caps.imageWidth.max) opts.imageWidth = caps.imageWidth.max;
+                if (caps && caps.imageHeight && caps.imageHeight.max) opts.imageHeight = caps.imageHeight.max;
                 blob = await Promise.race([imageCapture.takePhoto(opts), timeout(5000)]);
                 how = '全分辨率';
             }
@@ -538,6 +546,7 @@
         shooting = false;
         if (!blob) { logEv('没拍到画面（摄像头还没准备好）'); return; }
         logEv(`网页相机拍到一张（${how}，${mb(blob.size)}）`);
+        createImageBitmap(blob).then((b) => { logEv(`这张的尺寸 ${b.width}×${b.height}`); b.close(); }).catch(() => {});
         const file = new File([blob], `cam_${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
         camItems.push(...addFiles([file], '网页相机'));
         updateCamCount();

@@ -3,6 +3,15 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.22.4 — 2026-11-02
+
+- 变更：`photos.js` 的 `openCamera` 与 `phone.js` 的 `startCam` 先无分辨率约束打开摄像头，再读 `track.getCapabilities()` 的 `width.max` / `height.max` 用 `applyConstraints` 重新要求（取代 4096×3072 和 `aspectRatio` 4:3 的写死值）。`takePhoto` 仍同时传最大宽高。未实测
+
+## 1.22.3 — 2026-11-02
+
+- 修复：手机网页内相机（`phone.js` 的 `startCam` / `shoot`）出图过扁。`getUserMedia` 加 `aspectRatio: { ideal: 4/3 }`（不指定时有的手机选 21:9 的高分辨率取景模式）；`takePhoto` 同时传 `imageWidth` 和 `imageHeight` 最大值（原来只传宽度，出图比例跟随取景）。拍完在事件日志里记录这张的实际尺寸，方便排查
+- 未实测：需要真机
+
 ## 1.22.2 — 2026-11-02
 
 - 新增：大图 `openLightbox(items, start)` 支持同一缩略图容器（`.photo-thumbs`）内左右切换：边缘感应区 `.photo-lightbox-nav` 鼠标靠近才显示，触屏常显；键盘 ← →；每张各自带 rotator；切换时复位缩放
