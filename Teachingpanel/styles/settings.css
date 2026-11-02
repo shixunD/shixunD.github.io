@@ -1,0 +1,29 @@
+/* 主页（设置页）：今日概览、两栏布局、设置行、学生名单 */
+
+.overview-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-bottom: 1rem; }
+.overview-tile {
+    --tile-color: var(--primary-color);
+    background: var(--card-bg); border: none; border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 0.9rem 1rem; text-align: left; cursor: pointer; font-family: inherit;
+    border-top: 4px solid var(--tile-color);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.overview-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.ov-value { font-size: 1.8rem; font-weight: 800; line-height: 1.1; color: var(--text-primary); }
+.ov-label { font-size: 0.84rem; color: var(--text-secondary); }
+
+.home-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 1rem; align-items: start; }
+
+.btn-col { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.6rem; }
+.btn-col [hidden] { display: none; }
+
+.setting-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    padding: 0.55rem 0; border-bottom: 1px dashed var(--border-color); font-size: 0.9rem;
+}
+.setting-row:last-of-type { border-bottom: none; }
+.inline-input { display: flex; align-items: center; gap: 0.3rem; }
+.inline-input input { width: 76px; }
+
+.roster-table td.roster-note { color: var(--text-secondary); font-size: 0.84rem; }
+.row-actions { white-space: nowrap; text-align: right !important; }

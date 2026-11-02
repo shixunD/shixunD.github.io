@@ -1,0 +1,110 @@
+/* 作业/背诵共用的看板组件：学生色块卡片网格、状态选择按钮、分段进度条、矩阵表、欠交清单、时间轴色条 */
+
+.seg-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #eee; margin: 0.4rem 0; }
+.seg-bar span { display: block; min-width: 3px; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-size: 0.8rem; color: var(--text-secondary); align-items: center; }
+.seg-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.seg-legend b { color: var(--text-primary); }
+.seg-rate { margin-left: auto; font-weight: 700; color: var(--text-primary) !important; }
+
+.mini-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: #eee; margin: 0.3rem 0 0.15rem; }
+.mini-bar span { display: block; }
+
+.brush-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1rem 0 0.8rem; align-items: center; }
+.brush-sep { width: 1px; height: 22px; background: var(--border-color); margin: 0 0.2rem; }
+
+.stu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 0.5rem; }
+.stu-card {
+    position: relative;
+    background: var(--st-color); color: var(--st-text);
+    border-radius: 10px; padding: 0.5rem 0.6rem 0.45rem;
+    cursor: pointer; user-select: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    min-height: 74px;
+}
+.stu-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.stu-card:active { transform: scale(0.97); }
+.stu-card-no { font-size: 0.7rem; opacity: 0.8; }
+.stu-card-name { font-weight: 700; font-size: 0.98rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stu-card-status { font-size: 0.72rem; opacity: 0.92; }
+.stu-card-date { font-size: 0.68rem; opacity: 0.92; white-space: nowrap; }
+.stu-card-fix {
+    position: absolute; top: 6px; right: 6px;
+    border: none; border-radius: 6px; background: rgba(255,255,255,0.92); color: #1a4fa3;
+    font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.4rem; cursor: pointer; font-family: inherit;
+}
+.stu-card-fix:hover { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+
+.status-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.45rem; margin: 0.5rem 0 0.4rem; }
+.status-options-3 { grid-template-columns: repeat(3, 1fr); margin-top: 0.8rem; }
+.status-option {
+    border: 2px solid var(--st-color); background: #fff; color: var(--text-primary);
+    border-radius: 10px; padding: 0.6rem 0.4rem; font-size: 0.88rem; font-weight: 600; cursor: pointer; font-family: inherit;
+    box-shadow: inset 6px 0 0 var(--st-color);
+}
+.status-option:hover { background: color-mix(in srgb, var(--st-color) 12%, white); }
+.status-option.selected { background: var(--st-color); color: var(--st-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-color) 30%, transparent); }
+
+/* 矩阵表 */
+.matrix-scroll { overflow: auto; max-height: calc(100vh - 260px); }
+.matrix { border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+.matrix th, .matrix td { padding: 3px; text-align: center; border-bottom: 1px solid var(--border-color); background: #fff; }
+.matrix thead th { position: sticky; top: 0; z-index: 2; vertical-align: bottom; }
+.matrix .sticky-col { position: sticky; left: 0; z-index: 1; text-align: left; padding: 3px 10px 3px 4px; white-space: nowrap; }
+.matrix thead .sticky-col { z-index: 3; }
+.matrix-head-btn {
+    border: none; background: transparent; cursor: pointer; font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px; border-radius: 6px; min-width: 40px;
+}
+.matrix-head-btn:hover { background: var(--bg-color); }
+.mh-date { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); }
+.mh-sub, .mh-rate { font-size: 0.68rem; color: var(--text-secondary); font-weight: normal; }
+.mh-title { font-size: 0.72rem; font-weight: 700; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell {
+    width: 30px; height: 24px; border: none; border-radius: 5px; cursor: pointer; position: relative; display: block; margin: 0 auto;
+    font-size: 0.72rem; font-weight: 700; font-family: inherit;
+}
+.cell:hover { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.cell.has-comment::after {
+    content: ''; position: absolute; top: 0; right: 0;
+    border-style: solid; border-width: 0 8px 8px 0; border-color: transparent #fff transparent transparent;
+}
+.cell-text { width: 40px; }
+/* 背诵总览：按检查结果数量分段的色块（绿/黄/红从左到右），数字 = 检查次数 */
+.cell-bar { width: 56px; height: 24px; display: flex; overflow: hidden; padding: 0; background: #e5e7eb; position: relative; }
+.cell-bar > span { display: block; height: 100%; }
+.cell-bar .cell-count {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
+}
+.owe { font-weight: 700; color: var(--text-secondary); padding: 0 8px !important; }
+.owe-bad { color: var(--danger-color); }
+
+/* 欠交清单 */
+.pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0 1rem; }
+.pending-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 1rem; }
+.pending-count { color: var(--danger-color); font-weight: 700; font-size: 0.86rem; white-space: nowrap; }
+.pending-hw-link {
+    background: none; border: none; cursor: pointer; font-family: inherit; text-align: left; padding: 0;
+    display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; min-width: 0; color: var(--text-primary);
+}
+.pending-hw-link:hover .pending-hw-title { color: var(--primary-dark); text-decoration: underline; }
+.pending-hw-title { font-weight: 700; font-size: 1rem; }
+.pending-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0; border-top: 1px dashed var(--border-color); font-size: 0.86rem; }
+.pending-item-main { flex: 1; min-width: 0; }
+.pending-comment { color: var(--text-secondary); font-size: 0.8rem; }
+
+/* 学生时间轴色条 */
+.strip { display: flex; flex-wrap: wrap; gap: 3px; }
+.strip-cell { width: 16px; height: 22px; border-radius: 3px; display: inline-block; }
+.count-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+
+/* 考试 */
+.score-entry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.4rem 1rem; margin: 0.8rem 0; }
+.score-entry-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; color: var(--text-primary); }
+.score-entry-item input { width: 90px; }
+.import-preview { margin-top: 0.8rem; font-size: 0.86rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.import-preview .ok { color: var(--success-color); }
+.import-preview .bad { color: var(--danger-color); }
+.import-preview .warn { color: #a36d00; }
+.rank-table td:first-child { font-weight: 700; width: 56px; }
