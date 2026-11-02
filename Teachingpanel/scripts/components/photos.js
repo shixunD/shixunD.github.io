@@ -102,11 +102,10 @@
     const fmtSize = (n) => (n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(2) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
 
     // 预览框：逐档对比，确定后返回所选那一档的 Blob；放弃这张返回 null。读不了图片时抛错
+    // 预览区支持滚轮 / 双指缩放、左键拖动平移；四周边角直接拖动即裁剪（松手生效，可连续裁），另有左 / 右旋转
     async function chooseLevel(file) {
         const bitmap = await decode(file);
-        const canvas = drawToCanvas(bitmap, 0);
         const info = `${bitmap.width}×${bitmap.height}`;
-        if (bitmap.close) bitmap.close();
 
         const results = new Map();     // key -> { blob, url }
         const put = (key, blob) => results.set(key, { blob, url: URL.createObjectURL(blob) });
@@ -114,12 +113,33 @@
         let selected = getLevel().key;
         let closed = false;
 
+        // 编辑状态：rot = 顺时针 90° 的次数；crop = 旋转后整图上保留的区域（0–1 比例）
+        let rot = 0;
+        let crop = { x: 0, y: 0, w: 1, h: 1 };
+        let edited = false;
+        let canvas = drawToCanvas(bitmap, 0);
+        let gen = 0;                   // 每次编辑 +1，让过期的后台编码作废
+        const MIN_CROP = 0.05;
+
         const overlay = document.createElement('div');
         overlay.className = 'photo-choose-overlay';
         overlay.innerHTML = `
             <div class="photo-choose-box" role="dialog" aria-modal="true">
                 <h2>选择压缩档位 <small>原图 ${info} · ${fmtSize(file.size)}</small></h2>
-                <div class="photo-choose-view" data-view><img alt="预览"></div>
+                <div class="photo-choose-view" data-view>
+                    <div class="photo-stage" data-stage>
+                        <img alt="预览" draggable="false">
+                        <div class="pc-box" data-box>
+                            ${['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((d) => `<i class="pc-h pc-${d}" data-h="${d}"></i>`).join('')}
+                        </div>
+                    </div>
+                </div>
+                <div class="photo-choose-tools">
+                    <button type="button" class="btn-secondary" data-rot="-1" title="向左转 90°">↺ 左转</button>
+                    <button type="button" class="btn-secondary" data-rot="1" title="向右转 90°">↻ 右转</button>
+                    <button type="button" class="btn-secondary" data-reset-edit disabled>还原编辑</button>
+                    <span class="hint">拖动图片四周边角即可裁剪；滚轮缩放、左键拖动平移</span>
+                </div>
                 <div class="photo-choose-info" data-info></div>
                 <div class="photo-choose-levels">${LEVELS.map((l) => `<button type="button" class="photo-choose-lv" data-lv="${l.key}"><b>${Utils.escapeHtml(l.label)}</b><span data-size>${l.key === 'raw' ? fmtSize(file.size) : '计算中…'}</span></button>`).join('')}</div>
                 <div class="hint">点档位对比效果；确定后只保留所选的一份，收到的完整原图会丢弃。数字是 WebP 质量，越大越清楚、文件越大。</div>
@@ -131,19 +151,190 @@
             </div>`;
         const img = overlay.querySelector('img');
         const okBtn = overlay.querySelector('[data-ok]');
+        const view = overlay.querySelector('[data-view]');
+        const stage = overlay.querySelector('[data-stage]');
+        const box = overlay.querySelector('[data-box]');
+        const zoomBtn = overlay.querySelector('[data-zoom]');
+
+        // ---- 缩放 / 平移：stage 是按图片比例铺进预览区的一块，整体 translate + scale ----
+        let base = { x: 0, y: 0, w: 1, h: 1 };
+        let s = 1, X = 0, Y = 0;
+        function applyView() {
+            stage.style.transform = `translate(${X}px, ${Y}px) scale(${s})`;
+            stage.style.setProperty('--inv', String(1 / s));
+            view.classList.toggle('zoomed', s > 1.001);
+            zoomBtn.textContent = s > 1.01 ? '适应窗口' : '放大到 100%';
+        }
+        function layout() {
+            const vw = view.clientWidth, vh = view.clientHeight, ar = canvas.width / canvas.height;
+            let bw = vw, bh = bw / ar;
+            if (bh > vh) { bh = vh; bw = bh * ar; }
+            base = { x: (vw - bw) / 2, y: (vh - bh) / 2, w: bw, h: bh };
+            stage.style.width = bw + 'px';
+            stage.style.height = bh + 'px';
+            if (s <= 1.001) { s = 1; X = base.x; Y = base.y; }
+            applyView();
+        }
+        function zoomAt(cx, cy, f) {
+            const ns = Math.min(32, Math.max(1, s * f));
+            if (ns === s) return;
+            X = cx - (cx - X) * ns / s;
+            Y = cy - (cy - Y) * ns / s;
+            s = ns;
+            if (s <= 1.001) { s = 1; X = base.x; Y = base.y; }
+            applyView();
+        }
+        const viewPoint = (e) => { const r = view.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+        view.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const p = viewPoint(e);
+            zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+        }, { passive: false });
+        const pointers = new Map();
+        let pinch = null;
+        view.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('[data-h]')) return;
+            view.setPointerCapture(e.pointerId);
+            pointers.set(e.pointerId, viewPoint(e));
+            if (pointers.size === 2) {
+                const [a, b] = [...pointers.values()];
+                pinch = Math.hypot(a.x - b.x, a.y - b.y);
+            }
+        });
+        view.addEventListener('pointermove', (e) => {
+            if (!pointers.has(e.pointerId)) return;
+            const prev = pointers.get(e.pointerId);
+            const cur = viewPoint(e);
+            pointers.set(e.pointerId, cur);
+            if (pointers.size >= 2 && pinch) {
+                const [a, b] = [...pointers.values()];
+                const d = Math.hypot(a.x - b.x, a.y - b.y);
+                if (d > 0) { zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinch); pinch = d; }
+            } else if (pointers.size === 1 && s > 1) {
+                X += cur.x - prev.x;
+                Y += cur.y - prev.y;
+                applyView();
+            }
+        });
+        const endPointer = (e) => { pointers.delete(e.pointerId); pinch = null; };
+        view.addEventListener('pointerup', endPointer);
+        view.addEventListener('pointercancel', endPointer);
+        view.addEventListener('dblclick', (e) => { if (!e.target.closest('[data-h]')) { s = 1; layout(); } });
+        const onResize = () => { s = 1; layout(); };
+        window.addEventListener('resize', onResize);
+
+        // ---- 裁剪：四周边角拖动，松手把这次的框并入 crop，框回到图片边缘 ----
+        let live = { l: 0, t: 0, r: 1, b: 1 };
+        function drawBox() {
+            box.style.left = live.l * 100 + '%';
+            box.style.top = live.t * 100 + '%';
+            box.style.width = (live.r - live.l) * 100 + '%';
+            box.style.height = (live.b - live.t) * 100 + '%';
+            box.classList.toggle('active', live.l > 0 || live.t > 0 || live.r < 1 || live.b < 1);
+        }
+        box.addEventListener('pointerdown', (e) => {
+            const h = e.target.closest('[data-h]');
+            if (!h) return;
+            e.preventDefault();
+            e.stopPropagation();
+            h.setPointerCapture(e.pointerId);
+            const dir = h.dataset.h;
+            const sx = e.clientX, sy = e.clientY, start = { ...live };
+            const move = (ev) => {
+                const dx = (ev.clientX - sx) / (base.w * s), dy = (ev.clientY - sy) / (base.h * s);
+                const n = { ...start };
+                if (dir.includes('w')) n.l = Math.min(Math.max(0, start.l + dx), start.r - MIN_CROP);
+                if (dir.includes('e')) n.r = Math.max(Math.min(1, start.r + dx), start.l + MIN_CROP);
+                if (dir.includes('n')) n.t = Math.min(Math.max(0, start.t + dy), start.b - MIN_CROP);
+                if (dir.includes('s')) n.b = Math.max(Math.min(1, start.b + dy), start.t + MIN_CROP);
+                live = n;
+                drawBox();
+            };
+            const up = () => {
+                h.removeEventListener('pointermove', move);
+                h.removeEventListener('pointerup', up);
+                h.removeEventListener('pointercancel', up);
+                const f = live;
+                live = { l: 0, t: 0, r: 1, b: 1 };
+                drawBox();
+                if (f.r - f.l > 0.995 && f.b - f.t > 0.995) return;
+                crop = { x: crop.x + f.l * crop.w, y: crop.y + f.t * crop.h, w: (f.r - f.l) * crop.w, h: (f.b - f.t) * crop.h };
+                applyEdit();
+            };
+            h.addEventListener('pointermove', move);
+            h.addEventListener('pointerup', up);
+            h.addEventListener('pointercancel', up);
+        });
+
+        function rotate(step) {
+            const c = crop;
+            crop = step > 0 ? { x: 1 - (c.y + c.h), y: c.x, w: c.h, h: c.w } : { x: c.y, y: 1 - (c.x + c.w), w: c.h, h: c.w };
+            rot = (rot + (step > 0 ? 1 : 3)) % 4;
+            applyEdit();
+        }
+        function rebuildCanvas() {
+            const full = drawToCanvas(bitmap, rot);
+            if (crop.w >= 0.999 && crop.h >= 0.999) { canvas = full; return; }
+            const sx = Math.round(crop.x * full.width), sy = Math.round(crop.y * full.height);
+            const sw = Math.max(1, Math.min(full.width - sx, Math.round(crop.w * full.width)));
+            const sh = Math.max(1, Math.min(full.height - sy, Math.round(crop.h * full.height)));
+            canvas = document.createElement('canvas');
+            canvas.width = sw;
+            canvas.height = sh;
+            canvas.getContext('2d').drawImage(full, sx, sy, sw, sh, 0, 0, sw, sh);
+        }
+        // 旋转 / 裁剪后：所有档位作废重算；「不压缩」不再是收到的原文件，改按高质量重新编码
+        function applyEdit() {
+            edited = rot !== 0 || crop.w < 0.999 || crop.h < 0.999;
+            rebuildCanvas();
+            results.forEach((r) => URL.revokeObjectURL(r.url));
+            results.clear();
+            if (!edited) put('raw', file);
+            overlay.querySelectorAll('[data-lv] [data-size]').forEach((el) => {
+                el.textContent = !edited && el.closest('[data-lv]').dataset.lv === 'raw' ? fmtSize(file.size) : '计算中…';
+            });
+            overlay.querySelector('[data-reset-edit]').disabled = !edited;
+            s = 1;
+            layout();
+            show();
+            encodeAll();
+        }
 
         function show() {
             overlay.querySelectorAll('[data-lv]').forEach((b) => b.classList.toggle('selected', b.dataset.lv === selected));
             const r = results.get(selected);
             okBtn.disabled = !r;
+            img.classList.toggle('busy', !r);
             const level = LEVELS.find((l) => l.key === selected);
             const infoEl = overlay.querySelector('[data-info]');
+            const editNote = edited ? `（已编辑 → ${canvas.width}×${canvas.height}）` : '';
             if (r) {
                 img.src = r.url;
                 const pct = Math.round(r.blob.size / file.size * 100);
-                infoEl.innerHTML = `当前「${Utils.escapeHtml(level.label)}」：<b>${fmtSize(r.blob.size)}</b>` + (level.key === 'raw' ? '（原图大小）' : `（原图 ${fmtSize(file.size)}，为原图的 ${pct}%）`);
+                infoEl.innerHTML = `当前「${Utils.escapeHtml(level.label)}」：<b>${fmtSize(r.blob.size)}</b>` + (level.key === 'raw' && !edited ? '（原图大小）' : `（原图 ${fmtSize(file.size)}，为原图的 ${pct}%）`) + editNote;
             } else {
-                infoEl.textContent = `当前「${level.label}」：计算中…`;
+                infoEl.textContent = `当前「${level.label}」：计算中…` + editNote;
+            }
+        }
+
+        // 选中的档位优先算，其余依次在后台算；全部共用同一张 canvas
+        async function encodeAll() {
+            const my = ++gen;
+            const order = [selected].concat(LEVELS.map((l) => l.key).filter((k) => k !== selected && (k !== 'raw' || edited)));
+            for (const key of order) {
+                if (closed || my !== gen) return;
+                const level = LEVELS.find((l) => l.key === key);
+                const q = key === 'raw' ? (edited ? ROTATE_Q : null) : level.quality;
+                if (!q) continue;
+                try {
+                    const blob = await encodeImage(canvas, q);
+                    if (closed || my !== gen) return;
+                    put(key, blob);
+                    overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = fmtSize(blob.size);
+                    if (key === selected) show();
+                } catch (e) {
+                    if (!closed && my === gen) overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = '失败';
+                }
             }
         }
 
@@ -152,7 +343,9 @@
                 closed = true;
                 overlay.remove();
                 document.removeEventListener('keydown', onKey, true);
-                results.forEach((r, key) => { if (!value || r.blob !== value) URL.revokeObjectURL(r.url); });
+                window.removeEventListener('resize', onResize);
+                if (bitmap.close) bitmap.close();
+                results.forEach((r) => { if (!value || r.blob !== value) URL.revokeObjectURL(r.url); });
                 resolve(value);
             };
             const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(null); } };
@@ -160,9 +353,15 @@
             overlay.addEventListener('click', (e) => {
                 const lv = e.target.closest('[data-lv]');
                 if (lv) { selected = lv.dataset.lv; show(); return; }
-                if (e.target.closest('[data-zoom]')) {
-                    const on = overlay.querySelector('[data-view]').classList.toggle('actual');
-                    e.target.closest('[data-zoom]').textContent = on ? '适应窗口' : '放大到 100%';
+                const rt = e.target.closest('[data-rot]');
+                if (rt) { rotate(Number(rt.dataset.rot)); return; }
+                if (e.target.closest('[data-reset-edit]')) {
+                    rot = 0;
+                    crop = { x: 0, y: 0, w: 1, h: 1 };
+                    applyEdit();
+                } else if (e.target.closest('[data-zoom]')) {
+                    if (s > 1.01) { s = 1; layout(); }
+                    else zoomAt(view.clientWidth / 2, view.clientHeight / 2, canvas.width / base.w);   // 图片 1 像素 = 屏幕 1 像素
                 } else if (e.target.closest('[data-skip]')) {
                     finish(null);
                 } else if (e.target.closest('[data-ok]')) {
@@ -171,25 +370,9 @@
                 }
             });
             document.body.appendChild(overlay);
+            layout();
             show();
-
-            // 默认档优先算，其余依次在后台算；全部共用同一张 canvas
-            (async () => {
-                const order = [selected].concat(LEVELS.map((l) => l.key).filter((k) => k !== selected && k !== 'raw'));
-                for (const key of order) {
-                    if (closed) return;
-                    const level = LEVELS.find((l) => l.key === key);
-                    if (!level || !level.quality) continue;
-                    try {
-                        put(key, await encodeImage(canvas, level.quality));
-                        if (closed) { URL.revokeObjectURL(results.get(key).url); return; }
-                        overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = fmtSize(results.get(key).blob.size);
-                        if (key === selected) show();
-                    } catch (e) {
-                        if (!closed) overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = '失败';
-                    }
-                }
-            })();
+            encodeAll();
         });
     }
 

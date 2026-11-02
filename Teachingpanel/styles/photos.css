@@ -25,7 +25,7 @@
 }
 .photo-lightbox-bar button:hover { background: rgba(255, 255, 255, 0.35); }
 .photo-lightbox-close {
-    position: absolute; top: 12px; right: 16px; width: 36px; height: 36px; border: none; border-radius: 50%;
+    z-index: 2; position: absolute; top: 12px; right: 16px; width: 36px; height: 36px; border: none; border-radius: 50%;
     background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 1rem; cursor: pointer;
 }
 
@@ -94,10 +94,25 @@
 .photo-choose-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1rem; width: min(900px, 100%); max-height: 96vh; display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; }
 .photo-choose-box h2 { margin: 0; font-size: 1.1rem; }
 .photo-choose-box h2 small { font-weight: normal; color: var(--text-secondary); margin-left: 0.5rem; font-size: 0.8rem; }
-.photo-choose-view { flex: none; min-height: 200px; height: calc(96vh - 270px); overflow: auto; background: #111; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.photo-choose-view img { width: 100%; height: 100%; object-fit: contain; display: block; }   /* 竖图用 max-height:100% 会撑出容器（按宽度缩放后高度超出），改成撑满容器再 contain */
-.photo-choose-view.actual { display: block; }
-.photo-choose-view.actual img { width: auto; height: auto; max-width: none; max-height: none; }
+.photo-choose-view { flex: none; position: relative; min-height: 200px; height: calc(96vh - 310px); overflow: hidden; background: #111; border-radius: 8px; touch-action: none; user-select: none; }
+.photo-choose-view.zoomed { cursor: grab; }
+.photo-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.photo-stage img { width: 100%; height: 100%; display: block; -webkit-user-drag: none; }
+.photo-stage img.busy { opacity: 0.55; }
+.photo-choose-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.photo-choose-tools .hint { margin: 0 0 0 0.3rem; }
+/* 裁剪框：平时与图片等大（虚线），拖四周边角时收缩并压暗框外；手柄大小除以缩放倍数（--inv），放大后手感不变 */
+.pc-box { position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; border: calc(1px * var(--inv, 1)) dashed rgba(255, 255, 255, 0.7); pointer-events: none; }
+.pc-box.active { border-style: solid; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); }
+.pc-h { position: absolute; pointer-events: auto; touch-action: none; --e: calc(22px * var(--inv, 1)); --c: calc(34px * var(--inv, 1)); --t: calc(3px * var(--inv, 1)); }
+.pc-n, .pc-s { left: var(--c); right: var(--c); height: var(--e); cursor: ns-resize; }
+.pc-e, .pc-w { top: var(--c); bottom: var(--c); width: var(--e); cursor: ew-resize; }
+.pc-n { top: 0; } .pc-s { bottom: 0; } .pc-e { right: 0; } .pc-w { left: 0; }
+.pc-nw, .pc-ne, .pc-sw, .pc-se { width: var(--c); height: var(--c); box-sizing: border-box; border: 0 solid #fff; }
+.pc-nw { top: 0; left: 0; border-top-width: var(--t); border-left-width: var(--t); cursor: nwse-resize; }
+.pc-ne { top: 0; right: 0; border-top-width: var(--t); border-right-width: var(--t); cursor: nesw-resize; }
+.pc-sw { bottom: 0; left: 0; border-bottom-width: var(--t); border-left-width: var(--t); cursor: nesw-resize; }
+.pc-se { bottom: 0; right: 0; border-bottom-width: var(--t); border-right-width: var(--t); cursor: nwse-resize; }
 .photo-choose-levels { display: flex; flex-wrap: wrap; gap: 6px; }
 .photo-choose-lv { display: flex; flex-direction: column; align-items: center; min-width: 4.2rem; padding: 0.3rem 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: inherit; cursor: pointer; font-size: 0.9rem; }
 .photo-choose-lv span { font-size: 0.72rem; color: var(--text-secondary); }
@@ -108,7 +123,7 @@
 
 /* 大图左右切换：贴着屏幕左右边的透明感应区，鼠标靠近才显示箭头；触屏设备（没有 hover）一直显示 */
 .photo-lightbox-nav {
-    position: absolute; top: 0; bottom: 0; width: 22vw; max-width: 160px; border: none; background: transparent;
+    position: absolute; top: 0; bottom: 0; width: 22vw; max-width: 160px; border: none; padding-top: 64px; background: transparent;
     color: #fff; font-size: 3rem; cursor: pointer; opacity: 0; transition: opacity 0.15s; z-index: 1;
 }
 .photo-lightbox-nav.nav-prev { left: 0; text-align: left; padding-left: 14px; }

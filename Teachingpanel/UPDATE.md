@@ -3,6 +3,11 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.23.0 — 2026-11-02
+
+- 修复：`.photo-lightbox-close` 加 `z-index: 2`，高于全高的左右切换区 `.photo-lightbox-nav`（z-index 1）
+- 新增：`chooseLevel` 预览框支持旋转 / 拖边角裁剪（`rot` + `crop` 状态，`applyEdit()` 重算各档）和滚轮 / 拖动 / 双指缩放平移（`.photo-stage` transform）；编辑后「不压缩」档改按 0.92 重新编码。已在 Chromium 里实测裁剪、旋转、缩放、还原；触屏双指未实测
+
 ## 1.22.6 — 2026-11-02
 
 - 修复：手机网页相机 `shoot()` 对 `takePhoto` 的结果校验比例——和 `camTrack.getSettings()` 的取景比例相差超过 3% 就弃用并改 `grabFrame()`（用户实测取景 3024×4032，电脑收到的却是 1840×3984，说明该手机 `takePhoto` 出的是被裁过的图）。日志记录两者尺寸。未实测，需要真机
