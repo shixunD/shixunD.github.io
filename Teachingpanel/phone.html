@@ -10,9 +10,13 @@
         * { box-sizing: border-box; }
         body { margin: 0; font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #fff7f0; color: #2b2b2b; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
         h1 { font-size: 1.15rem; margin: 0 0 0.6rem; }
-        .status { padding: 0.6rem 0.8rem; border-radius: 10px; background: #fff; border: 1px solid #f0d9c6; font-size: 0.95rem; margin-bottom: 1rem; }
+        .status { padding: 0.6rem 0.8rem; border-radius: 10px; background: #fff; border: 1px solid #f0d9c6; font-size: 0.95rem; margin-bottom: 0.8rem; line-height: 1.5; }
         .status.ok { border-color: #1e8e3e; color: #1e8e3e; }
         .status.bad { border-color: #d93025; color: #d93025; }
+        .status.wait { border-color: #f2b705; color: #8a6500; }
+        .banner { padding: 0.6rem 0.8rem; border-radius: 10px; background: #fff4d6; border: 1px solid #f2b705; color: #6b4e00; font-size: 0.9rem; margin-bottom: 0.8rem; line-height: 1.5; }
+        .tips { background: #fff; border: 1px solid #f0d9c6; border-radius: 10px; padding: 0.4rem 0.8rem; margin-bottom: 0.8rem; font-size: 0.88rem; line-height: 1.6; }
+        .tips ul { margin: 0.3rem 0; padding-left: 1.2rem; }
         .big { display: block; width: 100%; padding: 1.1rem; font-size: 1.2rem; border: none; border-radius: 14px; background: #ff8a3d; color: #fff; text-align: center; margin-bottom: 0.7rem; }
         .big.alt { background: #fff; color: #e06a1f; border: 2px solid #ff8a3d; font-size: 1rem; padding: 0.8rem; }
         .big:active { opacity: 0.85; }
@@ -23,13 +27,20 @@
         .item.sent { border-color: #1e8e3e; }
         .item.fail { border-color: #d93025; }
         .item .tag { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.7rem; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 1px 0; }
+        details { margin: 0.8rem 0; font-size: 0.85rem; color: #555; }
+        summary { cursor: pointer; color: #999; }
+        .diag { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.8rem; margin-top: 0.4rem; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 0.5rem 0.7rem; }
+        .diag span:nth-child(odd) { color: #999; }
         .link { background: none; border: none; color: #999; text-decoration: underline; font-size: 0.85rem; padding: 0.3rem 0; }
         [hidden] { display: none !important; }
     </style>
 </head>
 <body>
     <h1>📱 手机拍照 → 电脑</h1>
+    <div class="banner" id="wechat" hidden>你是在<b>微信里</b>打开的，微信内置浏览器可能连不上电脑。建议点右上角「···」→「在浏览器打开」。</div>
     <div class="status" id="status">正在连接…</div>
+    <div class="tips" id="tips" hidden></div>
+    <div class="banner" id="note" hidden></div>
 
     <div id="main" hidden>
         <label class="big">📷 拍照
@@ -39,7 +50,11 @@
             <input type="file" accept="image/*" multiple hidden id="album">
         </label>
         <div class="list" id="list"></div>
-        <p class="hint">用的是手机自带相机，对焦、变焦、画质都和平时拍照一样。拍完自动传到电脑，再点「拍照」继续拍下一张。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
+        <p class="hint">用的是手机自带相机，对焦、变焦、画质都和平时拍照一样。拍完自动传到电脑，再点「拍照」继续拍下一张；没连上时拍的照片会先攒着，连上后自动发送。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
+        <details>
+            <summary>连接诊断</summary>
+            <div class="diag" id="diag"></div>
+        </details>
         <button type="button" class="link" id="forget">忘记这台电脑</button>
     </div>
     <p class="hint" id="nopair" hidden>请在电脑上打开「📱 手机拍」，然后用手机扫描它显示的二维码。</p>

@@ -289,16 +289,20 @@
                 + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rot" data-rot-pending="${i}" title="顺时针旋转 90°">↻</button><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
         }
 
-        async function addFiles(files) {
+        // 返回成功加入的张数（手机回传用它判断要不要告诉手机「电脑读不了这张」）
+        async function addFiles(files, { quiet = false } = {}) {
+            let added = 0;
             for (const file of Array.from(files)) {
                 try {
                     const blob = await compress(file);
                     pending.push({ blob, url: URL.createObjectURL(blob), src: file, rot: 0 });   // src/rot：旋转时从原图重新压缩
+                    added++;
                 } catch (err) {
-                    Toast.error(err.message);
+                    if (!quiet) Toast.error(err.message);
                 }
             }
             render();
+            return added;
         }
 
         box.querySelector('[data-photo-camera]').addEventListener('click', async () => {
@@ -314,7 +318,10 @@
             }
         });
         const phoneBtn = box.querySelector('[data-photo-phone]');
-        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open((blob) => addFiles([blob])));
+        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob) => {
+            // 读不了就抛错：PhoneLink 会把原因回给手机，手机那张照片显示失败，而不是假装「已发送」
+            if (!(await addFiles([blob], { quiet: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+        }));
         box.querySelector('[data-photo-upload]').addEventListener('click', () => box.querySelector('[data-photo-input="upload"]').click());
         box.querySelectorAll('[data-photo-input]').forEach((input) => input.addEventListener('change', async () => {
             await addFiles(input.files);

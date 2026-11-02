@@ -75,3 +75,11 @@
 .phonelink-status.connected { border-color: #1e8e3e; color: #1e8e3e; }
 .phonelink-status.error { border-color: #d93025; color: #d93025; }
 .phonelink-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; }
+.phonelink-status.pairing { border-color: #f2b705; color: #8a6500; }
+.phonelink-status.p2pfail { border-color: #d93025; color: #d93025; }
+.phonelink-tips { font-size: 0.85rem; line-height: 1.6; background: var(--bg-color); border-radius: 8px; padding: 0.4rem 0.7rem; margin-bottom: 0.6rem; }
+.phonelink-tips[hidden] { display: none; }
+.phonelink-tips ul { margin: 0.3rem 0; padding-left: 1.2rem; }
+.phonelink-diag { font-size: 0.82rem; margin-bottom: 0.6rem; color: var(--text-secondary); }
+.phonelink-diag summary { cursor: pointer; }
+.phonelink-diag-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.8rem; margin-top: 0.4rem; }
