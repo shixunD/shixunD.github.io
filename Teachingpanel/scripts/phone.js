@@ -541,7 +541,23 @@
             imageCapture = null;   // 这次打开相机期间不再尝试（每张都先失败一次会拖慢连拍），下次打开再试
             blob = null;
         }
-        if (!blob) blob = await grabFrame();
+        // takePhoto 的出图比例要和取景一致：个别手机（实测）取景是 3024×4032，takePhoto 却出 1840×3984 的裁切图。
+        // 比例差超过 3% 就丢掉，改用截取取景画面（分辨率可能低一点，但画面和你看到的一样）
+        if (blob && camTrack) {
+            const st = camTrack.getSettings();
+            const bmp = await createImageBitmap(blob).catch(() => null);
+            if (bmp && st.width && st.height) {
+                const rShot = Math.max(bmp.width, bmp.height) / Math.min(bmp.width, bmp.height);
+                const rView = Math.max(st.width, st.height) / Math.min(st.width, st.height);
+                if (Math.abs(rShot - rView) / rView > 0.03) {
+                    logEv(`全分辨率照片 ${bmp.width}×${bmp.height} 和取景 ${st.width}×${st.height} 比例不一致（被裁了），这次改为截取取景画面`);
+                    blob = null;
+                    imageCapture = null;
+                }
+            }
+            if (bmp && bmp.close) bmp.close();
+        }
+        if (!blob) { blob = await grabFrame(); how = '截取画面'; }
         $('camshot').classList.remove('busy');
         shooting = false;
         if (!blob) { logEv('没拍到画面（摄像头还没准备好）'); return; }

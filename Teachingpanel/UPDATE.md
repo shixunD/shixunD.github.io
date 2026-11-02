@@ -3,6 +3,15 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.22.6 — 2026-11-02
+
+- 修复：手机网页相机 `shoot()` 对 `takePhoto` 的结果校验比例——和 `camTrack.getSettings()` 的取景比例相差超过 3% 就弃用并改 `grabFrame()`（用户实测取景 3024×4032，电脑收到的却是 1840×3984，说明该手机 `takePhoto` 出的是被裁过的图）。日志记录两者尺寸。未实测，需要真机
+
+## 1.22.5 — 2026-11-02
+
+- 修复：`.photo-choose-view` 的 `flex: 1` + `max-height: 100%` 在父容器只有 max-height 时百分比高度不生效，竖图按宽度缩放后撑出预览区只露一段。改为预览区固定 `height: calc(96vh - 270px)`、`flex: none`，图片 `width/height: 100%` + `object-fit: contain`。实测（Chromium 1280×800，3024×4032 竖图）整张完整可见
+- 附：用户的手机日志显示 1.22.4 的取景已是 3024×4032，`takePhoto` 出图 2.35 MB / 1.93 MB，拍摄尺寸本身正常；之前「很小的图片」是预览框显示问题
+
 ## 1.22.4 — 2026-11-02
 
 - 变更：`photos.js` 的 `openCamera` 与 `phone.js` 的 `startCam` 先无分辨率约束打开摄像头，再读 `track.getCapabilities()` 的 `width.max` / `height.max` 用 `applyConstraints` 重新要求（取代 4096×3072 和 `aspectRatio` 4:3 的写死值）。`takePhoto` 仍同时传最大宽高。未实测
