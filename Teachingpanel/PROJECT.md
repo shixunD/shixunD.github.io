@@ -145,6 +145,7 @@ state = {
 - 作业登记（`records[studentId].photoIds`）、背诵检查（`recChecks[].photoIds`，含编辑检查）、学情记录（`remarks[].photoIds`）都可带照片；记录里只存 id 数组（可选字段，无需升 schema）。
 - 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。保存前 canvas 压缩（最长边 1600px，JPEG 0.8）。
 - 「📷 拍照」按设备分两条路：主输入是触摸（`matchMedia('(pointer: coarse)')`，手机/平板）用 `<input capture=environment>` 拉起系统相机；电脑上 `capture` 无效（只会弹文件选择框），改用 `getUserMedia` 在页面里开摄像头预览（`openCamera`，z-index 8000，可连拍、切换前后置）。`getUserMedia` 要 https / localhost；无摄像头、被拒绝或非安全上下文时 Toast 提示并退回选文件。
+- **摄像头选择**（`components/cameraPicker.js`，`CameraPicker`）：`openCamera` 开流前调 `CameraPicker.choose()`——`enumerateDevices` 扫描（名称 label 为空时先临时 `getUserMedia` 取权限再扫），与 localStorage `teachingPanel.cameras`（按**名称**记的有序名单，不进 .db，因为摄像头是每台电脑各自的）对比：没有新名称 → 用名单里排最前且已连接的；有新名称且共多于 1 个 → 弹选择框（z-index 8000，不用 `Modal.open`，否则会关掉下面的登记弹窗；勾选「设为默认」把所选移到名单最前），取消则不开相机。相机里的「切换」只在当前连接的摄像头间轮换，不改名单。主页「📷 默认摄像头」卡片：扫描、拖动排序（第一项 = 默认）、移除。同名摄像头只记一条。
 - 弹窗用 `Photos.editorHtml()` + `Photos.bindEditor(body, 已有ids)`；保存时先 `await editor.finalize()` 拿到最终 `photoIds` 再提交记录。展示用 `Photos.viewHtml(ids)`（`<img data-photo>` 由全局 MutationObserver 补 src，点击放大）。
 - 无人引用的照片由 `AppState.gcPhotos()` 在每次 `_commit` 后清理（存了不满 1 分钟的不动）。导入 .db = 整体替换，照片也以导入文件为准。
 
@@ -190,6 +191,7 @@ scripts/models/recitation.js       RecitationModel
 scripts/models/exams.js            ExamModel
 scripts/models/remarks.js          RemarkModel（学生趋势「其他情况」的学情记录）
 scripts/components/photos.js       Photos：拍照/上传编辑块、缩略图、点击放大
+scripts/components/cameraPicker.js CameraPicker：摄像头扫描/新设备选择框/默认顺序 + 主页卡片
 scripts/components/toast.js        Toast（含 Toast.action：带「撤销」等按钮的提示）
 scripts/components/modal.js        Modal.confirm / Modal.open（表单弹窗）/ Modal.prompt
 scripts/components/ui.js           UI：二级标签栏、学生链接、图例、统计块

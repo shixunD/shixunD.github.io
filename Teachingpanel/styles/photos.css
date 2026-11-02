@@ -29,3 +29,23 @@
 .camera-count { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.8rem; font-size: 0.85rem; }
 .camera-count:empty { display: none; }
 .camera-bar [hidden] { display: none !important; }
+
+/* 摄像头选择框（开相机前发现新摄像头）：叠在表单弹窗之上，层级 8000，高于照片放大 */
+.camera-pick-overlay { z-index: 8000; }
+.camera-pick-list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.6rem 0; }
+.camera-pick-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; }
+.camera-pick-item:has(input:checked) { border-color: var(--primary-color); background: var(--primary-soft); }
+.camera-pick-remember { display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.4rem; }
+.camera-new, .camera-badge { font-style: normal; font-size: 0.72rem; border-radius: 999px; padding: 0 0.45rem; color: #fff; background: var(--primary-color); }
+
+/* 主页「默认摄像头」卡片：可拖动排序的名单 */
+.camera-list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.5rem 0; }
+.camera-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.6rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg, #fff); cursor: grab; }
+.camera-row.dragging { opacity: 0.4; }
+.camera-row.drag-before { box-shadow: 0 -3px 0 0 var(--primary-color, #ff8a3d); }
+.camera-row.drag-after { box-shadow: 0 3px 0 0 var(--primary-color, #ff8a3d); }
+.camera-grip { color: var(--text-secondary); }
+.camera-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; }
+.camera-state { font-style: normal; font-size: 0.75rem; color: var(--text-secondary); }
+.camera-state.camera-on { color: #1e8e3e; }
+.camera-rm { border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0 0.2rem; }

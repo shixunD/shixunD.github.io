@@ -3,6 +3,11 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.15.0 — 2026-11-02
+
+- 新增：摄像头选择。`components/cameraPicker.js`（`CameraPicker`）：`Photos.openCamera` 开流前先 `CameraPicker.choose()` 扫描摄像头并与 localStorage `teachingPanel.cameras`（按名称记的有序名单）对比，无新摄像头用名单里最靠前且已连接的，有新的弹选择框（可勾选设为默认，取消则不开相机）；相机内「切换」改为在已连接摄像头间轮换（原 facingMode 前后置切换去掉）
+- 新增：主页「📷 默认摄像头」卡片——扫描、拖动排序、移除；`styles/photos.css` 追加样式；`index.html` / `service-worker.js` / PROJECT.md / Handbook 同步
+
 ## 1.14.1 — 2026-11-01
 
 - 配置：OneDrive 云备份启用。`msalAuth.js` 的 `MSAL_CLIENT_ID` 填入已注册的 Azure 应用 `de868c53-0d3c-4da7-b422-cdbc5f205cbc`（个人账户 / SPA / `Files.ReadWrite.AppFolder`），`isConfigured()` 变为 true，备份面板不再显示「尚未配置」；PROJECT.md 第七节补充重定向 URI 规则，Handbook 数据备份说明同步

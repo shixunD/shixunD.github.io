@@ -43,6 +43,7 @@
                 </div>
                 <div class="home-side">
                     ${QuickPhrases.cardHtml()}
+                    ${CameraPicker.cardHtml()}
 
                     <div class="card">
                         <h2>💾 数据</h2>
@@ -88,6 +89,7 @@
     function bind(el) {
         RosterSection.bind(el);
         QuickPhrases.bindCard(el);
+        CameraPicker.bindCard(el);
         const q = (sel) => el.querySelector(sel);
 
         el.querySelectorAll('[data-go]').forEach((btn) => btn.addEventListener('click', () => {

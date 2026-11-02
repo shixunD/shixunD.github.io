@@ -44,6 +44,7 @@ const URLS_TO_CACHE = [
     './scripts/components/modal.js',
     './scripts/components/studentTrend.js',
     './scripts/components/svgChart.js',
+    './scripts/components/cameraPicker.js',
     './scripts/components/photos.js',
     './scripts/components/toast.js',
     './scripts/components/ui.js',

@@ -105,12 +105,17 @@
 
     // 页面内相机：实时预览，可连续拍多张，每张交给 onShot(blob)；有多个摄像头时可切换前后置。打不开时 reject（调用方退回选文件）
     async function openCamera(onShot) {
-        let facing = 'environment';
+        // 先扫描摄像头：没有新的就用主页排序里的默认摄像头，有新的弹框让用户选；取消则不打开
+        const picked = await CameraPicker.choose();
+        if (picked === undefined) return;
+        let deviceId = picked;   // null = 浏览器默认
         let stream = null;
         async function start() {
             if (stream) stream.getTracks().forEach((t) => t.stop());
+            const video = { width: { ideal: 1920 }, height: { ideal: 1440 } };
+            if (deviceId) video.deviceId = { exact: deviceId };
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false });
+                stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
             } catch (err) {
                 throw new Error(cameraErrorText(err));
             }
@@ -143,8 +148,13 @@
         document.addEventListener('keydown', onKey, true);
 
         overlay.querySelector('[data-cam-done]').addEventListener('click', close);
+        // 切换：在当前连接的摄像头之间轮换（只影响这一次，不改默认顺序）
         overlay.querySelector('[data-cam-flip]').addEventListener('click', async () => {
-            facing = facing === 'environment' ? 'user' : 'environment';
+            const cams = (await navigator.mediaDevices.enumerateDevices().catch(() => [])).filter((d) => d.kind === 'videoinput');
+            if (cams.length < 2) return;
+            const cur = stream && stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings().deviceId;
+            const at = cams.findIndex((d) => d.deviceId === cur);
+            deviceId = cams[(at + 1) % cams.length].deviceId;
             try { await start(); video.srcObject = stream; } catch (err) { Toast.error(err.message); }
         });
         overlay.querySelector('[data-cam-shot]').addEventListener('click', () => {
@@ -207,7 +217,7 @@
             // 电脑：capture 无效（只会弹文件选择框），改用 getUserMedia 在页面里打开摄像头
             if (isTouchDevice() || !hasLiveCamera()) { fallback(); return; }
             try {
-                await openCamera(async (blob) => { await addFiles([blob]); });
+                await openCamera(async (blob) => { await addFiles([blob]); });   // 用户在选择框里取消时直接返回
             } catch (err) {
                 Toast.warning(`无法打开摄像头（${err.message}），请选择图片文件`);
                 fallback();
