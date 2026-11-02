@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ff8a3d">
+    <title>手机拍照 · 学情看板</title>
+    <link rel="icon" href="./icon-192.png">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #fff7f0; color: #2b2b2b; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+        h1 { font-size: 1.15rem; margin: 0 0 0.6rem; }
+        .status { padding: 0.6rem 0.8rem; border-radius: 10px; background: #fff; border: 1px solid #f0d9c6; font-size: 0.95rem; margin-bottom: 1rem; }
+        .status.ok { border-color: #1e8e3e; color: #1e8e3e; }
+        .status.bad { border-color: #d93025; color: #d93025; }
+        .big { display: block; width: 100%; padding: 1.1rem; font-size: 1.2rem; border: none; border-radius: 14px; background: #ff8a3d; color: #fff; text-align: center; margin-bottom: 0.7rem; }
+        .big.alt { background: #fff; color: #e06a1f; border: 2px solid #ff8a3d; font-size: 1rem; padding: 0.8rem; }
+        .big:active { opacity: 0.85; }
+        .hint { color: #777; font-size: 0.85rem; line-height: 1.5; }
+        .list { display: flex; flex-wrap: wrap; gap: 8px; margin: 1rem 0; }
+        .item { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; border: 2px solid #ddd; background: #eee; }
+        .item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .item.sent { border-color: #1e8e3e; }
+        .item.fail { border-color: #d93025; }
+        .item .tag { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.7rem; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 1px 0; }
+        .link { background: none; border: none; color: #999; text-decoration: underline; font-size: 0.85rem; padding: 0.3rem 0; }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+    <h1>📱 手机拍照 → 电脑</h1>
+    <div class="status" id="status">正在连接…</div>
+
+    <div id="main" hidden>
+        <label class="big">📷 拍照
+            <input type="file" accept="image/*" capture="environment" hidden id="cam">
+        </label>
+        <label class="big alt">🖼️ 从相册选（可多选）
+            <input type="file" accept="image/*" multiple hidden id="album">
+        </label>
+        <div class="list" id="list"></div>
+        <p class="hint">用的是手机自带相机，对焦、变焦、画质都和平时拍照一样。拍完自动传到电脑，再点「拍照」继续拍下一张。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
+        <button type="button" class="link" id="forget">忘记这台电脑</button>
+    </div>
+    <p class="hint" id="nopair" hidden>请在电脑上打开「📱 手机拍」，然后用手机扫描它显示的二维码。</p>
+
+    <script src="./scripts/vendor/peerjs.min.js"></script>
+    <script src="./scripts/phoneConfig.js"></script>
+    <script src="./scripts/phone.js"></script>
+</body>
+</html>

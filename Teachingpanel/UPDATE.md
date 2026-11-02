@@ -3,6 +3,18 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.17.0 — 2026-11-02
+
+- 变更：照片保存格式改为 WebP。`photos.js` 新增 `encodeImage()`：首次编码探测 `canvas.toBlob('image/webp')` 的实际 `type`，不是 WebP（Safari）就整页改用 JPEG；体积上限二分逻辑不变。依据 `tools/compress-bench.html` 实测：相同 SSIM 下 WebP 比浏览器 JPEG 小 28%–51%，MozJPEG（jSquash）−7%～+13% 且慢 10–40 倍，不采用
+- 变更：旋转改为从原图重压缩：`pending` 项保存 `src`（原图）与 `rot`，`compress(file, rot)` 一次完成摆正、旋转、缩放、压缩；删除 `rotateCw`。已保存照片旋转以存着的 blob 为原图
+- 新增：`tools/compress-bench.html`（压缩方案对比工具，不部署），PROJECT.md 文件清单同步
+- 已有照片不转换；格式随 `blob.type` 存入 IndexedDB 和 .db `photos.mime`，导出导入实测正常
+
+## 1.16.0 — 2026-11-02
+
+- 新增：手机拍照回传。`components/phoneLink.js`（电脑端二维码面板）、`phone.html` + `scripts/phone.js`（手机端）、`scripts/phoneConfig.js`（共用配置），PeerJS 1.5.4 + qrcode-generator 1.4.4 放 `scripts/vendor/`，按需加载；固定配对码存 localStorage，手机记住后自动重连、连续拍；iceServers 补国内 STUN。`index.html` / `service-worker.js` / PROJECT.md / Handbook 同步
+- 新增：缩略图「↻」顺时针旋转 90°（`rotateCw`，新拍照片直接替换，已保存照片转后作为新照片待保存）
+
 ## 1.15.2 — 2026-11-02
 
 - 新增：照片画质挡位 `Photos.PRESETS/getPreset/setPreset`（localStorage `teachingPanel.photoQuality`，默认「清晰」），主页「⚙️ 设置」新增「照片画质」下拉

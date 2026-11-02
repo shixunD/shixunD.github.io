@@ -6,7 +6,7 @@
 //   Photos.bindEditor(root, existingIds)        绑定，返回 { finalize() }：把新选的照片存起来，返回最终的 photoIds
 //   Photos.viewHtml(ids)                        只读缩略图（空数组返回空串）；<img data-photo> 由全局 MutationObserver 自动补 src
 // 拍照：手机/平板（pointer: coarse）用 <input capture> 拉起系统相机；电脑 capture 无效，改用 getUserMedia 页内相机（openCamera）。
-// 保存前按画质挡位（PRESETS，主页设置里选）缩小并自适应 JPEG 质量，保证每张不超过挡位的体积上限，避免手机原图（几 MB）撑爆存储和 .db 导出文件。
+// 保存前按画质挡位（PRESETS，主页设置里选）缩小并自适应质量（WebP，不支持时 JPEG），保证每张不超过挡位的体积上限，避免手机原图（几 MB）撑爆存储和 .db 导出文件。
 
 (function () {
     'use strict';
@@ -23,7 +23,7 @@
         });
     }
 
-    // 画质挡位：最长边（像素）+ 每张照片体积上限。体积超限时先降 JPEG 质量，降到底还超再缩小尺寸，保证每张不超过上限
+    // 画质挡位：最长边（像素）+ 每张照片体积上限。体积超限时先降质量，降到底还超再缩小尺寸，保证每张不超过上限
     const PRESETS = [
         { key: 'low',    label: '省空间', side: 1600, maxBytes: 300 * 1024 },
         { key: 'normal', label: '标准',   side: 2000, maxBytes: 600 * 1024 },
@@ -39,11 +39,26 @@
     }
     function setPreset(key) { if (PRESETS.some((p) => p.key === key)) Utils.lsSet(LS_QUALITY, key); }
 
-    const toBlob = (canvas, q) => new Promise((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('图片处理失败'))), 'image/jpeg', q);
+    const toBlob = (canvas, type, q) => new Promise((resolve, reject) => {
+        canvas.toBlob((bl) => (bl ? resolve(bl) : reject(new Error('图片处理失败'))), type, q);
     });
 
-    async function compress(file) {
+    // 1.17.0 起保存为 WebP：实测（tools/compress-bench.html）相同 SSIM 下比浏览器 JPEG 小约 30%–50%，小字肉眼无差别。
+    // Safari（iPhone/iPad）能显示 WebP 但 canvas 编不出来（会悄悄返回 PNG），所以先试一次，不支持就退回 JPEG。
+    // 已有照片不转换；每张照片的格式随 blob.type 存进 IndexedDB 和 .db（photos.mime），新旧格式混用没问题
+    let outType = null;
+    async function encodeImage(canvas, q) {
+        if (outType === null) {
+            const probe = await toBlob(canvas, 'image/webp', q).catch(() => null);
+            outType = probe && probe.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+            if (outType === 'image/webp') return probe;
+        }
+        return toBlob(canvas, outType, q);
+    }
+
+    // 读图（按 EXIF 摆正）→ 顺时针转 rot×90° → 按画质挡位缩小并压缩到体积上限以内。
+    // 旋转总是从原图重新压缩（而不是对压缩过的图再压一次），转几次画质都不会越来越差
+    async function compress(file, rot = 0) {
         let bitmap;
         try {
             bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -51,32 +66,33 @@
             throw new Error('无法读取这张图片，请换一张试试');
         }
         const preset = getPreset();
+        const turned = rot % 2 === 1;
         let scale = Math.min(1, preset.side / Math.max(bitmap.width, bitmap.height));
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         let blob = null;
         for (let round = 0; round < 6; round++) {
-            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const w = Math.max(1, Math.round(bitmap.width * scale));
+            const h = Math.max(1, Math.round(bitmap.height * scale));
+            canvas.width = turned ? h : w;
+            canvas.height = turned ? w : h;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.fillStyle = '#fff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-            blob = await toBlob(canvas, START_Q);
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(rot * Math.PI / 2);
+            ctx.drawImage(bitmap, -w / 2, -h / 2, w, h);
+            blob = await encodeImage(canvas, START_Q);
             if (blob.size <= preset.maxBytes) break;
-            // 在 [MIN_Q, START_Q] 里二分找「不超限的最高质量」
-            const lowest = await toBlob(canvas, MIN_Q);
-            if (lowest.size <= preset.maxBytes) {
-                let lo = MIN_Q, hi = START_Q;
-                blob = lowest;
-                for (let i = 0; i < 5; i++) {
-                    const mid = (lo + hi) / 2;
-                    const b = await toBlob(canvas, mid);
-                    if (b.size <= preset.maxBytes) { blob = b; lo = mid; } else { hi = mid; }
-                }
-                break;
+            // 在 [MIN_Q, START_Q] 里二分找「不超限的最高质量」；全都超限就缩小尺寸再来
+            let lo = MIN_Q, hi = START_Q, best = null;
+            for (let i = 0; i < 5; i++) {
+                const mid = (lo + hi) / 2;
+                const b = await encodeImage(canvas, mid);
+                if (b.size <= preset.maxBytes) { best = b; lo = mid; } else { hi = mid; }
             }
-            blob = lowest;
-            scale *= 0.85;   // 质量降到底还超：缩小尺寸再试
+            if (best) { blob = best; break; }
+            scale *= 0.85;
         }
         if (bitmap.close) bitmap.close();
         return blob;
@@ -253,6 +269,7 @@
             <div class="photo-editor" data-photo-editor>
                 <div class="photo-actions">
                     <button type="button" class="btn-secondary btn-sm" data-photo-camera>📷 拍照</button>
+                    ${isTouchDevice() ? '' : '<button type="button" class="btn-secondary btn-sm" data-photo-phone title="用手机自带相机拍，照片传回电脑">📱 手机拍</button>'}
                     <button type="button" class="btn-secondary btn-sm" data-photo-upload>🖼️ 上传照片</button>
                     <input type="file" accept="image/*" capture="environment" hidden data-photo-input="camera">
                     <input type="file" accept="image/*" multiple hidden data-photo-input="upload">
@@ -268,15 +285,15 @@
         const pending = [];   // { blob, url }
 
         function render() {
-            list.innerHTML = kept.map((id) => `<span class="photo-thumb"><img data-photo="${Utils.escapeHtml(id)}" alt="照片"><button type="button" class="photo-rm" data-rm-kept="${Utils.escapeHtml(id)}" title="移除">✕</button></span>`).join('')
-                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
+            list.innerHTML = kept.map((id) => `<span class="photo-thumb"><img data-photo="${Utils.escapeHtml(id)}" alt="照片"><button type="button" class="photo-rot" data-rot-kept="${Utils.escapeHtml(id)}" title="顺时针旋转 90°">↻</button><button type="button" class="photo-rm" data-rm-kept="${Utils.escapeHtml(id)}" title="移除">✕</button></span>`).join('')
+                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rot" data-rot-pending="${i}" title="顺时针旋转 90°">↻</button><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
         }
 
         async function addFiles(files) {
             for (const file of Array.from(files)) {
                 try {
                     const blob = await compress(file);
-                    pending.push({ blob, url: URL.createObjectURL(blob) });
+                    pending.push({ blob, url: URL.createObjectURL(blob), src: file, rot: 0 });   // src/rot：旋转时从原图重新压缩
                 } catch (err) {
                     Toast.error(err.message);
                 }
@@ -296,6 +313,8 @@
                 fallback();
             }
         });
+        const phoneBtn = box.querySelector('[data-photo-phone]');
+        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open((blob) => addFiles([blob])));
         box.querySelector('[data-photo-upload]').addEventListener('click', () => box.querySelector('[data-photo-input="upload"]').click());
         box.querySelectorAll('[data-photo-input]').forEach((input) => input.addEventListener('change', async () => {
             await addFiles(input.files);
@@ -305,6 +324,34 @@
         // 新拍的照片被移除后先不释放 object URL，撤销还要用；保存时（finalize）统一释放
         const discarded = [];
         list.addEventListener('click', async (e) => {
+            const rk = e.target.closest('[data-rot-kept]');
+            const rp = e.target.closest('[data-rot-pending]');
+            if (rk || rp) {
+                try {
+                    if (rp) {
+                        const p = pending[Number(rp.dataset.rotPending)];
+                        if (!p) return;
+                        p.rot = (p.rot + 1) % 4;
+                        const blob = await compress(p.src, p.rot);
+                        URL.revokeObjectURL(p.url);
+                        p.blob = blob;
+                        p.url = URL.createObjectURL(blob);
+                    } else {
+                        // 已保存的照片：转完当作新照片放进待保存列表（以存着的那张为原图），原来的那张在保存记录后由 gcPhotos 清理
+                        const id = rk.dataset.rotKept;
+                        const index = kept.indexOf(id);
+                        const old = await AppState.photoGet(id);
+                        if (index < 0 || !old) return;
+                        const blob = await compress(old, 1);
+                        kept.splice(index, 1);
+                        pending.push({ blob, url: URL.createObjectURL(blob), src: old, rot: 1 });
+                    }
+                    render();
+                } catch (err) {
+                    Toast.error('旋转失败：' + err.message);
+                }
+                return;
+            }
             const k = e.target.closest('[data-rm-kept]');
             const p = e.target.closest('[data-rm-pending]');
             if (!k && !p) return;
@@ -342,7 +389,7 @@
                     ids.push(id);
                     URL.revokeObjectURL(p.url);
                 }
-                pending.length = 0;
+                pending.length = 0;   // 连同 src（原图）一起释放
                 discarded.forEach((p) => URL.revokeObjectURL(p.url));
                 discarded.length = 0;
                 return ids;

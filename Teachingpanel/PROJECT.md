@@ -143,8 +143,11 @@ state = {
 ### 3.5 照片（`components/photos.js`）
 
 - 作业登记（`records[studentId].photoIds`）、背诵检查（`recChecks[].photoIds`，含编辑检查）、学情记录（`remarks[].photoIds`）都可带照片；记录里只存 id 数组（可选字段，无需升 schema）。
-- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。保存前 canvas 压缩：按画质挡位 `Photos.PRESETS`（省空间 1600px/0.3MB、标准 2000px/0.6MB、清晰 2400px/1MB 默认、超清 3200px/2MB；localStorage `teachingPanel.photoQuality`，主页「⚙️ 设置 → 照片画质」选），先缩到挡位尺寸，JPEG 质量从 0.9 起，超过体积上限就在 0.5–0.9 里二分找最高可用质量，降到底仍超再把尺寸 ×0.85 重试，保证每张不超过上限（简单的图本来就小，不会补大）。页内相机请求最高分辨率（ideal 3840×2160），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
+- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。保存前 canvas 压缩：按画质挡位 `Photos.PRESETS`（省空间 1600px/0.3MB、标准 2000px/0.6MB、清晰 2400px/1MB 默认、超清 3200px/2MB；localStorage `teachingPanel.photoQuality`，主页「⚙️ 设置 → 照片画质」选），先缩到挡位尺寸，质量从 0.9 起，超过体积上限就在 0.5–0.9 里二分找最高可用质量，降到底仍超再把尺寸 ×0.85 重试，保证每张不超过上限（简单的图本来就小，不会补大）。页内相机请求最高分辨率（ideal 3840×2160），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
 - 「📷 拍照」按设备分两条路：主输入是触摸（`matchMedia('(pointer: coarse)')`，手机/平板）用 `<input capture=environment>` 拉起系统相机；电脑上 `capture` 无效（只会弹文件选择框），改用 `getUserMedia` 在页面里开摄像头预览（`openCamera`，z-index 8000，可连拍、切换前后置）。`getUserMedia` 要 https / localhost；无摄像头、被拒绝或非安全上下文时 Toast 提示并退回选文件。
+- **手机拍照回传**（`components/phoneLink.js` 电脑端 + `phone.html` / `scripts/phone.js` 手机端 + `scripts/phoneConfig.js` 共用配置）：编辑块里「📱 手机拍」（仅电脑，`isTouchDevice()` 为假时显示）→ `PhoneLink.open(onPhoto)` 弹出二维码面板（z-index 8000），手机扫码打开 `phone.html#<配对码>`，用 `<input capture>` 调系统相机（对焦/变焦/画质全是系统相机的），照片经 PeerJS（WebRTC）直连传回电脑，每张走 `addFiles` → 画质挡位压缩。**配对码固定**：电脑端 localStorage `teachingPanel.phone.peerId`（`tp-` + 随机串），手机端 `teachingPanel.phone.target` 记住，之后电脑打开面板、手机打开页面即自动连，掉线自动重连，连续拍不用再扫码。PeerJS 公共牵线服务（0.peerjs.com）只交换连接信息，照片是点对点加密直连；`PEER_OPTIONS.iceServers` 里除 Google STUN / PeerJS TURN 外补了 miwifi、qq 两个国内 STUN（自己传 iceServers 会覆盖 PeerJS 默认值，所以默认的也要写）。PeerJS、二维码库按需加载，在 `scripts/vendor/`（`peerjs.min.js` 1.5.4 MIT、`qrcode.js` qrcode-generator 1.4.4 MIT）。手机端 >2.5MB 的原图先缩到最长边 3600px/JPEG 0.92 再传。本地调试（localhost）手机打不开二维码里的地址，需在线上使用。
+- **照片格式（1.17.0 起 WebP）**：`encodeImage()` 优先 `image/webp`，第一次编码时探测——Safari（iPhone/iPad）的 canvas 编不出 WebP 会悄悄返回 PNG，此时整个页面改用 `image/jpeg`。依据是 `tools/compress-bench.html` 的实测：相同 SSIM 下 WebP 比浏览器 JPEG 小约 28%–51%，小字放大看无差别；MozJPEG（jSquash）相同 SSIM 下体积 −7%～+13% 且慢 10–40 倍，没采用。已有照片不转换，格式随 `blob.type` 存（IndexedDB / .db 的 `photos.mime`），新旧混用、导出导入都不受影响。
+- **照片旋转**：编辑块缩略图左上角「↻」顺时针转 90°。待保存照片在 `pending` 里保留原图 `src` 和旋转次数 `rot`，每次旋转都是 `compress(src, rot)` 从原图重新压缩，转几次画质都不会变差；已保存的照片转完变成待保存的新照片（以存着的那张为原图，`rot = 1`，旧的由 `gcPhotos` 清理）。
 - **摄像头选择**（`components/cameraPicker.js`，`CameraPicker`）：`openCamera` 开流前调 `CameraPicker.choose()`——`enumerateDevices` 扫描（名称 label 为空时先临时 `getUserMedia` 取权限再扫），与 localStorage `teachingPanel.cameras`（按**名称**记的有序名单，不进 .db，因为摄像头是每台电脑各自的）对比：没有新名称 → 用名单里排最前且已连接的；有新名称且共多于 1 个 → 弹选择框（z-index 8000，不用 `Modal.open`，否则会关掉下面的登记弹窗；勾选「设为默认」把所选移到名单最前），取消则不开相机。相机里的「切换」只在当前连接的摄像头间轮换，不改名单。主页「📷 默认摄像头」卡片：扫描、拖动排序（第一项 = 默认）、移除。同名摄像头只记一条。
 - 弹窗用 `Photos.editorHtml()` + `Photos.bindEditor(body, 已有ids)`；保存时先 `await editor.finalize()` 拿到最终 `photoIds` 再提交记录。展示用 `Photos.viewHtml(ids)`（`<img data-photo>` 由全局 MutationObserver 补 src，点击放大）。
 - 无人引用的照片由 `AppState.gcPhotos()` 在每次 `_commit` 后清理（存了不满 1 分钟的不动）。导入 .db = 整体替换，照片也以导入文件为准。
@@ -168,6 +171,7 @@ version.json                       semver + changelog（只用于更新弹窗展
 wrangler.jsonc / .assetsignore     Cloudflare Workers 静态资源部署配置
 Handbook/index.html                终端用户使用说明（独立单文件，自带样式）
 tools/sync-to-site.js              同步到个人站点仓库 + 路径大小写体检（不部署，已在 .assetsignore 排除）
+tools/compress-bench.html          照片压缩方案对比（浏览器 JPEG / MozJPEG / WebP：相同 SSIM 下的体积、耗时、1:1 局部图；可拖入真实照片；不部署）
 .claude/settings.json + hooks/     PostToolUse 提醒 hook（改源码后提醒 bump 版本、同步 Handbook）
 
 styles/base.css                    CSS 变量（主色 #ff8a3d）、按钮/表单/弹窗/toast、z-index 层叠表注释
@@ -191,6 +195,9 @@ scripts/models/recitation.js       RecitationModel
 scripts/models/exams.js            ExamModel
 scripts/models/remarks.js          RemarkModel（学生趋势「其他情况」的学情记录）
 scripts/components/photos.js       Photos：拍照/上传编辑块、缩略图、点击放大
+scripts/components/phoneLink.js    PhoneLink：电脑端「📱 手机拍」二维码面板 + PeerJS 接收
+scripts/phoneConfig.js             手机拍照回传的共用配置（配对码键、ICE 服务器）
+scripts/phone.js + phone.html      手机端拍照页（自动连电脑、队列发送）
 scripts/components/cameraPicker.js CameraPicker：摄像头扫描/新设备选择框/默认顺序 + 主页卡片
 scripts/components/toast.js        Toast（含 Toast.action：带「撤销」等按钮的提示）
 scripts/components/modal.js        Modal.confirm / Modal.open（表单弹窗）/ Modal.prompt
@@ -205,6 +212,7 @@ scripts/reminders.js               背诵计划角标 / 每日一次提醒 / 系
 scripts/updateChecker.js           部署指纹判重 + 更新弹窗
 scripts/dbFile.js                  DbFile：state ↔ .db（SQLite）互转，表结构映射 TABLES；按需加载 sql.js
 scripts/importExport.js            本地导入导出 .db（下载 / 读取文件 → AppState.replaceState）
+scripts/vendor/peerjs.min.js, qrcode.js  PeerJS 1.5.4 / qrcode-generator 1.4.4（均 MIT），手机拍照回传按需加载
 scripts/vendor/sql-wasm.{js,wasm}  sql.js 1.10.3（SQLite 的 WebAssembly 版，MIT，见 sql.js-LICENSE）；离线可用，SW 预缓存
 scripts/persistence.js             navigator.storage.persist
 scripts/pwaInstall.js              安装到桌面

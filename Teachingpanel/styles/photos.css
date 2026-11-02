@@ -56,3 +56,22 @@
 .camera-zoom input { width: 140px; }
 .camera-info { position: absolute; top: 12px; right: 12px; color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.78rem; }
 .camera-info:empty { display: none; }
+
+/* 缩略图左上角的「顺时针旋转」按钮（与右上角的移除按钮对称） */
+.photo-rot {
+    position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: none; border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8rem; line-height: 20px; cursor: pointer; padding: 0;
+}
+
+/* 手机拍照接收面板（PhoneLink）：层级 8000，叠在登记弹窗之上 */
+.phonelink-overlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.phonelink-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1.2rem; width: min(440px, 100%); max-height: 94vh; overflow-y: auto; }
+.phonelink-box h2 { margin: 0 0 0.6rem; }
+.phonelink-qr { width: 220px; max-width: 70%; margin: 0 auto 0.4rem; text-align: center; }
+.phonelink-qr svg { width: 100%; height: auto; display: block; }
+.phonelink-url { font-size: 0.7rem; color: var(--text-secondary); word-break: break-all; margin-top: 0.2rem; }
+.phonelink-warn { color: #d93025; font-size: 0.85rem; }
+.phonelink-status { padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid var(--border-color); margin: 0.6rem 0; font-size: 0.92rem; }
+.phonelink-status.connected { border-color: #1e8e3e; color: #1e8e3e; }
+.phonelink-status.error { border-color: #d93025; color: #d93025; }
+.phonelink-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; }
