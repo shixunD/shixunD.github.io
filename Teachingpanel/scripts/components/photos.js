@@ -130,10 +130,41 @@
     function openLightbox(src) {
         const overlay = document.createElement('div');
         overlay.className = 'photo-lightbox';
-        overlay.innerHTML = `<img src="${src}" alt="照片"><button type="button" class="photo-lightbox-close" title="关闭">✕</button>`;
+        overlay.innerHTML = `<img src="${src}" alt="照片" draggable="false"><button type="button" class="photo-lightbox-close" title="关闭">✕</button>`
+            + '<div class="photo-lightbox-bar"><button type="button" data-lb="left" title="向左旋转 90°">↺ 左转</button><button type="button" data-lb="right" title="向右旋转 90°">↻ 右转</button><button type="button" data-lb="reset" title="还原">还原</button></div>';
+        const img = overlay.querySelector('img');
+        // 预览里的旋转/缩放/平移只改变当前查看效果，不改动已保存的照片
+        let rot = 0, scale = 1, x = 0, y = 0, dragging = false, moved = false, sx = 0, sy = 0;
+        const apply = () => { img.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${scale})`; };
         const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey, true); };
         const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-        overlay.addEventListener('click', close);
+        overlay.addEventListener('click', (e) => {
+            if (moved) { moved = false; return; }
+            const b = e.target.closest('button[data-lb]');
+            if (b) {
+                if (b.dataset.lb === 'left') rot -= 90;
+                else if (b.dataset.lb === 'right') rot += 90;
+                else { rot = 0; scale = 1; x = 0; y = 0; }
+                apply();
+            } else if (e.target !== img) close();
+        });
+        overlay.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            scale = Math.min(10, Math.max(0.2, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+            apply();
+        }, { passive: false });
+        img.addEventListener('pointerdown', (e) => {
+            dragging = true; moved = false; sx = e.clientX - x; sy = e.clientY - y;
+            img.setPointerCapture(e.pointerId);
+        });
+        img.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            if (Math.abs(e.clientX - sx - x) + Math.abs(e.clientY - sy - y) > 3) moved = true;
+            x = e.clientX - sx; y = e.clientY - sy; apply();
+        });
+        const endDrag = () => { dragging = false; };
+        img.addEventListener('pointerup', endDrag);
+        img.addEventListener('pointercancel', endDrag);
         document.addEventListener('keydown', onKey, true);
         document.body.appendChild(overlay);
     }

@@ -13,7 +13,17 @@
     position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.85);
     display: flex; align-items: center; justify-content: center; cursor: zoom-out;
 }
-.photo-lightbox img { max-width: 96vw; max-height: 94vh; object-fit: contain; }
+.photo-lightbox img { max-width: 96vw; max-height: 94vh; object-fit: contain; cursor: grab; touch-action: none; user-select: none; transition: transform 0.15s ease-out; }
+.photo-lightbox img:active { cursor: grabbing; transition: none; }
+.photo-lightbox-bar {
+    position: absolute; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+    display: flex; gap: 0.5rem; cursor: default;
+}
+.photo-lightbox-bar button {
+    border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.9rem; cursor: pointer;
+    background: rgba(255, 255, 255, 0.2); color: #fff;
+}
+.photo-lightbox-bar button:hover { background: rgba(255, 255, 255, 0.35); }
 .photo-lightbox-close {
     position: absolute; top: 12px; right: 16px; width: 36px; height: 36px; border: none; border-radius: 50%;
     background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 1rem; cursor: pointer;
