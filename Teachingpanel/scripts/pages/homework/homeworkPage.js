@@ -1,6 +1,6 @@
 // homeworkPage.js —— 作业页外壳（二级标签切换）+「登记」视图
 // 全局命名空间：window.HomeworkPage
-// 其余视图：matrix.js（总览矩阵 + 欠交清单）、student.js（学生趋势）
+// 其余视图：matrix.js（总览矩阵 + 欠交清单）；学生趋势在导航页「📈 学生趋势」（student.js 提供作业那一块）
 
 (function () {
     'use strict';
@@ -10,8 +10,7 @@
     const TABS = [
         { key: 'register', label: '📝 登记' },
         { key: 'matrix', label: '🧩 总览' },
-        { key: 'pending', label: '⏳ 欠交清单' },
-        { key: 'student', label: '📈 学生趋势' }
+        { key: 'pending', label: '⏳ 欠交清单' }
     ];
 
     // 页面级界面状态（不进 AppState，不持久化业务数据）
@@ -43,8 +42,7 @@
         const view = el.querySelector('#hw-view');
         if (ui.tab === 'register') renderRegister(view);
         else if (ui.tab === 'matrix') HomeworkMatrix.renderMatrix(view);
-        else if (ui.tab === 'pending') HomeworkMatrix.renderPending(view);
-        else HomeworkStudent.render(view);
+        else HomeworkMatrix.renderPending(view);
     }
 
     function openTab(key, opts) {
@@ -79,12 +77,11 @@
                     <div class="side-list">
                         ${list.length ? list.map((h) => {
                             const c = HomeworkModel.summarize(h, students);
-                            const problems = students.length - c.done;
                             return `
                                 <button type="button" class="side-item ${h.id === ui.selectedId ? 'active' : ''}" data-select="${h.id}" draggable="true" title="按住拖动可调整顺序">
                                     <div class="side-item-top"><span class="side-item-date">${Utils.formatDate(h.date)}</span></div>
                                     <div class="side-item-title">${esc(h.title)}</div>
-                                    <div class="side-item-sub">${problems ? `<span class="dot" style="background:#d93025"></span>${c.missing + c.poor} 未补 · ${c.missing_fixed + c.poor_fixed} 已补` : '全部完成'}</div>
+                                    <div class="side-item-sub">${c.missing + c.poor ? `<span class="dot" style="background:#d93025"></span>${c.missing} 未交 · ${c.poor} 未按要求` : '全部完成'}</div>
                                 </button>`;
                         }).join('') : '<div class="empty-message">还没有作业，点击「新建作业」开始登记</div>'}
                     </div>
@@ -140,10 +137,10 @@
         const st = HomeworkModel.STATUS_MAP[rec.status];
         const canFix = HomeworkModel.isOutstanding(rec.status);
         return `
-            <div class="stu-card" data-sid="${stu.id}" style="--st-color:${st.color};--st-text:${st.text}" title="${esc(st.label)}${rec.comment ? '：' + esc(rec.comment) : ''}">
+            <div class="stu-card" data-sid="${stu.id}" style="--st-color:${st.color};--st-text:${st.text}" title="${esc(st.label)}${rec.comment ? '：' + esc(rec.comment) : ''}${rec.photoIds.length ? '（有 ' + rec.photoIds.length + ' 张照片）' : ''}">
                 <div class="stu-card-no">${esc(stu.studentNo)}</div>
                 <div class="stu-card-name">${esc(stu.name)}</div>
-                <div class="stu-card-status">${esc(st.short)}${rec.comment ? ' 💬' : ''}</div>
+                <div class="stu-card-status">${esc(st.short)}${rec.comment || rec.photoIds.length ? ' 💬' : ''}</div>
                 ${canFix ? `<button type="button" class="stu-card-fix" data-fix="${stu.id}" title="标记为已补上">补</button>` : ''}
             </div>`;
     }

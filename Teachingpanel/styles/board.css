@@ -97,6 +97,8 @@
 /* 学生时间轴色条 */
 .strip { display: flex; flex-wrap: wrap; gap: 3px; }
 .strip-cell { width: 16px; height: 22px; border-radius: 3px; display: inline-block; }
+.strip-btn { border: none; padding: 0; cursor: pointer; }
+.strip-btn:hover { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 .count-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
 
 /* 考试 */

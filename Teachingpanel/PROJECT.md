@@ -17,9 +17,9 @@
 | 作业 | `homework-page` | `HomeworkPage` | 登记 / 总览矩阵 / 欠交清单 / 学生趋势 |
 | 背诵 | `recitation-page` | `RecitationPage` | 检查 / 计划背诵 / 时间看板 / 总览 / 学生趋势 |
 | 考试 | `exams-page` | `ExamsPage` | 考试（列表+详情） / 学生趋势 |
-| 其它 | `trend-page` | `TrendPage` | 默认就是「其他情况」（学情记录，可增改删，可带照片）；顶部作业/背诵/考试趋势按钮跳到对应页的学生趋势标签，四类共用一个学生选择器 |
+| 学生趋势 | `trend-page` | `TrendPage` | 1.24.0 起导航栏「📈 学生趋势」（原「🗂️ 其它」）：顶部固定的 `.trend-picker`（四块定位按钮 + 全班学生小块，`position: sticky`），下面作业 / 背诵 / 考试 / 其他情况四块从上到下连成一页（`.trend-sec`），点按钮 `scrollIntoView` 定位、滚动时高亮跟随（scroll-spy）；四块共用一个选中学生，选学生后整页重绘并保持滚动位置。作业 / 背诵 / 考试页不再有「📈 学生趋势」子标签 |
 
-另有跨页面的**学生趋势跳转**（`StudentTrend`）：任何带 `data-profile-id` 的元素（学生姓名）被点击，都会跳到该生的「学生趋势」（当前在作业/背诵/考试页就留在该页的学生趋势标签，其他地方沿用上次看的那类，`localStorage` 记 kind；kind 为 `other` 时去导航页「🗂️ 其它」）。
+另有跨页面的**学生趋势跳转**（`StudentTrend`）：任何带 `data-profile-id` 的元素（学生姓名）被点击，都会跳到导航页「📈 学生趋势」并定位到对应那块（当前在作业/背诵/考试页就定位到该类，其他地方沿用上次看的那类，`localStorage` 记 kind）。顶部固定区高度写入 `--nav-h` / `--picker-h`，章节的 `scroll-margin-top` 和「其他情况」右栏吸顶都用它。
 三类趋势页顶部共用 `StudentTrend.pickerHtml()`：作业/背诵/考试趋势快速切换 + 全班「学号 姓名」小块选择器，选中的学生在三类之间共享。
 
 ## 二、整体架构
@@ -138,12 +138,12 @@ state = {
 
 - `remarks` 一条 = 对某学生的一次记录：`date`（记录日期，可改，界面用 `Utils.formatDate`）+ `text`（纯文本，显示时 `white-space: pre-wrap` 保留换行）。关联用 `studentId`，没有 classId（班级由学生决定）。
 - `RemarkModel.listFor(studentId)` 日期新→旧；`add/update/remove`；内容不能为空。删除学生、删除班级会级联删除记录。
-- 视图 `OtherRecords`（导航页「🗂️ 其它」的全部内容）：选中学生由 `StudentTrend` 共享；新增表单是页内 `<form>`，提交后整页重绘（输入内容随之清空），编辑走 `Modal.open`。内容和照片至少要有一样。
+- 视图 `OtherRecords`（「其他情况」块）：选中学生由 `StudentTrend` 共享；新增表单是页内 `<form>`，提交后整页重绘（输入内容随之清空），编辑走 `Modal.open`。内容和照片至少要有一样。
 
 ### 3.5 照片（`components/photos.js`）
 
 - 作业登记（`records[studentId].photoIds`）、背诵检查（`recChecks[].photoIds`，含编辑检查）、学情记录（`remarks[].photoIds`）都可带照片；记录里只存 id 数组（可选字段，无需升 schema）。
-- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。压缩档位（1.22.0 起，取代原来的 `PRESETS` 画质挡位 / localStorage `teachingPanel.photoQuality`）：`Photos.LEVELS` = WebP 质量 0.1–1.0 每 0.1 一档 + `raw`（不压缩）；收到照片（拍照 / 手机回传 / 上传，都走 `addFiles`）后先试读一次，读得了就排进 `chooseQueue`，由 `chooseLevel(file)` 弹预览框（`.photo-choose-overlay`，z-index 8500）：共用一张 canvas 依次编码各档并显示大小，用户点「确定」只留所选那份 Blob 进 `pending`，原图丢弃；「放弃这张」不加入。队列在 `.camera-overlay` / `.phonelink-overlay` 还开着时等待，避免挡住连拍；`addFiles` 在入队后立即返回，所以手机回执不被预览框阻塞（试读失败仍会让手机显示「电脑读不了」）。预览框内可编辑（1.23.0）：状态 `rot`（顺时针 90° 次数）+ `crop`（旋转后整图上的比例矩形），`applyEdit()` 重建 canvas、作废所有档位并重算（`gen` 计数让过期编码作废）；编辑后 `raw` 档不再是原文件，改按 0.92 重新编码。裁剪框 `.pc-box` 平时与图片等大，拖四周 8 个手柄（`.pc-h`）松手并入 `crop`。预览区 `.photo-choose-view` 内 `.photo-stage` 整体 translate+scale 实现滚轮缩放 / 拖动平移 / 双指缩放（取代旧的 `.actual` 滚动条方式）。分辨率不缩（最长边超过 `MAX_SIDE`=4096 才等比缩）。默认预览档存 localStorage `teachingPanel.photoPreviewLevel`（默认 `q60`），主页「⚙️ 设置」里选。旋转（`rotateBlob`）要重新编码，质量取默认档与 0.6 的较大者，默认档为 raw 时用 0.92。页内相机请求 4096×3072（4:3，不能要 16:9，否则传感器被裁上下），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
+- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。压缩档位（1.22.0 起，取代原来的 `PRESETS` 画质挡位 / localStorage `teachingPanel.photoQuality`）：`Photos.LEVELS` = WebP 质量 0.01 / 0.03 / 0.05 / 0.08 + 0.1–1.0 每 0.1 一档 + `raw`（不压缩）；收到照片（拍照 / 手机回传 / 上传，都走 `addFiles`）后先试读一次，读得了就排进 `chooseQueue`，由 `chooseLevel(file)` 弹预览框（`.photo-choose-overlay`，z-index 8500）：共用一张 canvas 依次编码各档并显示大小，用户点「确定」只留所选那份 Blob 进 `pending`，原图丢弃；「放弃这张」不加入。队列在 `.camera-overlay` / `.phonelink-overlay` 还开着时等待，避免挡住连拍；`addFiles` 在入队后立即返回，所以手机回执不被预览框阻塞（试读失败仍会让手机显示「电脑读不了」）。预览框内可编辑（1.23.0）：状态 `rot`（顺时针 90° 次数）+ `crop`（旋转后整图上的比例矩形），`applyEdit()` 重建 canvas、作废所有档位并重算（`gen` 计数让过期编码作废）；编辑后 `raw` 档不再是原文件，改按 0.92 重新编码。裁剪框 `.pc-box` 平时与图片等大，拖四周 8 个手柄（`.pc-h`）松手并入 `crop`。预览区 `.photo-choose-view` 内 `.photo-stage` 整体 translate+scale 实现滚轮缩放 / 拖动平移 / 双指缩放（取代旧的 `.actual` 滚动条方式）。分辨率不缩（最长边超过 `MAX_SIDE`=4096 才等比缩）。默认预览档存 localStorage `teachingPanel.photoPreviewLevel`（默认 `q60`），主页「⚙️ 设置」里选。旋转（`rotateBlob`）要重新编码，质量取默认档与 0.6 的较大者，默认档为 raw 时用 0.92。页内相机请求 4096×3072（4:3，不能要 16:9，否则传感器被裁上下），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
 - 「📷 拍照」按设备分两条路：主输入是触摸（`matchMedia('(pointer: coarse)')`，手机/平板）用 `<input capture=environment>` 拉起系统相机；电脑上 `capture` 无效（只会弹文件选择框），改用 `getUserMedia` 在页面里开摄像头预览（`openCamera`，z-index 8000，可连拍、切换前后置）。`getUserMedia` 要 https / localhost；无摄像头、被拒绝或非安全上下文时 Toast 提示并退回选文件。
 - 手机回传 1.18.0 起：常见格式、8 MB 以内的原图原样发送（以前超过 2.5 MB 就在手机上用画布重压到 3600px，相机原图和相册小图走的是两条路），更大的或 HEIC 才在手机上转成 4096px JPEG 0.95。手机端牵线服务器断开时不再销毁 Peer（销毁会连直连一起关掉，从相机回来时最常见），只在后台重连牵线；手机编号被占用（`unavailable-id`）就换新编号。手机页「连接诊断」新增事件日志（拍照、进入后台/回到页面、得到的文件名/类型/大小、原样发送或转换、发送/回执/重连、各类错误），可「复制日志」发给开发者。
 - **手机端网页内相机（1.19.0）**：拍照页主按钮「📷 拍照」用 `getUserMedia` 在本页全屏取景（请求 4096×3072、后置），可连拍，取景上显示「已拍 N 张 · 已传 M 张」；支持 `ImageCapture` 的浏览器（Chromium 系）用 `takePhoto({imageWidth: 最大})` 拍全分辨率照片（2 秒取能力 / 5 秒拍照超时，失败一次本次打开期间就改为截取取景画面），按摄像头能力提供连续对焦、变焦滑块、点画面单次对焦、前后切换；切到后台时关摄像头、回来重开。原因：「系统相机」要跳到相机 App 再由浏览器把照片交回网页，这一步各浏览器实现不一，用户在狐猴浏览器（Chromium 系，安卓）上「选系统相机 → 拍完 → 什么都没发生」。系统相机保留为备选「📱 用系统相机拍」；file 控件从 `hidden`（display:none）改为视觉隐藏 `.vh`，部分安卓浏览器对不显示的 file 控件拍照后不回传。照片标签改为「发送中，等电脑确认… / ✓ 电脑已收到 / 没收到确认，等待重发 / 没发成功，点我重发」，强调以电脑回执为准。
@@ -229,7 +229,7 @@ scripts/pages/roster.js            学生名单卡片
 scripts/pages/homework/*.js        statusPicker（状态弹窗/作业表单/markFixed）/ homeworkPage（外壳+登记）/ matrix（总览+欠交）/ student
 scripts/pages/recitation/*.js      checkDialog（检查弹窗/轮次表单）/ recitationPage（外壳+检查）/ planView（计划背诵子标签）/ overview（时间看板+总览）/ student
 scripts/pages/exams/*.js           examDialogs / examsPage / examStudent
-scripts/pages/trend/*.js           trendPage（导航页「🗂️ 其它」外壳）/ otherRecords（其他情况）
+scripts/pages/trend/*.js           trendPage（导航页「📈 学生趋势」：固定选择器 + 四块流式排列）/ otherRecords（其他情况）
 scripts/app.js                     启动入口（最后加载）
 ```
 
@@ -241,7 +241,7 @@ scripts/app.js                     启动入口（最后加载）
 - 所有拼进 innerHTML 的用户文本必须 `Utils.escapeHtml`。
 - 全局 document 监听只在模块顶层注册一次（班级切换器外部点击、学生趋势跳转委托）。
 - `Modal.open` 同时只保留一个表单弹窗；`Modal.confirm` 的 Esc 用 capture 阶段，只关确认框本身。
-- **z-index 表**（见 `styles/base.css` 顶部注释）：导航 1000 < 下拉 2000 < 表单弹窗 6000 < 云备份 7000 < 确认框 7500 < toast 9500 < 更新弹窗 9999。
+- **z-index 表**（见 `styles/base.css` 顶部注释）：导航 1000 < 下拉 2000 < 表单弹窗 6000 < 云备份 7000 < 全屏层（手机配对 / 相机 / 照片放大）8000 < 压缩预览 8500 < 确认框 9000 < toast 9500 < 更新弹窗 9999。
 - 表单字段取值用 `form.elements.xxx`，**不要用 `form.title`/`form.name`**——会命中 `<form>` 自身的同名属性。
 
 ## 六、更新检测（部署指纹）

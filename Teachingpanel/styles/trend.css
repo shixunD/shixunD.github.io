@@ -1,6 +1,12 @@
-/* 学生趋势：类型快速切换 + 学号姓名小块选择器 */
+/* 学生趋势：顶部固定的选择器（四块快速定位 + 学号姓名小块）；下面四块连成一页 */
 
-.trend-picker { padding: 0.7rem 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; }
+/* 固定在导航栏下面不随页面滚动；比较高一点，学生小块多时也能完整看到（太多时自己滚动） */
+.trend-picker {
+    position: sticky; top: var(--nav-h, 56px); z-index: 50; padding: 0.9rem 1.1rem; min-height: 7.5rem; max-height: 40vh; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 0.8rem; box-sizing: border-box;
+}
+.trend-sec { scroll-margin-top: calc(var(--nav-h, 56px) + var(--picker-h, 120px) + 12px); margin-top: 1rem; }
+.trend-sec-title { font-size: 1.15rem; margin: 0 0 0.6rem; }
 .trend-kinds { display: flex; gap: 0.3rem; background: #f1e9e1; padding: 3px; border-radius: 9px; align-self: flex-start; }
 .trend-kind {
     border: none; background: transparent; padding: 0.3rem 0.8rem; border-radius: 7px; cursor: pointer;
@@ -37,7 +43,7 @@
 
 /* 其他情况：左右两栏（左：记录；右：该生以前的记录，自带滚动） */
 .other-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
-.other-right { position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow-y: auto; }
+.other-right { position: sticky; top: calc(var(--nav-h, 56px) + var(--picker-h, 120px) + 12px); max-height: calc(100vh - var(--nav-h, 56px) - var(--picker-h, 120px) - 32px); overflow-y: auto; }
 @media (max-width: 1000px) {
     .other-split { grid-template-columns: 1fr; }
     .other-right { position: static; max-height: none; }

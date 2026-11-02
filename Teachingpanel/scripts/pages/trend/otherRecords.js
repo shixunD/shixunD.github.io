@@ -15,7 +15,6 @@
         const remarks = RemarkModel.listFor(student.id);
 
         view.innerHTML = `
-            ${StudentTrend.pickerHtml('other')}
             <div class="other-split">
             <div class="card other-left">
                 <div class="detail-head">
@@ -52,7 +51,6 @@
             </aside>
             </div>`;
 
-        StudentTrend.bind(view, () => render(view));
         const form = view.querySelector('[data-add-form]');
         const photoEditor = Photos.bindEditor(form, []);
         form.addEventListener('submit', async (e) => {

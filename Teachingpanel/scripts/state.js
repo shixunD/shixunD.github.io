@@ -446,6 +446,14 @@
         return commit((s) => { s.settings.quickPhrases[kind].push(t); });
     }
 
+    function updateQuickPhrase(kind, index, text) {
+        const t = String(text || '').trim();
+        if (!t) return Promise.reject(new Error('快捷词不能为空'));
+        const list = getQuickPhrases(kind);
+        if (list.some((p, i) => i !== index && p === t)) return Promise.reject(new Error('快捷词已存在'));
+        return commit((s) => { s.settings.quickPhrases[kind][index] = t; });
+    }
+
     function removeQuickPhrase(kind, index) {
         return commit((s) => { s.settings.quickPhrases[kind].splice(index, 1); });
     }
@@ -467,6 +475,6 @@
         photoPut, photoGet, photoList, gcPhotos,
         getClasses, getActiveClass, getActiveClassId, addClass, renameClass, removeClass, switchClass,
         getStudents, getStudent, findStudentByName, addStudent, updateStudent, removeStudent, bulkAddStudents,
-        updateSettings, getQuickPhrases, addQuickPhrase, removeQuickPhrase, moveQuickPhrase
+        updateSettings, getQuickPhrases, addQuickPhrase, updateQuickPhrase, removeQuickPhrase, moveQuickPhrase
     };
 })();

@@ -11,10 +11,8 @@
         const id = StudentTrend.currentId();
 
         view.innerHTML = `
-            ${StudentTrend.pickerHtml('homework')}
             <div class="card">${summaryHtml(id, {}, true)}</div>
         `;
-        StudentTrend.bind(view, () => render(view));
     }
 
     // full 参数目前未使用，保留签名

@@ -1,7 +1,7 @@
 // modal.js —— 通用确认弹窗 + 通用表单弹窗
 // 全局命名空间：window.Modal
 //
-// Modal.confirm(...)  二次确认，z-index 7500（.modal-overlay），必须高于所有可能从中触发它的弹窗
+// Modal.confirm(...)  二次确认，z-index 9000（.modal-overlay），必须高于所有可能从中触发它的弹窗
 // Modal.open(...)     业务表单弹窗（状态选择、背诵检查、成绩录入等），z-index 6000（.dialog-overlay）
 
 (function () {

@@ -11,10 +11,8 @@
         const id = StudentTrend.currentId();
 
         view.innerHTML = `
-            ${StudentTrend.pickerHtml('recitation')}
             <div class="card">${summaryHtml(id, true)}</div>
         `;
-        StudentTrend.bind(view, () => render(view));
         view.querySelectorAll('[data-check-round]').forEach((btn) => {
             btn.addEventListener('click', () => RecitationDialogs.openCheck(btn.dataset.checkRound, id));
         });
@@ -41,21 +39,20 @@
                 ${UI.statTile('未检查', unchecked)}
                 ${UI.statTile('平均几次过关', avgAttempts == null ? '-' : Utils.formatNumber(avgAttempts, 1))}
             </div>
-            <h3 class="section-title">各轮次情况</h3>
-            <table class="simple-table">
-                <thead><tr><th>轮次</th><th>状态</th><th>下一次安排</th><th>检查次数</th><th>首次过关</th><th>用时</th>${full ? '<th></th>' : ''}</tr></thead>
-                <tbody>
-                    ${rows.map((r) => `<tr>
-                        <td>${esc(r.round.title)}${r.round.archived ? ' <span class="hint">(归档)</span>' : ''}</td>
-                        <td>${RecitationDialogs.statusPill(r.status)}</td>
-                        <td>${arrangementText(r.round.id, studentId)}</td>
-                        <td>${r.attempts || '-'}</td>
-                        <td>${r.firstPassDate ? Utils.formatDate(r.firstPassDate) : '-'}</td>
-                        <td>${r.daysToPass == null ? '-' : r.daysToPass === 0 ? '当天' : `${r.daysToPass} 天`}</td>
-                        ${full ? `<td><button type="button" class="btn-secondary btn-sm" data-check-round="${r.round.id}">检查</button></td>` : ''}
-                    </tr>`).join('')}
-                </tbody>
-            </table>
+            <div class="count-chips">
+                ${[...RecitationModel.RESULTS, RecitationModel.NONE].map((s) => `<span class="status-pill" style="background:${s.color};color:${s.text}">${esc(s.label)} ${rows.filter((r) => r.status === s.key).length}</span>`).join('')}
+            </div>
+            <h3 class="section-title">时间轴（旧 → 新）</h3>
+            <div class="strip">
+                ${rows.map((r) => {
+                    const s = R[r.status] || RecitationModel.NONE;
+                    const next = RecitationModel.nextArrangement(r.round.id, studentId);
+                    const tip = `${r.round.title}${r.round.archived ? '（归档）' : ''} · ${s.label} · 检查 ${r.attempts || 0} 次` + (r.firstPassDate ? ` · 首次过关 ${Utils.formatDate(r.firstPassDate)}` : '') + (r.daysToPass == null ? '' : r.daysToPass === 0 ? ' · 当天过关' : ` · 用时 ${r.daysToPass} 天`) + (next ? ` · 下一次 ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}` : '');
+                    return full
+                        ? `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-check-round="${r.round.id}" title="${esc(tip)}（点击检查）"></button>`
+                        : `<span class="strip-cell" style="background:${s.color}" title="${esc(tip)}"></span>`;
+                }).join('')}
+            </div>
             <h3 class="section-title">检查历史</h3>
             ${allChecks.length ? `<ul class="check-timeline">${allChecks.map(({ round, check }) => `
                 <li class="check-item" style="--dot-color:${(R[check.result] || {}).color || '#9aa0a6'}">
@@ -69,13 +66,6 @@
                 </li>`).join('')}</ul>`
                 : '<div class="hint">还没有检查记录</div>'}
         `;
-    }
-
-    function arrangementText(roundId, studentId) {
-        const next = RecitationModel.nextArrangement(roundId, studentId);
-        if (!next) return '-';
-        const what = '🗓️ 计划';
-        return `<span class="${next.overdue ? 'text-danger' : ''}">${what} ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}</span>`;
     }
 
     window.RecitationStudent = { render, summaryHtml };

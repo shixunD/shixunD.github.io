@@ -15,3 +15,4 @@
 .qp-edit-text { flex: 1; min-width: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
 .qp-add-row { display: flex; gap: 0.4rem; }
 .qp-add-row input { flex: 1; min-width: 0; }
+.qp-edit-input { flex: 1; min-width: 0; padding: 0.25rem 0.5rem; font-size: 0.9rem; }

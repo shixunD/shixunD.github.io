@@ -8,7 +8,7 @@
     position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: none; border-radius: 50%;
     background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.7rem; line-height: 20px; cursor: pointer; padding: 0;
 }
-/* 层级 8000：高于确认框 7500，低于提示条 9500（见 base.css 层叠表） */
+/* 层级 8000：低于确认框 9000 和提示条 9500（见 base.css 层叠表） */
 .photo-lightbox {
     position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.85);
     display: flex; align-items: center; justify-content: center; cursor: zoom-out;

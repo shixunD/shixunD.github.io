@@ -13,14 +13,12 @@
         const id = StudentTrend.currentId();
 
         view.innerHTML = `
-            ${StudentTrend.pickerHtml('exams')}
             <div class="toolbar card">
                 <button type="button" class="btn-toggle ${ui.mode === 'percent' ? 'btn-toggle-on' : ''}" data-mode="percent">得分率</button>
                 <button type="button" class="btn-toggle ${ui.mode === 'raw' ? 'btn-toggle-on' : ''}" data-mode="raw">原始分</button>
             </div>
             <div class="card">${summaryHtml(id, {}, ui.mode)}</div>
         `;
-        StudentTrend.bind(view, () => render(view));
         view.querySelectorAll('[data-mode]').forEach((btn) => btn.addEventListener('click', () => { ui.mode = btn.dataset.mode; render(view); }));
     }
 

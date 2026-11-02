@@ -3,6 +3,35 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.24.2 — 2026-11-02
+
+- 变更：`RecitationStudent.summaryHtml` 的「各轮次情况」表格换成 `.count-chips` 状态计数 + `.strip` 时间轴（旧 → 新，每轮次一格，`studentOverview` 本身就是旧→新）；原来表里的下一次安排 / 首次过关 / 用时移到悬停提示；原「检查」按钮改为点格子（`.strip-btn`，`data-check-round`）。删掉 `arrangementText`
+
+## 1.24.1 — 2026-11-02
+
+- 修复：`.modal-overlay`（`Modal.confirm`）z-index 7500 → 9000。`.phonelink-overlay` / `.camera-overlay` / `.photo-lightbox` 都是 8000，原来的确认框会被它们盖住（手机配对窗口「重新生成二维码」的确认框看不见）。同步 base.css 层叠表、PROJECT.md、modal.js 注释
+
+## 1.24.0 — 2026-11-02
+
+- 变更：学生趋势改为流模式单页。`TrendPage` 渲染固定的 `.trend-picker`（sticky，`min-height` 7.5rem）+ 四个 `.trend-sec`（作业 / 背诵 / 考试 / 其他情况），按钮 `scrollIntoView` 定位 + 滚动高亮；`HomeworkStudent` / `RecitationStudent` / `ExamStudent` / `OtherRecords` 的 `render(view)` 不再自带选择器；`StudentTrend.open(id, kind)` 改为跳导航页并定位。三个页面删掉「📈 学生趋势」子标签（已存的 `student` 标签值会回落到默认标签）；导航按钮「🗂️ 其它」改名「📈 学生趋势」
+- 已在 Chromium 实测：固定、按钮定位、高亮、选学生；未测：手机窄屏下选择栏占高
+
+## 1.23.4 — 2026-11-02
+
+- 新增：`AppState.updateQuickPhrase(kind, index, text)`（空值 / 重复会拒绝）；`quickPhrases.js` 卡片每行加 `data-qp-edit` 按钮，行就地变输入框，取消时把原节点放回；删除改走 `Modal.confirm({danger:true})`。已在 Chromium 实测编辑 / 取消 / 保存 / 删除确认
+
+## 1.23.3 — 2026-11-02
+
+- 变更：`studentCard` 的 `.stu-card-status` 小云朵在有 comment **或** 有照片（`rec.photoIds.length`）时都显示；卡片 title 补充照片张数
+
+## 1.23.2 — 2026-11-02
+
+- 变更：`homeworkPage.js` 左侧列表 `.side-item-sub` 由「未补 · 已补」改为「`c.missing` 未交 · `c.poor` 未按要求」，不再统计已补的
+
+## 1.23.1 — 2026-11-02
+
+- 新增：`Photos.LEVELS` 增加 q1 / q3 / q5 / q8（WebP 质量 0.01 / 0.03 / 0.05 / 0.08，标签保留两位小数）。key 是新增的，已存的默认档设置不受影响
+
 ## 1.23.0 — 2026-11-02
 
 - 修复：`.photo-lightbox-close` 加 `z-index: 2`，高于全高的左右切换区 `.photo-lightbox-nav`（z-index 1）

@@ -1,6 +1,6 @@
 // recitationPage.js —— 背诵页外壳（二级标签切换）+「检查」视图（单轮次）
 // 全局命名空间：window.RecitationPage
-// 其余视图：overview.js（总览 + 时间看板）、student.js（学生趋势）
+// 其余视图：overview.js（总览 + 时间看板）；学生趋势在导航页「📈 学生趋势」（student.js 提供背诵那一块）
 
 (function () {
     'use strict';
@@ -11,8 +11,7 @@
         { key: 'check', label: '✅ 检查' },
         { key: 'plan', label: '🗓️ 计划背诵' },
         { key: 'timeline', label: '⏰ 时间看板' },
-        { key: 'overview', label: '🧩 总览' },
-        { key: 'student', label: '📈 学生趋势' }
+        { key: 'overview', label: '🧩 总览' }
     ];
     const FILTERS = [
         { key: '', label: '全部' },
@@ -54,8 +53,7 @@
         if (ui.tab === 'check') renderCheck(view);
         else if (ui.tab === 'plan') RecitationPlan.render(view);
         else if (ui.tab === 'timeline') RecitationOverview.renderTimeline(view);
-        else if (ui.tab === 'overview') RecitationOverview.renderOverview(view);
-        else RecitationStudent.render(view);
+        else RecitationOverview.renderOverview(view);
     }
 
     function openTab(key, opts) {

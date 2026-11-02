@@ -1,6 +1,6 @@
 // examsPage.js —— 考试页外壳（二级标签）+「考试」视图（列表 + 单场详情/统计/导入导出）
 // 全局命名空间：window.ExamsPage
-// 学生趋势视图在 examStudent.js
+// 学生趋势在导航页「📈 学生趋势」，考试那一块在 examStudent.js
 
 (function () {
     'use strict';
@@ -8,8 +8,7 @@
     const esc = (s) => Utils.escapeHtml(s);
     const LS_TAB = 'teachingPanel.ui.examTab';
     const TABS = [
-        { key: 'exams', label: '📋 考试' },
-        { key: 'student', label: '📈 学生趋势' }
+        { key: 'exams', label: '📋 考试' }
     ];
     const ui = { tab: Utils.lsGet(LS_TAB, 'exams'), selectedId: null };
 
@@ -28,8 +27,7 @@
         `;
         el.querySelectorAll('[data-subtab]').forEach((btn) => btn.addEventListener('click', () => openTab(btn.dataset.subtab)));
         const view = el.querySelector('#exam-view');
-        if (ui.tab === 'exams') renderExams(view);
-        else ExamStudent.render(view);
+        renderExams(view);
     }
 
     function openTab(key) {

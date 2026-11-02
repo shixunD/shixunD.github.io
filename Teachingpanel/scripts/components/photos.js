@@ -26,10 +26,11 @@
     // 压缩档位（1.22.0 起）：只调 WebP 质量，分辨率保持原样（最长边超过 MAX_SIDE 才等比缩小）。
     // 拍照 / 上传 / 手机回传收到的照片先不保存，弹出预览框让用户逐档对比（chooseLevel），确定后只留所选档位那一份，完整原图丢弃。
     // 「不压缩」= 原样保存收到的那份文件。默认选中的档位在主页「⚙️ 设置」里选。
-    // 质量 0.1–1.0 每 0.1 一档，外加「不压缩」
-    const LEVELS = Array.from({ length: 10 }, (_, i) => {
-        const q = (i + 1) / 10;
-        return { key: 'q' + (i + 1) * 10, label: q.toFixed(1), quality: q, desc: '质量 ' + q.toFixed(1) };
+    // 质量 0.01 / 0.03 / 0.05 / 0.08 四个极限压缩档（1.23.1 起），0.1–1.0 每 0.1 一档，外加「不压缩」
+    const LEVELS = [1, 3, 5, 8, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => {
+        const q = n / 100;
+        const text = n < 10 || n % 10 ? q.toFixed(2) : q.toFixed(1);
+        return { key: 'q' + n, label: text, quality: q, desc: '质量 ' + text };
     }).concat([{ key: 'raw', label: '不压缩', quality: null, desc: '不压缩（保留收到的原图）' }]);
     const DEFAULT_LEVEL = 'q60';
     const LS_LEVEL = 'teachingPanel.photoPreviewLevel';

@@ -49,6 +49,7 @@
                                         <span class="qp-edit-text">${esc(p)}</span>
                                         <button type="button" class="class-item-btn" data-qp-move="${k.key}:${i}:-1" title="上移" ${i === 0 ? 'disabled' : ''}>↑</button>
                                         <button type="button" class="class-item-btn" data-qp-move="${k.key}:${i}:1" title="下移" ${i === list.length - 1 ? 'disabled' : ''}>↓</button>
+                                        <button type="button" class="class-item-btn" data-qp-edit="${k.key}:${i}" title="编辑">✎</button>
                                         <button type="button" class="class-item-btn" data-qp-del="${k.key}:${i}" title="删除">✕</button>
                                     </div>`).join('') || '<div class="hint">暂无</div>'}
                             </div>
@@ -73,10 +74,41 @@
                 }
             });
         });
-        root.querySelectorAll('[data-qp-del]').forEach((btn) => {
+        // 编辑：这一行就地变成输入框，回车 / 保存生效，Esc / 取消放弃
+        root.querySelectorAll('[data-qp-edit]').forEach((btn) => {
             btn.addEventListener('click', () => {
+                const [kind, i] = btn.dataset.qpEdit.split(':');
+                const row = btn.closest('.qp-edit-row');
+                const old = AppState.getQuickPhrases(kind)[Number(i)];
+                const kept = [...row.childNodes];   // 取消时原样放回
+                const cancel = () => row.replaceChildren(...kept);
+                row.innerHTML = '<input type="text" class="qp-edit-input" autocomplete="off"><button type="button" class="btn-secondary btn-sm" data-save>保存</button><button type="button" class="btn-secondary btn-sm" data-cancel>取消</button>';
+                const input = row.querySelector('input');
+                input.value = old;
+                input.focus();
+                input.select();
+                const save = async () => {
+                    if (input.value.trim() === old) { cancel(); return; }
+                    try {
+                        await AppState.updateQuickPhrase(kind, Number(i), input.value);
+                    } catch (err) {
+                        Toast.error(err.message);
+                    }
+                };
+                row.querySelector('[data-save]').addEventListener('click', save);
+                row.querySelector('[data-cancel]').addEventListener('click', cancel);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); save(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
+                });
+            });
+        });
+        root.querySelectorAll('[data-qp-del]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
                 const [kind, i] = btn.dataset.qpDel.split(':');
-                AppState.removeQuickPhrase(kind, Number(i));
+                const text = AppState.getQuickPhrases(kind)[Number(i)];
+                const ok = await Modal.confirm({ title: '删除快捷词', text: `确定删除快捷词「${text}」吗？`, confirmText: '删除', danger: true });
+                if (ok) AppState.removeQuickPhrase(kind, Number(i));
             });
         });
         root.querySelectorAll('[data-qp-move]').forEach((btn) => {
