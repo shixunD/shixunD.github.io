@@ -3,6 +3,13 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.18.1 — 2026-11-02
+
+- 修复：手机拍照页（`phone.html` / `/phone`、`scripts/phone.js`、`scripts/phoneConfig.js`、`scripts/vendor/peerjs.min.js`）改为网络优先（`service-worker.js` 的 `NETWORK_FIRST`），断网才用缓存。原先全部缓存优先，而拍照页不经过主页的更新检测、`service-worker.js` 多个版本未变不会重装，手机上一直运行第一次缓存的旧 `phone.js`，1.17.x / 1.18.0 的连接修复都没生效（用户反馈「拍照后显示重新连接、照片没传上去」）
+- 变更：`CACHE_NAME` `teaching-panel-cache-v1` → `v2`，所有设备重装 SW 并清掉旧缓存
+- 附：站点仓库提交 972f760 曾把 `Teachingpanel/scripts` 等目录记成删除导致线上 404，已由 32d930c 补回（站点仓库操作，与本仓库代码无关）
+- 未能本地实测：内置浏览器窗口不支持注册 Service Worker，只做了语法检查与路由规则核对
+
 ## 1.18.0 — 2026-11-02
 
 - 新增：照片画质挡位「画质优先」`best`（默认，`DEFAULT_PRESET`）：最长边 4096 以内不缩、WebP 质量 0.65（用户指定）、上限 4 MB。`PRESETS` 增加 `quality`（起始质量，无则 0.9）和 `desc`（设置下拉显示）；已手动选过挡位的浏览器保持原选择。实测模拟手机照片 4032×3024：干净 799 KB → 172 KB，带噪点 2554 KB → 266 KB（旧「清晰」2400×1800 分别为 203 / 408 KB），1:1 局部对比小字无差别

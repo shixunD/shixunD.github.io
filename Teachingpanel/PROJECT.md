@@ -249,6 +249,7 @@ scripts/app.js                     启动入口（最后加载）
 - `/deploy-tag.json` 用绝对路径是**故意的**（应用可能挂在子路径，指纹在宿主根目录）。
 - 设置页"检查更新"传 `{force:true}`，拿不到指纹时 Toast 报错，不会静默无反应。
 - SW 预缓存和兜底请求都 `cache:'no-store'`；注册带 `updateViaCache:'none'`。
+- **手机拍照页网络优先（1.18.1）**：`phone.html`（及 Cloudflare 去掉 .html 后的 `/phone`）、`scripts/phone.js`、`scripts/phoneConfig.js`、`scripts/vendor/peerjs.min.js` 走网络优先、断网才用缓存（`NETWORK_FIRST`）。原因：拍照页不跑 `UpdateChecker`，缓存优先会让手机一直停在第一次缓存的版本，1.17.x / 1.18.0 的修复都到不了手机。页面导航用 `fetch(event.request)` 原样转发（phone.html 会 307 到 /phone，按 URL 重新 fetch 得到的已跟随重定向响应不能回应导航）。同时 `CACHE_NAME` 由 `cache-v1` 改为 `cache-v2`，让所有设备重装 SW、清掉旧缓存。以后若再加「不经过主页更新检测」的独立页面，也要加进 `NETWORK_FIRST`。
 
 ### PWA 独立性（不和同域名下的其他应用冲突）
 

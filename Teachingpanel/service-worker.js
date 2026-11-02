@@ -3,9 +3,13 @@
 // 新增/改名文件时记得同步 URLS_TO_CACHE（否则该文件离线不可用；在线时首次请求会自动补进缓存）。
 // Cache Storage 按源共享：同域名下可能还有别的 PWA，清理缓存只动 CACHE_PREFIX 开头的（本应用自己的），
 // 不能 caches.keys() 全删，否则会把别的应用的离线缓存一起清掉。updateChecker.js 里有同名前缀，改名要两边同步。
+// v1→v2（1.18.1）：手机拍照页以前也是缓存优先，又不经过主页的更新检测，手机上一直停在第一次缓存的旧版本；
+// 改名让所有设备重装 SW、整个换掉旧缓存（activate 只删本前缀下的旧缓存）
 const CACHE_PREFIX = 'teaching-panel-';
-const CACHE_NAME = CACHE_PREFIX + 'cache-v1';
+const CACHE_NAME = CACHE_PREFIX + 'cache-v2';
 const DEPLOY_TAG_PATH = '/deploy-tag.json';
+// 手机拍照页及其脚本走网络优先（断网才用缓存）：手机上没有「检查更新」，缓存优先会让修复永远到不了手机
+const NETWORK_FIRST = /\/(phone(\.html)?|scripts\/phone\.js|scripts\/phoneConfig\.js|scripts\/vendor\/peerjs\.min\.js)$/;
 
 const URLS_TO_CACHE = [
     './',
@@ -116,6 +120,21 @@ self.addEventListener('fetch', (event) => {
     // 判重信号必须永远走网络，不能被它要判断"该不该清空"的缓存缓存住
     if (url.pathname === DEPLOY_TAG_PATH) {
         event.respondWith(fetch(event.request.url, { cache: 'no-store' }).catch(() => offlineResponse()));
+        return;
+    }
+
+    if (NETWORK_FIRST.test(url.pathname)) {
+        // 页面导航要原样转发请求：phone.html 在 Cloudflare 上会 307 到 /phone，自己按 URL 重新 fetch 得到的「已跟随重定向」响应不能用来回应导航
+        const fresh = event.request.mode === 'navigate' ? fetch(event.request) : fetch(event.request.url, { cache: 'no-store' });
+        event.respondWith(
+            fresh.then((response) => {
+                if (response && response.status === 200 && !response.redirected) {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
+                }
+                return response;
+            }).catch(() => caches.match(event.request, { ignoreSearch: true }).then((cached) => cached || offlineResponse()))
+        );
         return;
     }
 
