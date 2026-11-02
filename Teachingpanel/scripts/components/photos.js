@@ -6,12 +6,11 @@
 //   Photos.bindEditor(root, existingIds)        绑定，返回 { finalize() }：把新选的照片存起来，返回最终的 photoIds
 //   Photos.viewHtml(ids)                        只读缩略图（空数组返回空串）；<img data-photo> 由全局 MutationObserver 自动补 src
 // 拍照：手机/平板（pointer: coarse）用 <input capture> 拉起系统相机；电脑 capture 无效，改用 getUserMedia 页内相机（openCamera）。
-// 保存前会用 canvas 缩到最长边 1600px、JPEG 0.8，避免手机原图（几 MB）撑爆存储和 .db 导出文件。
+// 保存前按画质挡位（PRESETS，主页设置里选）缩小并自适应 JPEG 质量，保证每张不超过挡位的体积上限，避免手机原图（几 MB）撑爆存储和 .db 导出文件。
 
 (function () {
     'use strict';
 
-    const MAX_SIDE = 1600;
     const urlCache = new Map();    // 照片 id -> object URL
 
     function urlFor(id) {
@@ -24,6 +23,26 @@
         });
     }
 
+    // 画质挡位：最长边（像素）+ 每张照片体积上限。体积超限时先降 JPEG 质量，降到底还超再缩小尺寸，保证每张不超过上限
+    const PRESETS = [
+        { key: 'low',    label: '省空间', side: 1600, maxBytes: 300 * 1024 },
+        { key: 'normal', label: '标准',   side: 2000, maxBytes: 600 * 1024 },
+        { key: 'high',   label: '清晰',   side: 2400, maxBytes: 1024 * 1024 },
+        { key: 'ultra',  label: '超清',   side: 3200, maxBytes: 2 * 1024 * 1024 }
+    ];
+    const LS_QUALITY = 'teachingPanel.photoQuality';
+    const MIN_Q = 0.5, START_Q = 0.9;
+
+    function getPreset() {
+        const key = Utils.lsGet(LS_QUALITY, 'high');
+        return PRESETS.find((p) => p.key === key) || PRESETS[2];
+    }
+    function setPreset(key) { if (PRESETS.some((p) => p.key === key)) Utils.lsSet(LS_QUALITY, key); }
+
+    const toBlob = (canvas, q) => new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('图片处理失败'))), 'image/jpeg', q);
+    });
+
     async function compress(file) {
         let bitmap;
         try {
@@ -31,18 +50,36 @@
         } catch (e) {
             throw new Error('无法读取这张图片，请换一张试试');
         }
-        const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        const preset = getPreset();
+        let scale = Math.min(1, preset.side / Math.max(bitmap.width, bitmap.height));
         const canvas = document.createElement('canvas');
-        canvas.width = Math.round(bitmap.width * scale);
-        canvas.height = Math.round(bitmap.height * scale);
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        let blob = null;
+        for (let round = 0; round < 6; round++) {
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            blob = await toBlob(canvas, START_Q);
+            if (blob.size <= preset.maxBytes) break;
+            // 在 [MIN_Q, START_Q] 里二分找「不超限的最高质量」
+            const lowest = await toBlob(canvas, MIN_Q);
+            if (lowest.size <= preset.maxBytes) {
+                let lo = MIN_Q, hi = START_Q;
+                blob = lowest;
+                for (let i = 0; i < 5; i++) {
+                    const mid = (lo + hi) / 2;
+                    const b = await toBlob(canvas, mid);
+                    if (b.size <= preset.maxBytes) { blob = b; lo = mid; } else { hi = mid; }
+                }
+                break;
+            }
+            blob = lowest;
+            scale *= 0.85;   // 质量降到底还超：缩小尺寸再试
+        }
         if (bitmap.close) bitmap.close();
-        return new Promise((resolve, reject) => {
-            canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('图片处理失败'))), 'image/jpeg', 0.8);
-        });
+        return blob;
     }
 
     // ---------- 只读缩略图 ----------
@@ -112,7 +149,7 @@
         let stream = null;
         async function start() {
             if (stream) stream.getTracks().forEach((t) => t.stop());
-            const video = { width: { ideal: 1920 }, height: { ideal: 1440 } };
+            const video = { width: { ideal: 3840 }, height: { ideal: 2160 } };   // 尽量要最高分辨率，摄像头支持多少给多少
             if (deviceId) video.deviceId = { exact: deviceId };
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
@@ -134,10 +171,46 @@
                 <button type="button" class="camera-shutter" data-cam-shot title="拍照"></button>
                 <button type="button" class="btn-secondary btn-sm" data-cam-flip ${multi ? '' : 'hidden'}>🔄 切换</button>
             </div>
-            <div class="camera-count" data-cam-count></div>`;
+            <div class="camera-count" data-cam-count></div>
+            <div class="camera-zoom" data-cam-zoom-box hidden>🔍 <input type="range" data-cam-zoom> <span data-cam-zoom-val></span></div>
+            <div class="camera-info" data-cam-info></div>`;
         const video = overlay.querySelector('video');
         video.srcObject = stream;
         let shots = 0;
+
+        // 摄像头支持什么就开什么：连续自动对焦、变焦滑块、点画面重新对焦。
+        // 电脑上用手机当摄像头（Phone Link / DroidCam 等虚拟摄像头）通常不向浏览器开放这些，没有就不显示，对焦变焦要在手机端的软件里调
+        const zoomBox = overlay.querySelector('[data-cam-zoom-box]');
+        const zoomInput = overlay.querySelector('[data-cam-zoom]');
+        const zoomVal = overlay.querySelector('[data-cam-zoom-val]');
+        let caps = {};
+        const track = () => (stream && stream.getVideoTracks()[0]) || null;
+        const apply = (c) => { const t = track(); return t ? t.applyConstraints({ advanced: [c] }).catch(() => {}) : Promise.resolve(); };
+        function setupTrack() {
+            const t = track();
+            caps = (t && t.getCapabilities && t.getCapabilities()) || {};
+            if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) apply({ focusMode: 'continuous' });
+            if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+                zoomInput.min = caps.zoom.min; zoomInput.max = caps.zoom.max; zoomInput.step = caps.zoom.step || 0.1;
+                const cur = (t.getSettings && t.getSettings().zoom) || caps.zoom.min;
+                zoomInput.value = cur; zoomVal.textContent = `${Number(cur).toFixed(1)}×`;
+                zoomBox.hidden = false;
+            } else {
+                zoomBox.hidden = true;
+            }
+        }
+        function showInfo() {
+            const s = track() && track().getSettings ? track().getSettings() : {};
+            overlay.querySelector('[data-cam-info]').textContent = s.width ? `${s.width}×${s.height}` : '';
+        }
+        zoomInput.addEventListener('input', () => { zoomVal.textContent = `${Number(zoomInput.value).toFixed(1)}×`; apply({ zoom: Number(zoomInput.value) }); });
+        video.addEventListener('click', async () => {
+            if (!Array.isArray(caps.focusMode) || !caps.focusMode.includes('single-shot')) return;
+            await apply({ focusMode: 'single-shot' });
+            setTimeout(() => { if (caps.focusMode.includes('continuous')) apply({ focusMode: 'continuous' }); }, 1500);
+        });
+        video.addEventListener('loadedmetadata', showInfo);
+        setupTrack();
 
         const close = () => {
             if (stream) stream.getTracks().forEach((t) => t.stop());
@@ -155,7 +228,7 @@
             const cur = stream && stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings().deviceId;
             const at = cams.findIndex((d) => d.deviceId === cur);
             deviceId = cams[(at + 1) % cams.length].deviceId;
-            try { await start(); video.srcObject = stream; } catch (err) { Toast.error(err.message); }
+            try { await start(); video.srcObject = stream; setupTrack(); } catch (err) { Toast.error(err.message); }
         });
         overlay.querySelector('[data-cam-shot]').addEventListener('click', () => {
             if (!video.videoWidth) return;
@@ -196,7 +269,7 @@
 
         function render() {
             list.innerHTML = kept.map((id) => `<span class="photo-thumb"><img data-photo="${Utils.escapeHtml(id)}" alt="照片"><button type="button" class="photo-rm" data-rm-kept="${Utils.escapeHtml(id)}" title="移除">✕</button></span>`).join('')
-                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片"><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
+                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
         }
 
         async function addFiles(files) {
@@ -277,5 +350,5 @@
         };
     }
 
-    window.Photos = { editorHtml, bindEditor, viewHtml };
+    window.Photos = { editorHtml, bindEditor, viewHtml, PRESETS, getPreset, setPreset };
 })();

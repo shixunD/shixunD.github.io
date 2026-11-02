@@ -143,7 +143,7 @@ state = {
 ### 3.5 照片（`components/photos.js`）
 
 - 作业登记（`records[studentId].photoIds`）、背诵检查（`recChecks[].photoIds`，含编辑检查）、学情记录（`remarks[].photoIds`）都可带照片；记录里只存 id 数组（可选字段，无需升 schema）。
-- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。保存前 canvas 压缩（最长边 1600px，JPEG 0.8）。
+- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。保存前 canvas 压缩：按画质挡位 `Photos.PRESETS`（省空间 1600px/0.3MB、标准 2000px/0.6MB、清晰 2400px/1MB 默认、超清 3200px/2MB；localStorage `teachingPanel.photoQuality`，主页「⚙️ 设置 → 照片画质」选），先缩到挡位尺寸，JPEG 质量从 0.9 起，超过体积上限就在 0.5–0.9 里二分找最高可用质量，降到底仍超再把尺寸 ×0.85 重试，保证每张不超过上限（简单的图本来就小，不会补大）。页内相机请求最高分辨率（ideal 3840×2160），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
 - 「📷 拍照」按设备分两条路：主输入是触摸（`matchMedia('(pointer: coarse)')`，手机/平板）用 `<input capture=environment>` 拉起系统相机；电脑上 `capture` 无效（只会弹文件选择框），改用 `getUserMedia` 在页面里开摄像头预览（`openCamera`，z-index 8000，可连拍、切换前后置）。`getUserMedia` 要 https / localhost；无摄像头、被拒绝或非安全上下文时 Toast 提示并退回选文件。
 - **摄像头选择**（`components/cameraPicker.js`，`CameraPicker`）：`openCamera` 开流前调 `CameraPicker.choose()`——`enumerateDevices` 扫描（名称 label 为空时先临时 `getUserMedia` 取权限再扫），与 localStorage `teachingPanel.cameras`（按**名称**记的有序名单，不进 .db，因为摄像头是每台电脑各自的）对比：没有新名称 → 用名单里排最前且已连接的；有新名称且共多于 1 个 → 弹选择框（z-index 8000，不用 `Modal.open`，否则会关掉下面的登记弹窗；勾选「设为默认」把所选移到名单最前），取消则不开相机。相机里的「切换」只在当前连接的摄像头间轮换，不改名单。主页「📷 默认摄像头」卡片：扫描、拖动排序（第一项 = 默认）、移除。同名摄像头只记一条。
 - 弹窗用 `Photos.editorHtml()` + `Photos.bindEditor(body, 已有ids)`；保存时先 `await editor.finalize()` 拿到最终 `photoIds` 再提交记录。展示用 `Photos.viewHtml(ids)`（`<img data-photo>` 由全局 MutationObserver 补 src，点击放大）。

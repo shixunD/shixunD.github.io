@@ -3,6 +3,16 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.15.2 — 2026-11-02
+
+- 新增：照片画质挡位 `Photos.PRESETS/getPreset/setPreset`（localStorage `teachingPanel.photoQuality`，默认「清晰」），主页「⚙️ 设置」新增「照片画质」下拉
+- 变更：`compress()` 由固定 2400px/0.85 改为自适应：缩到挡位最长边 → JPEG 0.9 → 超体积上限则在 0.5–0.9 二分找最高质量 → 仍超则尺寸 ×0.85 重试（最多 6 轮）。新拍照片缩略图 title 显示实际 KB
+
+## 1.15.1 — 2026-11-02
+
+- 变更：页内相机（`Photos.openCamera`）请求分辨率由 1920×1440 改为 ideal 3840×2160；按 `track.getCapabilities()` 启用 `focusMode: continuous`、`zoom` 滑块（右侧）、点画面 `single-shot` 对焦，右上角显示实际分辨率；不支持的能力不显示。虚拟摄像头（手机当摄像头）通常不开放这些
+- 变更：照片压缩 `MAX_SIDE` 1600→2400，JPEG 质量 0.8→0.85（作业小字更清楚，.db 体积会相应变大）；`styles/photos.css` 追加变焦/分辨率样式
+
 ## 1.15.0 — 2026-11-02
 
 - 新增：摄像头选择。`components/cameraPicker.js`（`CameraPicker`）：`Photos.openCamera` 开流前先 `CameraPicker.choose()` 扫描摄像头并与 localStorage `teachingPanel.cameras`（按名称记的有序名单）对比，无新摄像头用名单里最靠前且已连接的，有新的弹选择框（可勾选设为默认，取消则不开相机）；相机内「切换」改为在已连接摄像头间轮换（原 facingMode 前后置切换去掉）

@@ -64,6 +64,10 @@
                             <button type="button" class="btn-toggle ${settings.reminderNotify ? 'btn-toggle-on' : ''}" data-notify>${settings.reminderNotify ? '已开启' : '已关闭'}</button>
                         </div>
                         <div class="setting-row">
+                            <div><div>照片画质</div><div class="hint">每张照片的体积上限；想看清小字选「清晰」或「超清」，想省空间选「省空间」。只影响以后新拍/上传的照片</div></div>
+                            <select data-photo-quality>${Photos.PRESETS.map((p) => `<option value="${p.key}" ${p.key === Photos.getPreset().key ? 'selected' : ''}>${p.label}（≤${p.maxBytes >= 1048576 ? p.maxBytes / 1048576 + ' MB' : Math.round(p.maxBytes / 1024) + ' KB'}）</option>`).join('')}</select>
+                        </div>
+                        <div class="setting-row">
                             <div><div>考试及格线</div><div class="hint">占满分的百分比</div></div>
                             <div class="inline-input"><input type="number" min="1" max="100" value="${settings.passPercent}" data-pass-percent> %</div>
                         </div>
@@ -156,6 +160,7 @@
             }
             await AppState.updateSettings({ reminderNotify: on });
         });
+        q('[data-photo-quality]').addEventListener('change', (e) => Photos.setPreset(e.target.value));
         q('[data-pass-percent]').addEventListener('change', (e) => {
             const v = Math.max(1, Math.min(100, Number(e.target.value) || 60));
             AppState.updateSettings({ passPercent: v });
