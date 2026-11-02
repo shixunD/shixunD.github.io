@@ -31,6 +31,8 @@
         summary { cursor: pointer; color: #999; }
         .diag { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.8rem; margin-top: 0.4rem; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 0.5rem 0.7rem; }
         .diag span:nth-child(odd) { color: #999; }
+        .loghead { display: flex; justify-content: space-between; align-items: center; margin-top: 0.6rem; }
+        .evlog { white-space: pre-wrap; word-break: break-all; font-size: 0.72rem; line-height: 1.45; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 0.5rem 0.6rem; max-height: 16rem; overflow: auto; margin: 0.3rem 0 0; }
         .link { background: none; border: none; color: #999; text-decoration: underline; font-size: 0.85rem; padding: 0.3rem 0; }
         [hidden] { display: none !important; }
     </style>
@@ -54,6 +56,8 @@
         <details>
             <summary>连接诊断</summary>
             <div class="diag" id="diag"></div>
+            <div class="loghead"><span>事件日志（最新的在上面）</span><button type="button" class="link" id="copylog">复制日志</button></div>
+            <pre class="evlog" id="evlog"></pre>
         </details>
         <button type="button" class="link" id="forget">忘记这台电脑</button>
     </div>
