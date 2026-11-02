@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>照片压缩对比</title>
+<!--
+  tools/compress-bench.html —— 照片压缩方案对比（开发用，不部署：tools/ 在 .assetsignore 里）
+  用法：在项目根目录起本地服务器（端口 8791），打开 http://localhost:8791/tools/compress-bench.html
+  选一张自己的作业照片（或点「生成测试图」），按 App 的流程缩到指定最长边，然后对每种编码器扫一遍质量：
+  体积、SSIM（结构相似度，越接近 1 越像原图）、PSNR、编码耗时；并在相同 SSIM 下比较体积、给出 1:1 局部对比图。
+  MozJPEG 从 jsdelivr 加载（@jsquash/jpeg 1.6.0），需要联网。
+-->
+<style>
+    :root { --fg: #222; --muted: #777; --line: #e3ddd5; --bg: #fffaf5; --accent: #ff8a3d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; color: var(--fg); background: var(--bg); }
+    h1 { font-size: 1.2rem; margin: 0 0 0.6rem; }
+    .bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem; }
+    button, select, input { font: inherit; }
+    button { padding: 0.35rem 0.8rem; border: 1px solid var(--accent); border-radius: 6px; background: #fff; color: #c25a14; cursor: pointer; }
+    button.primary { background: var(--accent); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    #log { white-space: pre-wrap; font-family: Consolas, monospace; font-size: 12px; color: var(--muted); max-height: 7rem; overflow: auto; }
+    table { border-collapse: collapse; margin: 0.6rem 0 1rem; background: #fff; }
+    th, td { border: 1px solid var(--line); padding: 0.25rem 0.55rem; text-align: right; font-variant-numeric: tabular-nums; }
+    th { background: #fbf3ea; }
+    td:first-child, th:first-child { text-align: left; }
+    .good { color: #1e8e3e; font-weight: 600; }
+    .bad { color: #d93025; }
+    .crops { display: flex; flex-wrap: wrap; gap: 10px; }
+    .crops figure { margin: 0; background: #fff; border: 1px solid var(--line); padding: 4px; }
+    .crops figcaption { font-size: 12px; color: var(--muted); }
+    .crops canvas { display: block; image-rendering: pixelated; }
+    .hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>照片压缩对比</h1>
+<div class="bar">
+    <input type="file" accept="image/*" id="file">
+    <button id="gen">生成测试图</button>
+    <label>最长边 <select id="side"><option>1600</option><option>2000</option><option selected>2400</option><option>3200</option></select></label>
+    <button class="primary" id="run" disabled>开始对比</button>
+</div>
+<div class="hint" id="info">先选一张照片或生成测试图。</div>
+<div id="log"></div>
+<div id="out"></div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const log = (s) => { $('log').textContent += s + '\n'; $('log').scrollTop = 1e9; };
+const MOZ_URL = 'https://cdn.jsdelivr.net/npm/@jsquash/jpeg@1.6.0/encode.js';
+
+let source = null;        // ImageBitmap（原图，已按 EXIF 摆正）
+let input = null;         // { canvas, ctx, w, h, luma } 缩放后的编码输入
+let mozEncode = null;
+
+// ---------- 测试图：模拟手机拍作业（4032×3024，光照渐变 + 横线纸 + 印刷字 + 手写字 + 红笔 + 镜头模糊 + 传感器噪点 + 相机 JPEG） ----------
+async function makeTestPhoto(noise = 7) {
+    const W = 4032, H = 3024;
+    const c = new OffscreenCanvas(W, H);
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(W * 0.45, H * 0.4, 200, W * 0.5, H * 0.5, W * 0.75);
+    g.addColorStop(0, '#f6f2e8'); g.addColorStop(1, '#cfc8b8');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+
+    const ink = new OffscreenCanvas(W, H);
+    const k = ink.getContext('2d');
+    k.strokeStyle = 'rgba(90,140,200,0.55)'; k.lineWidth = 3;
+    for (let y = 260; y < H - 120; y += 96) { k.beginPath(); k.moveTo(140, y); k.lineTo(W - 140, y); k.stroke(); }
+    k.fillStyle = '#26262b'; k.font = '54px "Microsoft YaHei", "PingFang SC", sans-serif';
+    k.fillText('八年级数学 课后作业（第 12 课） 姓名：__________  学号：____', 180, 200);
+    let rnd = 7; const r = () => (rnd = (rnd * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 26; i++) {
+        const y = 250 + i * 96;
+        if (i % 3 === 0) {
+            k.fillStyle = '#26262b'; k.font = '50px "Microsoft YaHei", sans-serif';
+            k.fillText(`${i / 3 + 1}. 已知 a + b = ${3 + i}，ab = ${i + 2}，求 a² + b² 的值，并写出完整的解题过程。`, 180, y);
+        } else {
+            k.save();
+            k.translate(240 + r() * 30, y); k.rotate((r() - 0.5) * 0.02);
+            k.fillStyle = '#1b2442'; k.font = '64px KaiTi, STKaiti, "楷体", serif';
+            k.fillText(`解：a² + b² = (a + b)² − 2ab = ${(3 + i) ** 2} − ${2 * (i + 2)} = ${(3 + i) ** 2 - 2 * (i + 2)}  所以答案为 ${(3 + i) ** 2 - 2 * (i + 2)}。`, 0, 0);
+            k.restore();
+        }
+    }
+    k.strokeStyle = '#c8231e'; k.lineWidth = 8; k.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+        const y = 330 + i * 288;
+        k.beginPath(); k.moveTo(W - 520, y); k.lineTo(W - 470, y + 50); k.lineTo(W - 360, y - 70); k.stroke();
+    }
+    k.beginPath(); k.ellipse(1500, 1300, 260, 70, -0.05, 0, Math.PI * 2); k.stroke();
+    k.font = '90px KaiTi, serif'; k.fillStyle = '#c8231e'; k.fillText('A  阅', W - 700, H - 200);
+
+    x.filter = 'blur(1.4px)';       // 镜头 / 对焦带来的轻微模糊
+    x.drawImage(ink, 0, 0);
+    x.filter = 'none';
+
+    if (noise) {   // 近似高斯的传感器噪点，noise=7 时 σ≈3.5；0 = 模拟相机强降噪后的干净照片
+        const img = x.getImageData(0, 0, W, H);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const n = (Math.random() + Math.random() + Math.random() - 1.5) * noise;
+            d[i] += n; d[i + 1] += n * 0.9; d[i + 2] += n * 1.1;
+        }
+        x.putImageData(img, 0, 0);
+    }
+    const camJpeg = await c.convertToBlob({ type: 'image/jpeg', quality: 0.92 });   // 手机相机输出本身就是 JPEG
+    return createImageBitmap(camJpeg);
+}
+
+// ---------- 和 App 一样缩放（canvas drawImage） ----------
+function prepare(side) {
+    const scale = Math.min(1, side / Math.max(source.width, source.height));
+    const w = Math.round(source.width * scale), h = Math.round(source.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(source, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h);
+    input = { canvas, ctx, w, h, px, luma: toLuma(px.data, w, h) };
+}
+
+function toLuma(d, w, h) {
+    const y = new Float32Array(w * h);
+    for (let i = 0, j = 0; j < y.length; i += 4, j++) y[j] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    return y;
+}
+
+// SSIM：亮度通道，8×8 窗口、步长 4
+function ssim(a, b, w, h) {
+    const C1 = (0.01 * 255) ** 2, C2 = (0.03 * 255) ** 2;
+    let sum = 0, n = 0;
+    for (let y0 = 0; y0 + 8 <= h; y0 += 4) {
+        for (let x0 = 0; x0 + 8 <= w; x0 += 4) {
+            let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+            for (let y = y0; y < y0 + 8; y++) {
+                let o = y * w + x0;
+                for (let x = 0; x < 8; x++, o++) { const p = a[o], q = b[o]; sa += p; sb += q; saa += p * p; sbb += q * q; sab += p * q; }
+            }
+            const ma = sa / 64, mb = sb / 64;
+            const va = saa / 64 - ma * ma, vb = sbb / 64 - mb * mb, cov = sab / 64 - ma * mb;
+            sum += ((2 * ma * mb + C1) * (2 * cov + C2)) / ((ma * ma + mb * mb + C1) * (va + vb + C2));
+            n++;
+        }
+    }
+    return sum / n;
+}
+function psnr(a, b) {
+    let se = 0;
+    for (let i = 0; i < a.length; i++) { const e = a[i] - b[i]; se += e * e; }
+    return 10 * Math.log10(255 * 255 / (se / a.length));
+}
+
+async function decodeLuma(blob) {
+    const bm = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(input.w, input.h);
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(bm, 0, 0);
+    bm.close();
+    return toLuma(x.getImageData(0, 0, input.w, input.h).data, input.w, input.h);
+}
+
+// ---------- 编码器 ----------
+const canvasBlob = (type, q) => new Promise((res) => input.canvas.toBlob(res, type, q));
+const ENCODERS = {
+    jpeg: { label: '浏览器 JPEG（现在用的）', qs: [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95], enc: (q) => canvasBlob('image/jpeg', q) },
+    moz:  { label: 'MozJPEG（jSquash）', qs: [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95], enc: async (q) => {
+        if (!mozEncode) mozEncode = (await import(MOZ_URL)).default;
+        return new Blob([await mozEncode(input.px, { quality: Math.round(q * 100) })], { type: 'image/jpeg' });
+    } },
+    webp: { label: '浏览器 WebP', qs: [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95], enc: async (q) => {
+        const b = await canvasBlob('image/webp', q);
+        if (b.type !== 'image/webp') throw new Error('这个浏览器不支持 WebP 编码');
+        return b;
+    } }
+};
+
+async function sweep(key) {
+    const E = ENCODERS[key];
+    const rows = [];
+    for (const q of E.qs) {
+        const t = performance.now();
+        const blob = await E.enc(q);
+        const ms = performance.now() - t;
+        const l = await decodeLuma(blob);
+        rows.push({ q, kb: blob.size / 1024, ssim: ssim(input.luma, l, input.w, input.h), psnr: psnr(input.luma, l), ms, blob });
+        log(`${E.label} q=${q}: ${(blob.size / 1024).toFixed(0)} KB, SSIM ${rows.at(-1).ssim.toFixed(4)}, ${ms.toFixed(0)} ms`);
+        await new Promise((r) => setTimeout(r));
+    }
+    return rows;
+}
+
+// 相同 SSIM 下的体积：在 (ssim, kb) 曲线上线性插值；超出扫描范围返回 null
+function kbAt(rows, target) {
+    const s = rows.slice().sort((a, b) => a.ssim - b.ssim);
+    for (let i = 0; i + 1 < s.length; i++) {
+        if (s[i].ssim <= target && target <= s[i + 1].ssim) {
+            const t = (target - s[i].ssim) / ((s[i + 1].ssim - s[i].ssim) || 1);
+            return s[i].kb + t * (s[i + 1].kb - s[i].kb);
+        }
+    }
+    return null;
+}
+function nearest(rows, target) {
+    return rows.filter((r) => r.ssim >= target).sort((a, b) => a.kb - b.kb)[0] || rows.at(-1);
+}
+
+async function run() {
+    $('run').disabled = true; $('out').innerHTML = ''; $('log').textContent = '';
+    prepare(Number($('side').value));
+    log(`编码输入：${input.w}×${input.h}`);
+    const results = {};
+    for (const key of Object.keys(ENCODERS)) {
+        try { results[key] = await sweep(key); } catch (e) { log(`${ENCODERS[key].label}：${e.message}`); }
+    }
+    window.__bench = { results, w: input.w, h: input.h };
+    render(results);
+    $('run').disabled = false;
+    return summarize(results);
+}
+
+function summarize(results) {
+    const targets = [0.95, 0.96, 0.97, 0.98];
+    return targets.map((t) => {
+        const row = { ssim: t };
+        for (const k of Object.keys(results)) row[k] = kbAt(results[k], t);
+        return row;
+    });
+}
+
+function render(results) {
+    const keys = Object.keys(results);
+    const sum = summarize(results);
+    const base = 'jpeg';
+    let html = `<h2>相同画质（SSIM）下的体积</h2><table><tr><th>SSIM</th>${keys.map((k) => `<th>${ENCODERS[k].label}</th>`).join('')}</tr>`;
+    for (const r of sum) {
+        html += `<tr><td>${r.ssim}</td>${keys.map((k) => {
+            const v = r[k];
+            if (v == null) return '<td>—</td>';
+            const pct = r[base] ? (v / r[base] - 1) * 100 : 0;
+            const cls = k === base ? '' : pct < -5 ? 'good' : pct > 5 ? 'bad' : '';
+            return `<td class="${cls}">${v.toFixed(0)} KB${k === base ? '' : `（${pct > 0 ? '+' : ''}${pct.toFixed(0)}%）`}</td>`;
+        }).join('')}</tr>`;
+    }
+    html += '</table><h2>平均编码耗时</h2><table><tr><th>编码器</th><th>每次</th></tr>';
+    for (const k of keys) html += `<tr><td>${ENCODERS[k].label}</td><td>${(results[k].reduce((s, r) => s + r.ms, 0) / results[k].length).toFixed(0)} ms</td></tr>`;
+    html += '</table><h2>局部 1:1 对比（各取 SSIM ≥ 0.97 里最小的那档）</h2><div class="crops" id="crops"></div>';
+    $('out').innerHTML = html;
+    const cw = Math.min(520, input.w), ch = Math.min(320, input.h);
+    const sx = Math.round(input.w * 0.12), sy = Math.round(input.h * 0.18);
+    const add = (title, src) => {
+        const fig = document.createElement('figure');
+        const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+        cv.getContext('2d').drawImage(src, sx, sy, cw, ch, 0, 0, cw, ch);
+        fig.append(cv); fig.insertAdjacentHTML('beforeend', `<figcaption>${title}</figcaption>`);
+        $('crops').append(fig);
+    };
+    add('原图（编码前）', input.canvas);
+    for (const k of keys) {
+        const r = nearest(results[k], 0.97);
+        createImageBitmap(r.blob).then((bm) => add(`${ENCODERS[k].label} q=${r.q} · ${r.kb.toFixed(0)} KB · SSIM ${r.ssim.toFixed(4)}`, bm));
+    }
+}
+
+$('file').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    source = await createImageBitmap(f, { imageOrientation: 'from-image' });
+    $('info').textContent = `已载入：${f.name}（${source.width}×${source.height}，${(f.size / 1048576).toFixed(2)} MB）`;
+    $('run').disabled = false;
+});
+$('gen').addEventListener('click', async () => {
+    $('info').textContent = '正在生成测试图…';
+    source = await makeTestPhoto();
+    $('info').textContent = `已生成测试图（${source.width}×${source.height}，模拟手机拍作业）`;
+    $('run').disabled = false;
+});
+$('run').addEventListener('click', run);
+
+window.bench = { makeTestPhoto, setSource: (bm) => { source = bm; }, prepare, sweep, run, summarize, ENCODERS, get input() { return input; } };
+</script>
+</body>
+</html>

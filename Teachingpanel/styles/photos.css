@@ -1,0 +1,85 @@
+/* 照片：弹窗里的拍照/上传编辑块、记录里的缩略图、点击放大 */
+.photo-editor { margin-top: 0.7rem; }
+.photo-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.3rem 0; }
+.photo-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.3rem; }
+.photo-thumb { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-color); }
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+.photo-rm {
+    position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: none; border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.7rem; line-height: 20px; cursor: pointer; padding: 0;
+}
+/* 层级 8000：高于确认框 7500，低于提示条 9500（见 base.css 层叠表） */
+.photo-lightbox {
+    position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.85);
+    display: flex; align-items: center; justify-content: center; cursor: zoom-out;
+}
+.photo-lightbox img { max-width: 96vw; max-height: 94vh; object-fit: contain; }
+.photo-lightbox-close {
+    position: absolute; top: 12px; right: 16px; width: 36px; height: 36px; border: none; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 1rem; cursor: pointer;
+}
+
+/* 页面内相机（电脑上 capture 无效时用）：层级 8000，同照片放大 */
+.camera-overlay { position: fixed; inset: 0; z-index: 8000; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.camera-video { width: 100%; flex: 1; min-height: 0; object-fit: contain; background: #000; }
+.camera-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem 1.2rem calc(0.8rem + env(safe-area-inset-bottom)); background: rgba(0, 0, 0, 0.7); }
+.camera-bar .btn-secondary { min-width: 4.5rem; }
+.camera-shutter { width: 64px; height: 64px; border-radius: 50%; border: 4px solid #fff; background: rgba(255, 255, 255, 0.35); cursor: pointer; padding: 0; }
+.camera-shutter:active { background: #fff; }
+.camera-count { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.8rem; font-size: 0.85rem; }
+.camera-count:empty { display: none; }
+.camera-bar [hidden] { display: none !important; }
+
+/* 摄像头选择框（开相机前发现新摄像头）：叠在表单弹窗之上，层级 8000，高于照片放大 */
+.camera-pick-overlay { z-index: 8000; }
+.camera-pick-list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.6rem 0; }
+.camera-pick-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; }
+.camera-pick-item:has(input:checked) { border-color: var(--primary-color); background: var(--primary-soft); }
+.camera-pick-remember { display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.4rem; }
+.camera-new, .camera-badge { font-style: normal; font-size: 0.72rem; border-radius: 999px; padding: 0 0.45rem; color: #fff; background: var(--primary-color); }
+
+/* 主页「默认摄像头」卡片：可拖动排序的名单 */
+.camera-list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.5rem 0; }
+.camera-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.6rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg, #fff); cursor: grab; }
+.camera-row.dragging { opacity: 0.4; }
+.camera-row.drag-before { box-shadow: 0 -3px 0 0 var(--primary-color, #ff8a3d); }
+.camera-row.drag-after { box-shadow: 0 3px 0 0 var(--primary-color, #ff8a3d); }
+.camera-grip { color: var(--text-secondary); }
+.camera-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; }
+.camera-state { font-style: normal; font-size: 0.75rem; color: var(--text-secondary); }
+.camera-state.camera-on { color: #1e8e3e; }
+.camera-rm { border: none; background: none; color: var(--text-secondary); cursor: pointer; padding: 0 0.2rem; }
+
+/* 相机里的变焦滑块、实际分辨率（摄像头支持才显示） */
+.camera-zoom { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.4rem; color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.85rem; }
+.camera-zoom[hidden] { display: none; }
+.camera-zoom input { width: 140px; }
+.camera-info { position: absolute; top: 12px; right: 12px; color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.78rem; }
+.camera-info:empty { display: none; }
+
+/* 缩略图左上角的「顺时针旋转」按钮（与右上角的移除按钮对称） */
+.photo-rot {
+    position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border: none; border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8rem; line-height: 20px; cursor: pointer; padding: 0;
+}
+
+/* 手机拍照接收面板（PhoneLink）：层级 8000，叠在登记弹窗之上 */
+.phonelink-overlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.phonelink-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1.2rem; width: min(440px, 100%); max-height: 94vh; overflow-y: auto; }
+.phonelink-box h2 { margin: 0 0 0.6rem; }
+.phonelink-qr { width: 220px; max-width: 70%; margin: 0 auto 0.4rem; text-align: center; }
+.phonelink-qr svg { width: 100%; height: auto; display: block; }
+.phonelink-url { font-size: 0.7rem; color: var(--text-secondary); word-break: break-all; margin-top: 0.2rem; }
+.phonelink-warn { color: #d93025; font-size: 0.85rem; }
+.phonelink-status { padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid var(--border-color); margin: 0.6rem 0; font-size: 0.92rem; }
+.phonelink-status.connected { border-color: #1e8e3e; color: #1e8e3e; }
+.phonelink-status.error { border-color: #d93025; color: #d93025; }
+.phonelink-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; }
+.phonelink-status.pairing { border-color: #f2b705; color: #8a6500; }
+.phonelink-status.p2pfail { border-color: #d93025; color: #d93025; }
+.phonelink-tips { font-size: 0.85rem; line-height: 1.6; background: var(--bg-color); border-radius: 8px; padding: 0.4rem 0.7rem; margin-bottom: 0.6rem; }
+.phonelink-tips[hidden] { display: none; }
+.phonelink-tips ul { margin: 0.3rem 0; padding-left: 1.2rem; }
+.phonelink-diag { font-size: 0.82rem; margin-bottom: 0.6rem; color: var(--text-secondary); }
+.phonelink-diag summary { cursor: pointer; }
+.phonelink-diag-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.8rem; margin-top: 0.4rem; }
