@@ -21,7 +21,7 @@
         let checkDate = null;
         let planOn = true;         // 「🗓️ 计划背诵」开关，独立于检查结果
         // 该生本轮已有的（未完成）计划日期：打开「计划背诵」时直接显示为选中，再点一次 = 取消那天的计划
-        const existingDates = RecitationModel.pendingPlans(roundId, studentId).map((p) => p.date);
+        let existingDates = RecitationModel.pendingPlans(roundId, studentId).map((p) => p.date);
         let planDates = existingDates.slice();
         const P = RecitationModel.PLAN;
 
@@ -30,7 +30,7 @@
             // 宽弹窗：两组 7 天日期块需要横向空间，日期+星期才能一行放下
             wide: true,
             html: `
-                <div class="dialog-meta">当前：${statusPill(pg.status)}</div>
+                <div class="dialog-meta" data-cur-status>当前：${statusPill(pg.status)}</div>
                 <div class="status-options status-options-5">
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option" data-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
@@ -58,8 +58,7 @@
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
                     <button type="button" class="btn-primary" data-save disabled>保存</button>
                 </div>
-                ${plansHtml(roundId, studentId)}
-                ${historyHtml(roundId, studentId)}
+                <div data-lists>${plansHtml(roundId, studentId)}${historyHtml(roundId, studentId)}</div>
             `,
             onMount(body, close) {
                 StudentTrend.linkDialogTitle(body, stu, round.title, close);
@@ -163,24 +162,41 @@
                         Toast.error(err.message);
                     }
                 });
-                body.querySelectorAll('[data-rm-plan]').forEach((btn) => {
-                    btn.addEventListener('click', async () => {
-                        close();
-                        await RecitationModel.removePlan(btn.dataset.rmPlan);
-                        Toast.info('已删除该计划');
+                // 删除计划 / 检查记录：不关弹窗，原地刷新「当前状态」和下面两个列表；没保存的选择、备注、照片都保留
+                function refreshLists() {
+                    body.querySelector('[data-cur-status]').innerHTML = `当前：${statusPill(RecitationModel.progressOf(roundId, studentId).status)}`;
+                    body.querySelector('[data-lists]').innerHTML = plansHtml(roundId, studentId) + historyHtml(roundId, studentId);
+                    bindLists();
+                    render();
+                }
+                function bindLists() {
+                    body.querySelectorAll('[data-rm-plan]').forEach((btn) => {
+                        btn.addEventListener('click', async () => {
+                            const plan = RecitationModel.plansFor(roundId, studentId).find((x) => x.id === btn.dataset.rmPlan);
+                            await RecitationModel.removePlan(btn.dataset.rmPlan);
+                            if (plan) {
+                                // 这天的计划已经没了：从「已有计划」和日期选择里一并去掉，免得保存时又被当成改动
+                                existingDates = existingDates.filter((d) => d !== plan.date);
+                                planDates = planDates.filter((d) => d !== plan.date);
+                                planPicker.set(planDates);
+                            }
+                            Toast.info('已删除该计划');
+                            refreshLists();
+                        });
                     });
-                });
-                body.querySelectorAll('[data-edit-check]').forEach((btn) => {
-                    btn.addEventListener('click', () => openEditCheck(btn.dataset.editCheck));
-                });
-                body.querySelectorAll('[data-rm-check]').forEach((btn) => {
-                    btn.addEventListener('click', async () => {
-                        const ok = await Modal.confirm({ title: '删除检查记录', text: '确定删除这条检查记录吗？', confirmText: '删除', danger: true });
-                        if (!ok) return;
-                        close();
-                        await RecitationModel.removeCheck(btn.dataset.rmCheck);
+                    body.querySelectorAll('[data-edit-check]').forEach((btn) => {
+                        btn.addEventListener('click', () => openEditCheck(btn.dataset.editCheck));
                     });
-                });
+                    body.querySelectorAll('[data-rm-check]').forEach((btn) => {
+                        btn.addEventListener('click', async () => {
+                            const ok = await Modal.confirm({ title: '删除检查记录', text: '确定删除这条检查记录吗？', confirmText: '删除', danger: true });
+                            if (!ok) return;
+                            await RecitationModel.removeCheck(btn.dataset.rmCheck);
+                            refreshLists();
+                        });
+                    });
+                }
+                bindLists();
                 render();
             }
         });

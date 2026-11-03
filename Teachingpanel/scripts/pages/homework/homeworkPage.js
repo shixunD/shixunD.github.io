@@ -81,7 +81,7 @@
                                 <button type="button" class="side-item ${h.id === ui.selectedId ? 'active' : ''}" data-select="${h.id}" draggable="true" title="按住拖动可调整顺序">
                                     <div class="side-item-top"><span class="side-item-date">${Utils.formatDate(h.date)}</span></div>
                                     <div class="side-item-title">${esc(h.title)}</div>
-                                    <div class="side-item-sub">${c.missing + c.poor ? `<span class="dot" style="background:#d93025"></span>${c.missing} 未交 · ${c.poor} 未按要求` : '全部完成'}</div>
+                                    <div class="side-item-sub">${c.missing + c.poor ? `<span class="dot" style="background:#d93025"></span>${c.missing} 未交 · <span class="dot" style="background:#f48fb1"></span>${c.poor} 未按要求` : '全部完成'}</div>
                                 </button>`;
                         }).join('') : '<div class="empty-message">还没有作业，点击「新建作业」开始登记</div>'}
                     </div>

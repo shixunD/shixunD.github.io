@@ -1,6 +1,11 @@
 /* svgChart.js 生成的图表 */
 
 .chart-wrap { width: 100%; max-width: 760px; margin: 0.4rem auto 0.8rem; }
+/* 考试趋势：折线图与成绩表左右并排，窄屏上下堆叠 */
+.exam-trend-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0.8rem; align-items: start; }
+.exam-trend-split .chart-wrap { margin: 0; }
+.exam-trend-split .simple-table th, .exam-trend-split .simple-table td { padding: 0.3rem 0.4rem; font-size: 0.8rem; }
+@media (max-width: 720px) { .exam-trend-split { grid-template-columns: 1fr; } }
 .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart-grid { stroke: #eee5dc; stroke-width: 1; }
 .chart-axis { font-size: 11px; fill: #8a7f78; }

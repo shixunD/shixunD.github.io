@@ -3,6 +3,18 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.24.5 — 2026-11-03
+
+- 变更：`homeworkPage.js` 侧栏每个作业的统计行，「未按要求」前单独加一个粉红（`#f48fb1`）圆点，「未交」仍为红色圆点
+
+## 1.24.4 — 2026-11-02
+
+- 变更：`ExamStudent.summaryHtml` 的折线图和成绩表包进 `.exam-trend-split`（`charts.css`，两列 grid，≤720px 堆叠）；工具栏按钮顺序改为原始分在前；统计块「最近一次名次」改为「平均名次」（有名次的考试名次均值，保留 1 位小数）
+
+## 1.24.3 — 2026-11-02
+
+- 变更：`checkDialog.js` 的 `openCheck` 里删除检查记录（`data-rm-check`）/ 计划（`data-rm-plan`）后不再 `close()`，而是 `refreshLists()` 重绘 `[data-lists]` 和「当前状态」并重新绑定；删计划时同步更新 `existingDates` / `planDates` / 日期选择。已在 Chromium 实测删记录、删计划
+
 ## 1.24.2 — 2026-11-02
 
 - 变更：`RecitationStudent.summaryHtml` 的「各轮次情况」表格换成 `.count-chips` 状态计数 + `.strip` 时间轴（旧 → 新，每轮次一格，`studentOverview` 本身就是旧→新）；原来表里的下一次安排 / 首次过关 / 用时移到悬停提示；原「检查」按钮改为点格子（`.strip-btn`，`data-check-round`）。删掉 `arrangementText`

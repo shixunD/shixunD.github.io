@@ -14,8 +14,8 @@
 
         view.innerHTML = `
             <div class="toolbar card">
-                <button type="button" class="btn-toggle ${ui.mode === 'percent' ? 'btn-toggle-on' : ''}" data-mode="percent">得分率</button>
                 <button type="button" class="btn-toggle ${ui.mode === 'raw' ? 'btn-toggle-on' : ''}" data-mode="raw">原始分</button>
+                <button type="button" class="btn-toggle ${ui.mode === 'percent' ? 'btn-toggle-on' : ''}" data-mode="percent">得分率</button>
             </div>
             <div class="card">${summaryHtml(id, {}, ui.mode)}</div>
         `;
@@ -30,6 +30,8 @@
         const val = (v, exam) => (v == null ? null : pct ? (v / exam.fullScore) * 100 : v);
         const taken = hist.filter((h) => h.score != null);
         const avgPct = taken.length ? taken.reduce((n, h) => n + h.score / h.exam.fullScore, 0) / taken.length : null;
+        const ranked = taken.filter((h) => h.rank);
+        const avgRank = ranked.length ? ranked.reduce((n, h) => n + h.rank, 0) / ranked.length : null;
         const last = taken[taken.length - 1];
         const prev = taken[taken.length - 2];
         const trend = last && prev ? (last.score / last.exam.fullScore - prev.score / prev.exam.fullScore) * 100 : null;
@@ -38,9 +40,10 @@
             <div class="stat-row">
                 ${UI.statTile('参加考试', `${taken.length}/${hist.length}`)}
                 ${UI.statTile('平均得分率', avgPct == null ? '-' : `${Math.round(avgPct * 100)}%`)}
-                ${UI.statTile('最近一次名次', last && last.rank ? `${last.rank}/${last.count}` : '-')}
+                ${UI.statTile('平均名次', avgRank == null ? '-' : Utils.formatNumber(avgRank, 1))}
                 ${UI.statTile('较上次', trend == null ? '-' : `${trend >= 0 ? '↑' : '↓'} ${Utils.formatNumber(Math.abs(trend), 1)}%`, '得分率变化', trend == null ? null : trend >= 0 ? '#1e8e3e' : '#d93025')}
             </div>
+            <div class="exam-trend-split">
             ${SvgChart.line({
                 labels: hist.map((h) => Utils.formatDate(h.exam.date)),
                 series: [
@@ -61,7 +64,8 @@
                     <td>${Utils.formatNumber(h.avg, 1)}</td>
                     <td>${h.rank ? `${h.rank}/${h.count}` : '-'}</td>
                 </tr>`).join('')}</tbody>
-            </table>`;
+            </table>
+            </div>`;
     }
 
     window.ExamStudent = { render, summaryHtml };
