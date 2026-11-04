@@ -16,9 +16,7 @@
     // 页面级界面状态（不进 AppState，不持久化业务数据）
     const ui = {
         tab: Utils.lsGet(LS_TAB, 'register'),
-        selectedId: null,
-        // 刷子模式：null = 点击学生弹出登记框；其他 = 点击直接套用该状态
-        brush: null
+        selectedId: null
     };
 
     function container() { return document.getElementById('homework-page-body'); }
@@ -54,14 +52,6 @@
 
     // ---------- 登记视图 ----------
 
-    const BRUSHES = [
-        { key: null, label: '点击弹窗登记' },
-        { key: 'missing', label: '刷：未完成' },
-        { key: 'poor', label: '刷：未按要求' },
-        { key: 'fix', label: '刷：已补上' },
-        { key: 'done', label: '刷：恢复完成' }
-    ];
-
     function renderRegister(view) {
         const students = AppState.getStudents();
         const list = HomeworkModel.sideList();
@@ -73,17 +63,10 @@
                 <aside class="card side-panel">
                     <div class="side-panel-head">
                         <button type="button" class="btn-primary btn-sm" data-new>＋ 新建作业</button>
+                        <button type="button" class="btn-secondary btn-sm" data-new-group title="新建分组夹，可把作业拖进去，点击可折叠">＋ 分组</button>
                     </div>
                     <div class="side-list">
-                        ${list.length ? list.map((h) => {
-                            const c = HomeworkModel.summarize(h, students);
-                            return `
-                                <button type="button" class="side-item ${h.id === ui.selectedId ? 'active' : ''}" data-select="${h.id}" draggable="true" title="按住拖动可调整顺序">
-                                    <div class="side-item-top"><span class="side-item-date">${Utils.formatDate(h.date)}</span></div>
-                                    <div class="side-item-title">${esc(h.title)}</div>
-                                    <div class="side-item-sub">${c.missing + c.poor ? `<span class="dot" style="background:#d93025"></span>${c.missing} 未交 · <span class="dot" style="background:#f48fb1"></span>${c.poor} 未按要求` : '全部完成'}</div>
-                                </button>`;
-                        }).join('') : '<div class="empty-message">还没有作业，点击「新建作业」开始登记</div>'}
+                        ${UI.sideTreeHtml(HomeworkModel.sideLayout(), (h) => itemHtml(h, students), '<div class="empty-message">还没有作业，点击「新建作业」开始登记</div>')}
                     </div>
                 </aside>
                 <section class="main-panel">
@@ -98,8 +81,34 @@
         view.querySelectorAll('[data-select]').forEach((btn) => {
             btn.addEventListener('click', () => { ui.selectedId = btn.dataset.select; render(); });
         });
-        UI.bindSideDrag(view, async (id, beforeId) => { await HomeworkModel.moveHomework(id, beforeId); render(); });
+        view.querySelector('[data-new-group]').addEventListener('click', async () => {
+            const name = await Modal.prompt({ title: '新建分组', placeholder: '如：第一单元' });
+            if (name && name.trim()) await SideGroups.createGroup('hw', name.trim());
+        });
+        UI.bindSideTree(view, {
+            move: (drag, drop) => HomeworkModel.moveSide(drag, drop),
+            toggle: (id) => SideGroups.updateGroup(id, { collapsed: !SideGroups.getGroup(id).collapsed }),
+            rename: async (id) => {
+                const g = SideGroups.getGroup(id);
+                const name = await Modal.prompt({ title: '重命名分组', value: g.title });
+                if (name && name.trim()) await SideGroups.updateGroup(id, { title: name.trim() });
+            },
+            remove: async (id) => {
+                const g = SideGroups.getGroup(id);
+                const ok = await Modal.confirm({ title: '删除分组', text: `确定删除分组「${g.title}」吗？里面的作业不会被删除，会回到列表中。`, confirmText: '删除', danger: true });
+                if (ok) await HomeworkModel.removeGroup(id);
+            }
+        });
         if (hw) bindDetail(view, hw);
+    }
+
+    function itemHtml(h, students) {
+        const c = HomeworkModel.summarize(h, students);
+        return `
+            <button type="button" class="side-item ${h.id === ui.selectedId ? 'active' : ''}" data-select="${h.id}" draggable="true" title="按住拖动可调整顺序">
+                <div class="side-item-top"><span class="side-item-date">${Utils.formatDate(h.date)}</span><span class="side-item-sub">${c.missing + c.poor ? `<span class="dot" style="background:#d93025"></span>${c.missing} 未交 · <span class="dot" style="background:#f48fb1"></span>${c.poor} 未按要求` : '全部完成'}</span></div>
+                <div class="side-item-title">${esc(h.title)}</div>
+            </button>`;
     }
 
     function registerDetail(hw, students) {
@@ -121,12 +130,8 @@
                     ${HomeworkModel.STATUSES.map((s) => c[s.key] ? `<span style="flex:${c[s.key]};background:${s.color}" title="${esc(s.label)} ${c[s.key]}"></span>` : '').join('')}
                 </div>
                 <div class="seg-legend">
-                    ${HomeworkModel.STATUSES.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)} <b>${c[s.key]}</b></span>`).join('')}
-                    <span class="seg-rate">按时完成率 ${Utils.percent(c.done, total)}</span>
-                    <span class="seg-rate seg-rate-fixed">补改完成率 ${Utils.percent(c.done + c.missing_fixed + c.poor_fixed, total)}</span>
-                </div>
-                <div class="brush-bar">
-                    ${BRUSHES.map((b) => `<button type="button" class="btn-toggle ${ui.brush === b.key ? 'btn-toggle-on' : ''}" data-brush="${b.key || ''}">${esc(b.label)}</button>`).join('')}
+                    <div class="seg-items">${HomeworkModel.STATUSES.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)} <b>${c[s.key]}</b></span>`).join('')}</div>
+                    <span class="seg-rate">按时完成 ${Utils.percent(c.done, total)} | 补改完成 ${Utils.percent(c.done + c.missing_fixed + c.poor_fixed, total)}</span>
                 </div>
                 ${students.length ? `<div class="stu-grid">${students.map((stu) => studentCard(hw, stu)).join('')}</div>` : UI.emptyStudentsHint()}
             </div>
@@ -157,9 +162,6 @@
             });
             if (ok) await HomeworkModel.remove(hw.id);
         });
-        view.querySelectorAll('[data-brush]').forEach((btn) => {
-            btn.addEventListener('click', () => { ui.brush = btn.dataset.brush || null; render(); });
-        });
         const grid = view.querySelector('.stu-grid');
         if (!grid) return;
         grid.addEventListener('click', async (e) => {
@@ -172,9 +174,7 @@
             const card = e.target.closest('[data-sid]');
             if (!card) return;
             const sid = card.dataset.sid;
-            if (!ui.brush) { HomeworkDialogs.openStatus(hw.id, sid); return; }
-            if (ui.brush === 'fix') await HomeworkDialogs.markFixed(hw.id, sid);
-            else await HomeworkModel.setRecord(hw.id, sid, { status: ui.brush });
+            HomeworkDialogs.openStatus(hw.id, sid);
         });
     }
 

@@ -32,30 +32,21 @@
 
     // ---------- 轮次 ----------
 
-    // 排序：没有手动排过序（无 order）的新轮次在最前面，按创建时间新→旧；手动排过的按 order 升序跟在后面
-    function rounds(opts) {
-        const o = opts || {};
+    // 默认（没手动排过）新轮次在最前，按创建时间新→旧；手动排序 / 分组夹见 models/sideGroups.js
+    function cmpRound(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }
+
+    function classRounds() {
         const classId = AppState.getActiveClassId();
-        return state().recRounds
-            .filter((r) => r.classId === classId)
-            .filter((r) => o.includeArchived || !r.archived)
-            .sort((a, b) => {
-                const ha = a.order != null, hb = b.order != null;
-                if (ha && hb) return a.order - b.order;
-                if (ha !== hb) return ha ? 1 : -1;
-                return (b.createdAt || 0) - (a.createdAt || 0);
-            });
+        return state().recRounds.filter((r) => r.classId === classId);
     }
 
-    // 拖动排序：把 id 的轮次移到 targetId 之前（targetId 为 null = 移到最后）；按含已归档的完整顺序重新编号
-    function moveRound(id, targetId) {
-        const list = rounds({ includeArchived: true }).filter((r) => r.id !== id);
-        const moving = getRound(id);
-        if (!moving) return Promise.resolve();
-        const at = targetId ? list.findIndex((r) => r.id === targetId) : -1;
-        list.splice(at < 0 ? list.length : at, 0, moving);
-        return AppState._commit(() => { list.forEach((r, i) => { r.order = i; }); });
-    }
+    function roundLayout() { return SideGroups.layout('rec', classRounds(), cmpRound); }
+    // 按侧栏显示顺序拍平的轮次数组（总览、计划页也用这个顺序）
+    function rounds() { return SideGroups.flatten(roundLayout()); }
+
+    // 拖动排序 / 进出分组夹：drag、drop 的含义见 SideGroups.move
+    function moveSide(drag, drop) { return SideGroups.move('rec', classRounds(), cmpRound, drag, drop); }
+    function removeGroup(id) { return SideGroups.removeGroup('rec', classRounds(), cmpRound, id); }
 
     function getRound(id) { return state().recRounds.find((r) => r.id === id) || null; }
 
@@ -296,8 +287,8 @@
     }
 
     window.RecitationModel = {
-        RESULTS, RESULT_MAP, NONE, PLAN, isPassed, moveRound,
-        rounds, getRound, createRound, updateRound, removeRound,
+        RESULTS, RESULT_MAP, NONE, PLAN, isPassed, moveSide, removeGroup,
+        rounds, roundLayout, getRound, createRound, updateRound, removeRound,
         checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
         plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
         schedule, nextArrangement, dueToday, reminderCounts, studentOverview

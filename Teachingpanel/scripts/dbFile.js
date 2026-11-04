@@ -49,9 +49,14 @@
             // 1.13.0 新增；旧版本导出的 .db 没有这张表，导入时视为空（见 OPTIONAL_TABLES）
             key: 'remarks', table: 'remarks',
             cols: [['id', 'id', 'text'], ['studentId', 'student_id', 'text'], ['date', 'date', 'text'], ['text', 'text', 'text'], ['createdAt', 'created_at', 'int']]
+        },
+        {
+            // 1.27.0 新增：作业 / 背诵侧栏的分组夹；旧版本导出的 .db 没有这张表，导入时视为空
+            key: 'sideGroups', table: 'side_groups',
+            cols: [['id', 'id', 'text'], ['classId', 'class_id', 'text'], ['kind', 'kind', 'text'], ['title', 'title', 'text'], ['collapsed', 'collapsed', 'bool'], ['order', 'sort_order', 'int'], ['createdAt', 'created_at', 'int']]
         }
     ];
-    const OPTIONAL_TABLES = new Set(['remarks']);
+    const OPTIONAL_TABLES = new Set(['remarks', 'side_groups']);
     const HW_RECORD_COLS = [['status', 'status', 'text'], ['comment', 'comment', 'text'], ['madeUpAt', 'made_up_at', 'text']];
     const SQL_TYPE = { text: 'TEXT', int: 'INTEGER', real: 'REAL', bool: 'INTEGER' };
 

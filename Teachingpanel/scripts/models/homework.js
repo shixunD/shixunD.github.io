@@ -35,29 +35,21 @@
             .sort((a, b) => (b.date.localeCompare(a.date)) || ((b.createdAt || 0) - (a.createdAt || 0)));
     }
 
-    // 作业页侧栏的显示顺序：没手动排过（无 order）的在最前，按日期新→旧；拖动排过的按 order 升序跟在后面。
-    // 只用于侧栏——list() 仍按日期，趋势/统计依赖这个时间顺序，不能被手动顺序打乱
-    function sideList() {
+    // 作业页侧栏：默认（没手动排过）按日期新→旧。只用于侧栏——list() 仍按日期，趋势/统计依赖这个时间顺序，不能被手动顺序打乱
+    function cmpSide(a, b) { return (b.date.localeCompare(a.date)) || ((b.createdAt || 0) - (a.createdAt || 0)); }
+
+    function classHomework() {
         const classId = AppState.getActiveClassId();
-        return state().homework
-            .filter((h) => h.classId === classId)
-            .sort((a, b) => {
-                const ha = a.order != null, hb = b.order != null;
-                if (ha && hb) return a.order - b.order;
-                if (ha !== hb) return ha ? 1 : -1;
-                return (b.date.localeCompare(a.date)) || ((b.createdAt || 0) - (a.createdAt || 0));
-            });
+        return state().homework.filter((h) => h.classId === classId);
     }
 
-    // 拖动排序：把 id 的作业移到 beforeId 之前（beforeId 为 null = 移到最后），按完整顺序重新编号
-    function moveHomework(id, beforeId) {
-        const moving = get(id);
-        if (!moving) return Promise.resolve();
-        const rest = sideList().filter((h) => h.id !== id);
-        const at = beforeId ? rest.findIndex((h) => h.id === beforeId) : -1;
-        rest.splice(at < 0 ? rest.length : at, 0, moving);
-        return AppState._commit(() => { rest.forEach((h, i) => { h.order = i; }); });
-    }
+    // 侧栏布局（含分组夹，见 models/sideGroups.js）；sideList() = 按侧栏显示顺序拍平的作业数组
+    function sideLayout() { return SideGroups.layout('hw', classHomework(), cmpSide); }
+    function sideList() { return SideGroups.flatten(sideLayout()); }
+
+    // 拖动排序 / 进出分组夹：drag、drop 的含义见 SideGroups.move
+    function moveSide(drag, drop) { return SideGroups.move('hw', classHomework(), cmpSide, drag, drop); }
+    function removeGroup(id) { return SideGroups.removeGroup('hw', classHomework(), cmpSide, id); }
 
     function get(id) { return state().homework.find((h) => h.id === id) || null; }
 
@@ -220,7 +212,7 @@
 
     window.HomeworkModel = {
         STATUSES, STATUS_MAP, FIX_MAP,
-        list, sideList, moveHomework, get, create, update, remove,
+        list, sideList, sideLayout, moveSide, removeGroup, get, create, update, remove,
         getRecord, setRecord, markFixed, snapshotRecord, restoreRecord, isProblem, isOutstanding,
         summarize, outstanding, countOutstanding, studentStats, weeklyRates
     };

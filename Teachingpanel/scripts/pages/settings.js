@@ -85,7 +85,7 @@
                             <button type="button" class="btn-secondary" data-check-update>🔄 检查更新</button>
                             <button type="button" class="btn-secondary" data-install ${PwaInstall.isAvailable() ? '' : 'hidden'}>📲 安装到桌面</button>
                             ${PwaInstall.isStandalone() ? '<div class="hint">✅ 当前以已安装应用方式运行</div>' : ''}
-                            <a class="btn-secondary btn-link" href="./Handbook/index.html" target="_blank" rel="noopener">📖 使用说明</a>
+                            <a class="btn-secondary btn-link" href="./Handbook/" target="_blank" rel="noopener">📖 使用说明</a>
                         </div>
                     </div>
                 </div>

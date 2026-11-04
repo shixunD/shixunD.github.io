@@ -5,7 +5,7 @@
     'use strict';
 
     const esc = (s) => Utils.escapeHtml(s);
-    const ui = { includeArchived: false, horizon: 'all' };
+    const ui = { horizon: 'all' };
 
     // ---------- 时间看板 ----------
     // 内容 = 所有未完成的背诵计划（1.9.0 起"需重新过关/未过关"不再带日期，哪天再背都用计划表示）。
@@ -90,7 +90,7 @@
 
     function renderOverview(view) {
         const students = AppState.getStudents();
-        const rounds = RecitationModel.rounds({ includeArchived: ui.includeArchived }).slice().reverse();
+        const rounds = RecitationModel.rounds().slice().reverse();
         const R = RecitationModel.RESULT_MAP;
 
         let body;
@@ -140,12 +140,10 @@
 
         view.innerHTML = `
             <div class="toolbar card">
-                <label class="checkbox-label-inline"><input type="checkbox" data-archived ${ui.includeArchived ? 'checked' : ''}> 包含已归档轮次</label>
                 ${UI.legend(['excel', 'pass', 'cond', 'retry', 'fail', 'none'].map((k) => ({ color: R[k].color, label: R[k].label })))}
             </div>
             <div class="card">${body}</div>
         `;
-        view.querySelector('[data-archived]').addEventListener('change', (e) => { ui.includeArchived = e.target.checked; renderOverview(view); });
         view.querySelectorAll('.cell').forEach((cell) => {
             cell.addEventListener('click', () => RecitationDialogs.openCheck(cell.dataset.round, cell.dataset.sid));
         });

@@ -3,6 +3,33 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.27.3 — 2026-11-04
+
+- 变更：分组夹 UI 重做（`ui.js` 里用内联 SVG 取代 📁 / ▸▾ / ✎ / ✕ 文本图标；`layout.css` 的 `.side-group*`：分组夹透明无边框，内容区缩进 + 浅橙色左竖线（`.side-group-body`）区分内外，标题行（数量胶囊在编辑 / 删除按钮右边），操作按钮悬停才显示）
+
+## 1.27.2 — 2026-11-04
+
+- 变更：1.27.1 把统计去掉 `margin-left: auto` 后不再靠右。现在图例项包进 `.seg-items`，`.seg-legend` 用 `justify-content: space-between`：一行放得下时统计在最右，放不下换行后它独占一行、靠左（作业页和背诵页都改）
+
+## 1.27.1 — 2026-11-04
+
+- 变更：`.seg-legend` 加 `margin-bottom: 1rem`（原来靠刷子栏的上边距隔开，删刷子栏后和学生卡片贴太近）；`.seg-rate` 去掉 `margin-left: auto` 改 `white-space: nowrap`，跟在图例后面，一行放不下时整体换行并靠左（删除 responsive.css 里对应的 `margin-left: 0`）
+
+## 1.27.0 — 2026-11-04
+
+- 新增：作业 / 背诵侧栏分组夹。新文件 `scripts/models/sideGroups.js`（`SideGroups`：layout / flatten / move / createGroup / updateGroup / removeGroup）；数据 `state.sideGroups` + 条目可选 `groupId` / `order`，`SCHEMA_VERSION` 5 → 6（`normalize()` 补空数组，删除班级级联删除分组夹）；`.db` 新增可选表 `side_groups`
+- 变更：`UI.bindSideDrag` 换成 `UI.sideTreeHtml` + `UI.bindSideTree`（拖动排序、进出分组夹、折叠、重命名、删除）；`HomeworkModel.moveHomework` / `RecitationModel.moveRound` 换成 `moveSide` + `removeGroup`，新增 `sideLayout()` / `roundLayout()`；`rounds()` / `sideList()` 按侧栏显示顺序拍平
+- 变更：背诵侧栏卡片第一行改为「任务名 + 过关统计」（`.side-item-row`，放不下时统计才换行）
+- 实测：模型层移动 / 进出分组 / 删除分组、DOM 拖放事件、导出 → 导入 .db 后分组和折叠状态都保留
+
+## 1.26.9 — 2026-11-04
+
+- 变更：`homeworkPage.js` 统计行把按时完成率 / 补改完成率合并为一个 `.seg-rate` 并排显示，文案去掉「率」；删除 `board.css` 的 `.seg-rate-fixed`；删除登记页刷子栏（`BRUSHES` / `ui.brush` / `data-brush` 逻辑），点击学生卡片统一 `HomeworkDialogs.openStatus`；作业 / 背诵侧栏卡片的统计（`.side-item-sub`）挪进第一行 `.side-item-top` 日期右侧，`.side-item-date` / `.side-item-sub` 字号调小；背诵侧栏卡片的统计改回标题 / 进度条下面同一行（`.side-item-sub`），并移除背诵「归档」功能：去掉列表勾选框、详情页归档按钮、总览「包含已归档轮次」，`RecitationModel.rounds()` 不再按 `archived` 过滤（字段保留以兼容旧数据，旧的已归档轮次一律正常显示）
+
+## 1.26.5 — 2026-11-04
+
+- 变更：设置页「使用说明」链接 `./Handbook/index.html` → `./Handbook/`；`service-worker.js` 预缓存去掉 `./index.html`，`./Handbook/index.html` 改 `./Handbook/`，且 `response.redirected` 的响应不写入缓存（Cloudflare 会把 `/x/index.html` 301 到 `/x/`，缓存重定向响应回应导航会打不开）
+
 ## 1.26.4 — 2026-11-04
 
 - 变更：`openCheck` 的 `checkDate` 初值改为今天，`result` 初值 null，挂载后 `loadCheckFor(checkDate)`：今天有记录就载入结果 / 备注 / 照片（取代 1.26.3「没检查过才留空」的判断）

@@ -2,11 +2,11 @@
 
 .seg-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #eee; margin: 0.4rem 0; }
 .seg-bar span { display: block; min-width: 3px; }
-.seg-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-size: 0.8rem; color: var(--text-secondary); align-items: center; }
+.seg-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem 0.9rem; font-size: 0.8rem; color: var(--text-secondary); align-items: center; margin-bottom: 1rem; }
+.seg-items { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; align-items: center; }
 .seg-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
 .seg-legend b { color: var(--text-primary); }
-.seg-rate { margin-left: auto; font-weight: 700; color: var(--text-primary) !important; }
-.seg-legend .seg-rate-fixed { flex-basis: 100%; justify-content: flex-end; margin-left: 0; }
+.seg-rate { white-space: nowrap; font-weight: 700; color: var(--text-primary) !important; }
 
 .mini-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: #eee; margin: 0.3rem 0 0.15rem; }
 .mini-bar span { display: block; }

@@ -40,7 +40,7 @@ index.html
 
 **单一数据源 + 整段重绘**：所有页面渲染都是整段 `innerHTML` 重绘 + 重新绑定事件。业务数据只能通过
 `AppState` 方法或业务模型（`scripts/models/*.js`，内部调用 `AppState._commit(mutator)`）修改，
-`_commit` 负责持久化 + 广播。**页面级界面状态**（当前子标签、选中的作业/轮次、筛选条件、刷子模式）
+`_commit` 负责持久化 + 广播。**页面级界面状态**（当前子标签、选中的作业/轮次、筛选条件）
 放在各页面模块的 `ui` 对象里，不进 AppState；子标签和当前页面另外记到 localStorage（仅界面偏好，读写都 try/catch）。
 
 **输入焦点问题的处理**：整页重绘会让正在输入的 `<input>` 丢焦点，所以凡是"连续输入多个值"的场景
@@ -50,7 +50,7 @@ index.html
 
 ```js
 state = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   classes:   [{ id, name }],
   activeClassId,
   students:  [{ id, classId, name, studentNo, note }],    // 姓名在同一班级内唯一（addStudent/updateStudent/bulkAdd 校验）
@@ -60,6 +60,7 @@ state = {
   recChecks: [{ id, roundId, studentId, date, result, note, createdAt }],   // v4 起不带复查日期
   recPlans:  [{ id, roundId, studentId, date, createdAt, note? }],   // 计划某天背诵（v3 新增；note 为该天计划的备注，1.26.0 起，可选字段无需迁移，.db 里落在 extra）
   exams:     [{ id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }],
+  sideGroups: [{ id, classId, kind: 'hw'|'rec', title, collapsed, order?, createdAt }],   // 作业/背诵侧栏的分组夹（v6 新增）；作业/轮次上可选 groupId、order
   remarks:   [{ id, studentId, date, text, createdAt }],   // 「学生趋势 → 其他情况」的学情记录（v5 新增；photoIds? 见 3.5）
   settings:  { reminderNotify: false, passPercent: 60,
                quickPhrases: { homework: [], recitation: ['复习体系混乱', '复习体系有条理', '书写有一定问题', '格式需要改善'] } }
@@ -75,7 +76,7 @@ state = {
 - `settings.quickPhrases`：comment 快捷词，作业/背诵两套独立。`normalize()` 对它做深合并——缺哪一组补默认值、过滤空串/重复项，所以旧数据和旧备份导入后也一定有这个字段（因此加它不需要升 schema）。
 - **schema 历史**：v1（1.0.0）带 `subjects` 列表和各记录的 `subjectId`；v2（1.1.0）`migrate()` 把它们删掉；
   v3（1.2.0）新增 `recPlans`（无需转换，`normalize()` 补空数组）；v4（1.9.0）把检查记录上的 `nextDates` 转成 `recPlans`
-  （计划 `createdAt` = 原检查记录的 `createdAt`，同一学生同一轮同一天不重复）并删除 `nextDates`；v5（1.13.0）新增 `remarks`（无需转换，`normalize()` 补空数组）。删除学生/轮次/班级都会级联删除计划。
+  （计划 `createdAt` = 原检查记录的 `createdAt`，同一学生同一轮同一天不重复）并删除 `nextDates`；v5（1.13.0）新增 `remarks`（无需转换，`normalize()` 补空数组）。删除学生/轮次/班级都会级联删除计划。v6（1.27.0）新增 `sideGroups`（无需转换，`normalize()` 补空数组；删除班级级联删除其分组夹）。
 - **迁移**：`load()` 和 `replaceState()`（本地导入、云端恢复共用）都走 `normalize()` → `migrate()`。
   以后改结构：递增 `SCHEMA_VERSION`，在 `migrate()` 里按版本逐级升级，并同步改 `validateSnapshot()`，
   然后**实际跑一遍"导出 → 导入"**确认旧备份仍能导入。
@@ -96,7 +97,7 @@ state = {
 - **欠交清单按作业分组**（`outstanding()` 返回 `[{hw, items:[{student, rec}]}]`，作业日期倒序、组内学号序）。
 - "已补上"统一走 `HomeworkDialogs.markFixed(hwId, sid, {confirm})`：欠交清单里 `confirm:true` 先二次确认；
   执行前用 `snapshotRecord` 存下原记录，执行后弹 `Toast.action` 的「撤销」（8 秒），撤销调 `restoreRecord` 原样恢复（含 comment）。
-  登记页卡片上的「补」和刷子「已补上」不确认（追求快），但同样提供撤销。
+  登记页卡片上的「补」不确认（追求快），但同样提供撤销。
 - 状态颜色是固定语义色，与主题主色无关，不要跟着换肤改。
 
 ### 3.2 背诵（`models/recitation.js`）
@@ -106,8 +107,9 @@ state = {
   result：`excel` 深绿（超额完成，1.10.0 新增）/ `pass` 绿 / `cond` 浅绿（有条件过关=勉强过，1.12.0 新增，同样算过关）/ `retry` 黄（需重新过关）/ `fail` 红（未过关）。
   超额完成 = 过关里做得好的，凡是"算不算过关"的地方（过关率、过关数、连续过关、把未过关的加入计划）都用 `RecitationModel.isPassed()` 判断，
   `roundSummary()` 另给 `passed = excel + pass + cond`。计划背诵标识色 1.12.0 起改为浅天蓝（`PLAN`）。
-  作业侧栏同理：`HomeworkModel.sideList()` / `moveHomework()`，可选字段 `order`；`list()` 保持按日期（趋势统计依赖时间顺序），拖动逻辑共用 `UI.bindSideDrag`。
-  轮次顺序：`rounds()` 无 `order` 的排最前（按创建时间新→旧），有 `order`（侧栏拖动后写入，`moveRound()`）的按升序跟在后面；`order` 是可选字段，无需迁移。新增结果值不需要迁移（result 本来就是自由文本字段）。
+  作业侧栏同理：`HomeworkModel.sideLayout()` / `sideList()` / `moveSide()`，可选字段 `order`；`list()` 保持按日期（趋势统计依赖时间顺序）。
+  **分组夹**（1.27.0，`models/sideGroups.js`，作业 / 背诵共用）：最外层 = 没进分组的条目 + 分组夹，共用一套 `order`；分组夹内条目有自己一套 `order` 和 `groupId`；分组夹只有一层。`SideGroups.move(kind, items, cmpItem, drag, drop)` 每次都对整个布局重新编号；删除分组夹时里面的条目留在原位置。拖动 / 折叠 UI 在 `UI.sideTreeHtml` + `UI.bindSideTree`（取代旧的 `bindSideDrag`）：条目落在条目上半 / 下半 = 插到前 / 后（进入或留在它的分组夹），落在分组夹标题（上 30% = 插到前面，其余 = 放进去），落在列表底部 `.side-end` = 移到最外层最后（脱离分组夹）；分组夹拖到别的分组夹里面的条目上 = 落到那个分组夹前 / 后。折叠状态存 `collapsed`（进数据 / 备份）。
+  轮次顺序：`roundLayout()` 无 `order` 的排最前（按创建时间新→旧），有 `order`（侧栏拖动后写入，`moveSide()`）的按升序跟在后面；`rounds()` 是按侧栏显示顺序拍平的数组；`order` / `groupId` 是可选字段，无需迁移。背诵侧栏卡片第一行是「标题 + 过关统计」，放不下时统计才换行（`.side-item-row`）。已移除「归档」功能（`archived` 字段保留，不再过滤）。新增结果值不需要迁移（result 本来就是自由文本字段）。
   **1.9.0 起"需重新过关 / 未过关"只是状态，不带日期**（用户要求与复查日期脱离关系）；"哪天再背"统一用背诵计划表示。
   原先 1.4.0 的"设了 N 个复查日期就要过关 N 次"规则随之取消。`progressOf()` 还给出 `passedOn`（这一段连续过关的第一次过关日期）
   与 `attemptsToPass`，供学生趋势"首次过关 / 用时 / 平均几次过关"使用。
@@ -197,6 +199,7 @@ styles/responsive.css              所有断点（1000px 单栏、720px 移动�
 
 scripts/utils.js                   Utils：escapeHtml、uid、日期工具、学号排序、下载、localStorage 兜底
 scripts/state.js                   AppState：持久化/订阅/迁移/校验 + 班级/学生/设置/快捷词
+scripts/models/sideGroups.js       SideGroups（作业 / 背诵侧栏的分组夹与手动排序）
 scripts/models/homework.js         HomeworkModel
 scripts/models/recitation.js       RecitationModel
 scripts/models/exams.js            ExamModel
@@ -238,7 +241,7 @@ scripts/app.js                     启动入口（最后加载）
 ## 五、UI 约定
 
 - 主色 `--primary-color: #ff8a3d` / `--primary-dark: #e06a1f`，同步在 `<meta name="theme-color">` 与 manifest。
-- 开关型按钮统一 `.btn-toggle` + `.btn-toggle-on`（刷子模式、筛选、提醒开关）。
+- 开关型按钮统一 `.btn-toggle` + `.btn-toggle-on`（筛选、提醒开关）。
 - 所有拼进 innerHTML 的用户文本必须 `Utils.escapeHtml`。
 - 全局 document 监听只在模块顶层注册一次（班级切换器外部点击、学生趋势跳转委托）。
 - `Modal.open` 同时只保留一个表单弹窗；`Modal.confirm` 的 Esc 用 capture 阶段，只关确认框本身。
@@ -306,6 +309,7 @@ scripts/app.js                     启动入口（最后加载）
   rec_plans(id, round_id, student_id, date, created_at, extra)
   exams(id, class_id, name, date, full_score, created_at, extra)
   remarks(id, student_id, date, text, created_at, extra)   1.13.0 新增；旧 .db 没有这张表，导入时视为空
+  side_groups(id, class_id, kind, title, collapsed, sort_order, created_at, extra)   1.27.0 新增；旧 .db 没有这张表，导入时视为空（条目上的 groupId / order 在各自表的 extra 里）
   photos(id, mime, data BLOB, created_at)                  1.14.0 新增；照片本体（记录的 photoIds 指向这里），旧 .db 没有则视为无照片
   exam_scores(exam_id, student_id, score)
   ```

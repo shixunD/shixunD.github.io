@@ -13,7 +13,6 @@ const NETWORK_FIRST = /\/(phone(\.html)?|scripts\/phone\.js|scripts\/phoneConfig
 
 const URLS_TO_CACHE = [
     './',
-    './index.html',
     './manifest.json',
     './version.json',
     './icon.png',
@@ -61,6 +60,7 @@ const URLS_TO_CACHE = [
     './scripts/components/quickPhrases.js',
     './scripts/components/dayPicker.js',
     './scripts/models/exams.js',
+    './scripts/models/sideGroups.js',
     './scripts/models/homework.js',
     './scripts/models/recitation.js',
     './scripts/models/remarks.js',
@@ -82,7 +82,7 @@ const URLS_TO_CACHE = [
     './scripts/pages/homework/matrix.js',
     './scripts/pages/homework/statusPicker.js',
     './scripts/pages/homework/student.js',
-    './Handbook/index.html'
+    './Handbook/'
 ];
 
 const offlineResponse = () => new Response('Network error - offline', { status: 408, headers: { 'Content-Type': 'text/plain' } });
@@ -93,7 +93,8 @@ async function precacheAll(cache) {
     await Promise.all(URLS_TO_CACHE.map(async (url) => {
         try {
             const response = await fetch(url, { cache: 'no-store' });
-            if (response && response.status === 200) await cache.put(url, response);
+            // 被重定向过的响应（如 /index.html → /）不能缓存：用它回应页面导航会报错打不开
+            if (response && response.status === 200 && !response.redirected) await cache.put(url, response);
         } catch (err) {
             console.warn('[SW] 预缓存失败:', url, err);
         }
@@ -143,7 +144,7 @@ self.addEventListener('fetch', (event) => {
             if (cached) return cached;
             return fetch(event.request.url, { cache: 'no-store' })
                 .then((response) => {
-                    if (response && response.status === 200) {
+                    if (response && response.status === 200 && !response.redirected) {
                         const copy = response.clone();
                         caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
                     }

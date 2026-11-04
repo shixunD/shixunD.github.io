@@ -13,6 +13,7 @@
 //   recPlans[]  { id, roundId, studentId, date, createdAt }   计划某天背诵（还没检查），检查后自动消耗
 //   exams[]     { id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }
 //   remarks[]   { id, studentId, date, text, photoIds?, createdAt }   「其他」页：对学生的学情记录（v5 新增）
+//   sideGroups[] { id, classId, kind:'hw'|'rec', title, collapsed, order?, createdAt }   作业/背诵侧栏的分组夹（v6 新增）；作业/轮次上可选 groupId、order
 //   settings    { reminderNotify, passPercent, quickPhrases: { homework[], recitation[] } }
 
 (function () {
@@ -24,7 +25,7 @@
     const PHOTO_STORE = 'photos';       // 照片单独存放（key = 照片 id，value = { blob, createdAt }），不进 state 整份存储
     const STATE_KEY = 'main';
 
-    const SCHEMA_VERSION = 5;
+    const SCHEMA_VERSION = 6;
     const APP_ID = 'TeachingPanel';
 
     const DEFAULT_SETTINGS = {
@@ -41,7 +42,7 @@
     };
     const PHRASE_KINDS = Object.keys(DEFAULT_QUICK_PHRASES);
 
-    const COLLECTIONS = ['classes', 'students', 'homework', 'recRounds', 'recChecks', 'recPlans', 'exams', 'remarks'];
+    const COLLECTIONS = ['classes', 'students', 'homework', 'recRounds', 'recChecks', 'recPlans', 'exams', 'remarks', 'sideGroups'];
 
     let state = emptyState();
     let db = null;
@@ -52,7 +53,7 @@
         return {
             schemaVersion: SCHEMA_VERSION,
             classes: [], students: [],
-            homework: [], recRounds: [], recChecks: [], recPlans: [], exams: [], remarks: [],
+            homework: [], recRounds: [], recChecks: [], recPlans: [], exams: [], remarks: [], sideGroups: [],
             activeClassId: null,
             settings: defaultSettings()
         };
@@ -188,6 +189,7 @@
             data.recPlans = plans;
         }
         // v4 -> v5：新增 remarks（「其他」页的学情记录）。无需转换，normalize() 会把缺失的集合补成空数组
+        // v5 -> v6：新增 sideGroups（作业/背诵侧栏分组夹）。无需转换，normalize() 会把缺失的集合补成空数组
         data.schemaVersion = SCHEMA_VERSION;
         return data;
     }
@@ -208,6 +210,8 @@
             s.note = s.note || '';
         });
         out.homework.forEach((h) => { if (!h.records || typeof h.records !== 'object') h.records = {}; });
+        out.sideGroups = out.sideGroups.filter((g) => g.kind === 'hw' || g.kind === 'rec');
+        out.sideGroups.forEach((g) => { g.title = String(g.title || '分组'); g.collapsed = !!g.collapsed; });
         out.exams.forEach((e) => { if (!e.scores || typeof e.scores !== 'object') e.scores = {}; });
 
         ensureDefaults(out);
@@ -327,6 +331,7 @@
             s.recChecks = s.recChecks.filter((x) => !roundIds.has(x.roundId));
             s.recPlans = s.recPlans.filter((x) => !roundIds.has(x.roundId));
             s.exams = s.exams.filter((x) => x.classId !== id);
+            s.sideGroups = s.sideGroups.filter((x) => x.classId !== id);
             if (s.activeClassId === id) s.activeClassId = s.classes[0].id;
         });
     }

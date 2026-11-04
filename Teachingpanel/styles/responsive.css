@@ -34,7 +34,6 @@
     .dp-day span { font-size: 0.56rem; }
     .dp-other input[type="date"] { grid-column: 1 / -1; }
     .dp-other [data-dp-picked] { grid-column: 1 / -1; }
-    .seg-rate { margin-left: 0; }
     .toolbar select { min-width: 0; flex: 1; }
     .profile-panel { padding: 1rem 0.9rem 2rem; }
     .dialog-box { padding: 1rem; }

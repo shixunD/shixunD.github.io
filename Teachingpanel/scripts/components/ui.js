@@ -36,35 +36,113 @@
         </div>`;
     }
 
-    // 侧栏列表拖动排序（作业、背诵轮次共用）：落在某项上半部分 = 插到它前面，下半部分 = 插到它后面。
-    // root 内的 .side-item[data-select] 需要 draggable="true"；move(id, beforeId|null, done) 里完成保存后重绘
-    function bindSideDrag(root, move) {
-        const items = Array.from(root.querySelectorAll('.side-item[data-select]'));
-        let dragId = null;
-        const clear = () => items.forEach((el) => el.classList.remove('drag-before', 'drag-after', 'dragging'));
-        const isAfter = (e, el) => e.clientY > el.getBoundingClientRect().top + el.offsetHeight / 2;
-        items.forEach((el, i) => {
-            el.addEventListener('dragstart', (e) => {
-                dragId = el.dataset.select;
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', dragId);
-                el.classList.add('dragging');
-            });
-            el.addEventListener('dragend', () => { dragId = null; clear(); });
+    // 侧栏列表（作业、背诵轮次共用）：最外层的条目 + 可折叠的分组夹。layout 来自 SideGroups.layout()，
+    // renderItem(obj) 返回条目按钮的 HTML（需带 class="side-item" data-select draggable="true"）
+    function sideTreeHtml(layout, renderItem, emptyHtml) {
+        if (!layout.length) return emptyHtml;
+        const body = layout.map((e) => {
+            if (e.type === 'item') return renderItem(e.obj);
+            const g = e.obj;
+            return `<div class="side-group ${g.collapsed ? 'collapsed' : ''}" data-gid="${g.id}">
+                <div class="side-group-head" draggable="true" data-group="${g.id}" title="点击折叠 / 展开；按住拖动可调整位置">
+                    <svg class="side-group-arrow" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5.5 3.5 10 8l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <svg class="side-group-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                    <span class="side-group-title">${esc(g.title)}</span>
+                    <button type="button" class="side-group-btn" data-group-rename="${g.id}" title="重命名分组"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2.5 13.5 3 10l7.6-7.6a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L6 13zM9.5 3.5l3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
+                    <button type="button" class="side-group-btn" data-group-del="${g.id}" title="删除分组（里面的内容保留）"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+                    <span class="side-group-count">${e.children.length}</span>
+                </div>
+                ${g.collapsed ? '' : `<div class="side-group-body">${e.children.map((c) => renderItem(c.obj)).join('')}</div>`}
+            </div>`;
+        }).join('');
+        return body + '<div class="side-end" title="拖到这里：移到最后 / 移出分组"></div>';
+    }
+
+    // 侧栏拖动排序 + 分组夹交互。h = { move(drag, drop), toggle(id), rename(id), remove(id) }
+    //   条目可以落到：某条目的上半 / 下半（插到它前 / 后，并进入或留在它所在的分组夹）、分组夹标题（上 30% = 插到分组夹前面，
+    //   其余 = 放进分组夹）、列表底部空白（移到最外层最后，即脱离分组夹）；分组夹只能在最外层移动
+    function bindSideTree(root, h) {
+        const all = () => root.querySelectorAll('.side-item, .side-group, .side-group-head, .side-end');
+        const clear = () => {
+            all().forEach((el) => el.classList.remove('drag-before', 'drag-after', 'drag-into', 'dragging'));
+        };
+        let drag = null;
+        const half = (e, el) => e.clientY > el.getBoundingClientRect().top + el.offsetHeight / 2;
+        const same = (t, id) => drag && drag.type === t && drag.id === id;
+
+        root.querySelectorAll('.side-item[data-select]').forEach((el) => {
+            const id = el.dataset.select;
+            const wrap = el.closest('.side-group');
+            el.addEventListener('dragstart', (e) => { e.stopPropagation(); drag = { type: 'item', id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); el.classList.add('dragging'); });
+            el.addEventListener('dragend', () => { drag = null; clear(); });
             el.addEventListener('dragover', (e) => {
-                if (!dragId || dragId === el.dataset.select) return;
-                e.preventDefault();
-                items.forEach((x) => x.classList.remove('drag-before', 'drag-after'));
-                el.classList.add(isAfter(e, el) ? 'drag-after' : 'drag-before');
+                if (!drag || same('item', id)) return;
+                if (drag.type === 'group' && wrap && wrap.dataset.gid === drag.id) return;
+                e.preventDefault(); e.stopPropagation();
+                clear();
+                const target = drag.type === 'group' && wrap ? wrap : el;
+                target.classList.add(half(e, target) ? 'drag-after' : 'drag-before');
             });
             el.addEventListener('drop', async (e) => {
-                if (!dragId || dragId === el.dataset.select) return;
-                e.preventDefault();
-                const next = isAfter(e, el) ? items[i + 1] : el;
-                const id = dragId;
-                dragId = null;
+                if (!drag || same('item', id)) return;
+                e.preventDefault(); e.stopPropagation();
+                const d = drag, after = half(e, drag.type === 'group' && wrap ? wrap : el);
+                drag = null; clear();
+                await h.move(d, d.type === 'group' && wrap ? { type: 'group', id: wrap.dataset.gid, after } : { type: 'item', id, after });
+            });
+        });
+
+        root.querySelectorAll('.side-group-head[data-group]').forEach((head) => {
+            const gid = head.dataset.group;
+            const wrap = head.closest('.side-group');
+            const collapsed = wrap.classList.contains('collapsed');
+            head.addEventListener('dragstart', (e) => { e.stopPropagation(); drag = { type: 'group', id: gid }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', gid); wrap.classList.add('dragging'); });
+            head.addEventListener('dragend', () => { drag = null; clear(); });
+            const dropFor = (e) => {
+                if (drag.type === 'group') return { type: 'group', id: gid, after: half(e, head) };
+                const rect = head.getBoundingClientRect();
+                if (e.clientY < rect.top + rect.height * 0.3) return { type: 'group', id: gid, after: false };
+                return { type: 'group', id: gid, into: collapsed ? 'end' : 'start' };
+            };
+            head.addEventListener('dragover', (e) => {
+                if (!drag || same('group', gid)) return;
+                e.preventDefault(); e.stopPropagation();
                 clear();
-                await move(id, next ? next.dataset.select : null);
+                const d = dropFor(e);
+                if (d.into) head.classList.add('drag-into');
+                else wrap.classList.add(d.after ? 'drag-after' : 'drag-before');
+            });
+            head.addEventListener('drop', async (e) => {
+                if (!drag || same('group', gid)) return;
+                e.preventDefault(); e.stopPropagation();
+                const d = drag, to = dropFor(e);
+                drag = null; clear();
+                await h.move(d, to);
+            });
+            head.addEventListener('click', (e) => {
+                if (e.target.closest('[data-group-rename], [data-group-del]')) return;
+                h.toggle(gid);
+            });
+        });
+        root.querySelectorAll('[data-group-rename]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); h.rename(b.dataset.groupRename); }));
+        root.querySelectorAll('[data-group-del]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); h.remove(b.dataset.groupDel); }));
+
+        const list = root.querySelector('.side-list');
+        const end = root.querySelector('.side-end');
+        [end, list].forEach((el) => {
+            if (!el) return;
+            el.addEventListener('dragover', (e) => {
+                if (!drag) return;
+                e.preventDefault();
+                clear();
+                if (end) end.classList.add('drag-into');
+            });
+            el.addEventListener('drop', async (e) => {
+                if (!drag) return;
+                e.preventDefault(); e.stopPropagation();
+                const d = drag;
+                drag = null; clear();
+                await h.move(d, { type: 'end' });
             });
         });
     }
@@ -77,5 +155,5 @@
         try { input.showPicker(); } catch (err) { /* 不支持 showPicker 或已打开：忽略 */ }
     });
 
-    window.UI = { bindSideDrag, subTabs, studentLink, legend, emptyStudentsHint, statTile };
+    window.UI = { sideTreeHtml, bindSideTree, subTabs, studentLink, legend, emptyStudentsHint, statTile };
 })();

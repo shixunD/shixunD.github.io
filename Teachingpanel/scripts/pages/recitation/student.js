@@ -60,7 +60,7 @@
                 ${rows.map((r) => {
                     const s = R[r.status] || RecitationModel.NONE;
                     const next = RecitationModel.nextArrangement(r.round.id, studentId);
-                    const tip = `${r.round.title}${r.round.archived ? '（归档）' : ''} · ${s.label} · 检查 ${r.attempts || 0} 次` + (r.firstPassDate ? ` · 首次过关 ${Utils.formatDate(r.firstPassDate)}` : '') + (r.daysToPass == null ? '' : r.daysToPass === 0 ? ' · 当天过关' : ` · 用时 ${r.daysToPass} 天`) + (next ? ` · 下一次 ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}` : '');
+                    const tip = `${r.round.title} · ${s.label} · 检查 ${r.attempts || 0} 次` + (r.firstPassDate ? ` · 首次过关 ${Utils.formatDate(r.firstPassDate)}` : '') + (r.daysToPass == null ? '' : r.daysToPass === 0 ? ' · 当天过关' : ` · 用时 ${r.daysToPass} 天`) + (next ? ` · 下一次 ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}` : '');
                     return full
                         ? `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-jump-round="${r.round.id}" title="${esc(tip)}（点击跳到检查历史）"></button>`
                         : `<span class="strip-cell" style="background:${s.color}" title="${esc(tip)}"></span>`;

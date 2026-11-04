@@ -26,7 +26,6 @@
     const ui = {
         tab: Utils.lsGet(LS_TAB, 'check'),
         selectedId: null,
-        showArchived: false,
         filter: ''
     };
 
@@ -70,7 +69,7 @@
 
     function renderCheck(view) {
         const students = AppState.getStudents();
-        const rounds = RecitationModel.rounds({ includeArchived: ui.showArchived });
+        const rounds = RecitationModel.rounds();
         if (!rounds.some((r) => r.id === ui.selectedId)) ui.selectedId = rounds.length ? rounds[0].id : null;
         const round = ui.selectedId ? RecitationModel.getRound(ui.selectedId) : null;
 
@@ -78,20 +77,11 @@
             <div class="split-layout">
                 <aside class="card side-panel">
                     <div class="side-panel-head">
-                        <label class="checkbox-label-inline"><input type="checkbox" data-archived ${ui.showArchived ? 'checked' : ''}> 显示已归档</label>
                         <button type="button" class="btn-primary btn-sm" data-new>＋ 新建轮次</button>
+                        <button type="button" class="btn-secondary btn-sm" data-new-group title="新建分组夹，可把轮次拖进去，点击可折叠">＋ 分组</button>
                     </div>
                     <div class="side-list">
-                        ${rounds.length ? rounds.map((r) => {
-                            const c = RecitationModel.roundSummary(r.id, students);
-                            return `
-                                <button type="button" class="side-item ${r.id === ui.selectedId ? 'active' : ''} ${r.archived ? 'archived' : ''}" data-select="${r.id}" draggable="true" title="按住拖动可调整顺序">
-                                    ${r.archived ? '<div class="side-item-top"><span class="side-item-date">已归档</span></div>' : ''}
-                                    <div class="side-item-title">${esc(r.title)}</div>
-                                    <div class="mini-bar">${miniBar(c)}</div>
-                                    <div class="side-item-sub">过关 ${c.passed}/${students.length}${c.retry + c.fail ? ` · 未过关 ${c.retry + c.fail}` : ''}</div>
-                                </button>`;
-                        }).join('') : '<div class="empty-message">还没有背诵轮次，点击「新建轮次」开始</div>'}
+                        ${UI.sideTreeHtml(RecitationModel.roundLayout(), (r) => itemHtml(r, students), '<div class="empty-message">还没有背诵轮次，点击「新建轮次」开始</div>')}
                     </div>
                 </aside>
                 <section class="main-panel">
@@ -100,7 +90,6 @@
             </div>
         `;
 
-        view.querySelector('[data-archived]').addEventListener('change', (e) => { ui.showArchived = e.target.checked; render(); });
         view.querySelector('[data-new]').addEventListener('click', () => {
             RecitationDialogs.openRoundForm(null, (created) => { ui.selectedId = created.id; render(); });
         });
@@ -111,9 +100,38 @@
         if (round) bindDetail(view, round);
     }
 
-    // 侧栏轮次拖动排序（UI.bindSideDrag）
+    function itemHtml(r, students) {
+        const c = RecitationModel.roundSummary(r.id, students);
+        return `
+            <button type="button" class="side-item ${r.id === ui.selectedId ? 'active' : ''}" data-select="${r.id}" draggable="true" title="按住拖动可调整顺序">
+                <div class="side-item-row">
+                    <div class="side-item-title">${esc(r.title)}</div>
+                    <div class="side-item-sub">过关 ${c.passed}/${students.length}${c.retry + c.fail ? ` · 未过关 ${c.retry + c.fail}` : ''}</div>
+                </div>
+                <div class="mini-bar">${miniBar(c)}</div>
+            </button>`;
+    }
+
+    // 侧栏拖动排序 + 分组夹（UI.bindSideTree）
     function bindRoundDrag(view) {
-        UI.bindSideDrag(view, async (id, beforeId) => { await RecitationModel.moveRound(id, beforeId); render(); });
+        view.querySelector('[data-new-group]').addEventListener('click', async () => {
+            const name = await Modal.prompt({ title: '新建分组', placeholder: '如：第一单元' });
+            if (name && name.trim()) await SideGroups.createGroup('rec', name.trim());
+        });
+        UI.bindSideTree(view, {
+            move: (drag, drop) => RecitationModel.moveSide(drag, drop),
+            toggle: (id) => SideGroups.updateGroup(id, { collapsed: !SideGroups.getGroup(id).collapsed }),
+            rename: async (id) => {
+                const g = SideGroups.getGroup(id);
+                const name = await Modal.prompt({ title: '重命名分组', value: g.title });
+                if (name && name.trim()) await SideGroups.updateGroup(id, { title: name.trim() });
+            },
+            remove: async (id) => {
+                const g = SideGroups.getGroup(id);
+                const ok = await Modal.confirm({ title: '删除分组', text: `确定删除分组「${g.title}」吗？里面的背诵轮次不会被删除，会回到列表中。`, confirmText: '删除', danger: true });
+                if (ok) await RecitationModel.removeGroup(id);
+            }
+        });
     }
 
     function miniBar(c) {
@@ -136,15 +154,14 @@
                     <div class="detail-actions">
                         <button type="button" class="btn-primary btn-sm" data-plan>🗓️ 计划背诵</button>
                         <button type="button" class="btn-secondary btn-sm" data-edit>编辑</button>
-                        <button type="button" class="btn-secondary btn-sm" data-archive>${round.archived ? '取消归档' : '归档'}</button>
                         <button type="button" class="btn-secondary btn-sm btn-danger-text" data-delete>删除</button>
                     </div>
                 </div>
                 <div class="seg-bar">${miniBar(c)}</div>
                 <div class="seg-legend">
-                    ${['excel', 'pass', 'cond', 'retry', 'fail', 'none'].map((k) => `<span><i style="background:${R[k].color}"></i>${esc(R[k].label)} <b>${c[k]}</b></span>`).join('')}
+                    <div class="seg-items">${['excel', 'pass', 'cond', 'retry', 'fail', 'none'].map((k) => `<span><i style="background:${R[k].color}"></i>${esc(R[k].label)} <b>${c[k]}</b></span>`).join('')}
                     <span><i style="background:${RecitationModel.PLAN.color}"></i>已计划</span>
-                    <span><i class="due-legend"></i>今天要检查</span>
+                    <span><i class="due-legend"></i>今天要检查</span></div>
                     <span class="seg-rate">过关率 ${Utils.percent(c.passed, students.length)}</span>
                 </div>
                 <div class="brush-bar">
@@ -195,11 +212,10 @@
     function bindDetail(view, round) {
         view.querySelector('[data-plan]').addEventListener('click', () => openTab('plan', { roundId: round.id }));
         view.querySelector('[data-edit]').addEventListener('click', () => RecitationDialogs.openRoundForm(round));
-        view.querySelector('[data-archive]').addEventListener('click', () => RecitationModel.updateRound(round.id, { archived: !round.archived }));
         view.querySelector('[data-delete]').addEventListener('click', async () => {
             const ok = await Modal.confirm({
                 title: '删除背诵轮次',
-                text: `确定删除「${round.title}」及其全部检查记录吗？此操作不可撤销。\n（只是不想再显示的话，可以用"归档"）`,
+                text: `确定删除「${round.title}」及其全部检查记录吗？此操作不可撤销。`,
                 confirmText: '删除',
                 danger: true
             });
