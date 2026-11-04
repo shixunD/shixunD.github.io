@@ -8,21 +8,25 @@
     const esc = (s) => Utils.escapeHtml(s);
 
     // 检查弹窗：登记检查结果 和/或 安排计划背诵（两者互不影响，一次保存可以同时做）
+    // 1.26.0 起：没有「计划背诵」开关，计划日期选择器始终显示；选了日期就是要计划。
+    //   每个日期都只有一个检查状态、一个计划：点到已有记录的日期会自动载入那天的备注（检查日期还会载入结果和照片），可改可存。
+    //   计划备注按日期分开存（recPlans[].note）：点「已选」里的日期切换正在编辑的是哪一天。
     function openCheck(roundId, studentId) {
         const round = RecitationModel.getRound(roundId);
         const stu = AppState.getStudent(studentId);
         if (!round || !stu) return;
 
-        const today = Utils.today();
         const pg = RecitationModel.progressOf(roundId, studentId);
-        // 默认：已选「过关」+ 打开「🗓️ 计划背诵」，两个日期选择都直接显示
         let result = 'pass';        // 'excel' | 'pass' | 'cond' | 'retry' | 'fail' | null（再点一次已选的结果可以取消）
         // 检查日期默认不选，需要手动点；不选日期 = 这次不登记检查结果（只处理计划）。再点一次已选的日期可以取消
         let checkDate = null;
-        let planOn = true;         // 「🗓️ 计划背诵」开关，独立于检查结果
-        // 该生本轮已有的（未完成）计划日期：打开「计划背诵」时直接显示为选中，再点一次 = 取消那天的计划
+        // 该生本轮已有的（未完成）计划日期：直接显示为选中，再点一次 = 取消那天的计划
+        const plansAll = () => RecitationModel.plansFor(roundId, studentId);
         let existingDates = RecitationModel.pendingPlans(roundId, studentId).map((p) => p.date);
         let planDates = existingDates.slice();
+        const planNotes = {};       // 日期 → 正在编辑的计划备注（含已有计划载入的）
+        plansAll().forEach((p) => { planNotes[p.date] = p.note || ''; });
+        let focusDate = null;       // 备注框当前对应的计划日期
         const P = RecitationModel.PLAN;
 
         Modal.open({
@@ -35,24 +39,25 @@
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option" data-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}
-                    <button type="button" class="status-option" data-plan-toggle style="--st-color:${P.color};--st-text:${P.text}" title="可以和检查结果同时选">🗓️ ${esc(P.label)}</button>
                 </div>
                 <div class="hint" data-mode-hint></div>
                 <div data-date-row>
-                    <label class="field-label">检查日期（请手动选；不选 = 这次不登记检查结果，再点一次已选的日期可取消）</label>
+                    <label class="field-label">检查日期（请手动选；不选 = 这次不登记检查结果，再点一次已选的日期可取消；点到已有记录的日期会自动载入当天的结果和备注）</label>
                     ${DayPicker.html('check', { count: 7, dimFuture: true })}
                     <div class="hint text-danger" data-replace-hint></div>
-                </div>
-                <div data-plan-wrap hidden>
-                    <label class="field-label">🗓️ 计划背诵日期（哪天再背，可点多个；当天会出现在时间看板和提醒里）</label>
-                    ${DayPicker.html('plan', { count: 7, dimPast: true, color: P.color, textColor: P.text })}
-                    <div class="date-chips" data-plan-chips></div>
                 </div>
                 <div data-note-wrap>
                     <label class="field-label">备注（comment）</label>
                     ${QuickPhrases.chipsHtml('recitation')}
                     <textarea rows="2" data-note placeholder="如：第二段不熟、卡在第 5 句…"></textarea>
                     ${Photos.editorHtml()}
+                </div>
+                <div data-plan-wrap>
+                    <label class="field-label">🗓️ 计划背诵日期（哪天再背，可点多个；当天会出现在时间看板和提醒里）</label>
+                    ${DayPicker.html('plan', { count: 7, dimPast: true, color: P.color, textColor: P.text })}
+                    <div class="date-chips" data-plan-chips></div>
+                    <label class="field-label" data-plan-note-label></label>
+                    <textarea rows="2" data-plan-note placeholder="这一天计划背诵的备注，如：重点背第二段"></textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
@@ -62,27 +67,40 @@
             `,
             onMount(body, close) {
                 StudentTrend.linkDialogTitle(body, stu, round.title, close);
-                QuickPhrases.bind(body, body.querySelector('[data-note]'));
+                const noteEl = body.querySelector('[data-note]');
+                const planNoteEl = body.querySelector('[data-plan-note]');
+                QuickPhrases.bind(body, noteEl);
                 const photoEditor = Photos.bindEditor(body, []);
                 const saveBtn = body.querySelector('[data-save]');
                 const show = (sel, on) => { body.querySelector(sel).hidden = !on; };
 
-                function chipsHtml(list, attr, emptyText) {
-                    return list.length
-                        ? '<span class="hint">已选：</span>' + list.map((d) => `<span class="date-chip">${Utils.formatDate(d)} · ${Utils.relativeDay(d)}<button type="button" ${attr}="${d}">✕</button></span>`).join('')
-                        : `<span class="hint">${emptyText}</span>`;
-                }
-
                 const addedDates = () => planDates.filter((d) => !existingDates.includes(d));
                 const removedDates = () => existingDates.filter((d) => !planDates.includes(d));
                 const planChanged = () => addedDates().length > 0 || removedDates().length > 0;
+                const noteOf = (d) => (planNotes[d] || '').trim();
+                // 已有计划的备注被改过（新增的日期不算，算在 added 里）
+                const planNoteChanged = () => planDates.some((d) => {
+                    const p = plansAll().find((x) => x.date === d);
+                    return p && noteOf(d) !== (p.note || '');
+                });
+
+                function setFocus(d) {
+                    focusDate = d;
+                    planNoteEl.value = d ? (planNotes[d] || '') : '';
+                    render();
+                }
+                planNoteEl.addEventListener('input', () => { if (focusDate) planNotes[focusDate] = planNoteEl.value; render(); });
 
                 function render() {
-                    body.querySelector('[data-plan-chips]').innerHTML = chipsHtml(planDates, 'data-rm-plan-date', '还没选计划日期');
-                    body.querySelector('[data-plan-toggle]').classList.toggle('selected', planOn);
+                    body.querySelector('[data-plan-chips]').innerHTML = planDates.length
+                        ? '<span class="hint">已选（点日期切换备注）：</span>' + planDates.map((d) => `<span class="date-chip ${d === focusDate ? 'date-chip-focus' : ''}"><a href="#" data-focus-plan="${d}">${Utils.formatDate(d)} · ${Utils.relativeDay(d)}</a><button type="button" data-rm-plan-date="${d}">✕</button></span>`).join('')
+                        : '<span class="hint">还没选计划日期</span>';
+                    planNoteEl.disabled = !focusDate;
+                    body.querySelector('[data-plan-note-label]').textContent = focusDate
+                        ? `计划备注（comment）· ${Utils.formatDate(focusDate)}`
+                        : '计划备注（comment）· 先点上面的计划日期，再写这一天的备注';
 
-                    // 检查日期 / 备注只在选了检查结果后才出现；刚打开弹窗、或只选了计划背诵时都不显示
-                    show('[data-plan-wrap]', planOn);
+                    // 检查日期 / 备注只在选了检查结果后才出现
                     show('[data-date-row]', !!result);
                     show('[data-note-wrap]', !!result);
 
@@ -93,47 +111,68 @@
                         ? `${Utils.formatDate(sameDay.date)} 已有检查记录「${(R[sameDay.result] || R.none).label}」，保存后会改成「${R[result].label}」（同一天只保留一个状态）`
                         : '';
 
-                    // 只改计划时必须有改动（新选了日期，或取消了已有的日期）；登记了结果时计划可以不动
-                    // recordCheck：选了结果 且 选了日期才会登记检查；选了结果但没选日期 = 这次不登记结果
-                    const withPlan = planOn && planChanged();
+                    // 只改计划时必须有改动（新选了日期、取消了已有的日期、或改了计划备注）；登记了结果时计划可以不动
+                    const withPlan = planChanged() || planNoteChanged();
                     const recordCheck = !!(result && checkDate);
                     let problem = '';
-                    if (!result && !planOn) problem = '请选择检查结果，或安排计划背诵';
-                    else if (!recordCheck && !withPlan) problem = result ? '请选择检查日期（或改计划日期）' : '请选择要新增的计划日期（点已选的日期可取消）';
+                    if (!recordCheck && !withPlan) problem = result ? '请选择检查日期（或改计划日期 / 备注）' : '请选择检查结果，或选计划日期、改计划备注';
                     saveBtn.disabled = !!problem;
                     saveBtn.title = problem;
                     saveBtn.textContent = recordCheck && withPlan ? '保存并更新计划' : (!recordCheck && withPlan) ? '保存计划' : '保存';
                     body.querySelector('[data-mode-hint]').textContent = result && !checkDate
                         ? '还没选检查日期：不选的话这次不会登记检查结果（只处理计划）'
-                        : result && planOn
-                            ? (withPlan ? '将同时登记检查结果并更新背诵计划' : '可以顺便选哪天再背（点已选的日期可取消），不改就只登记结果')
-                            : (result ? '' : '「计划背诵」可以和检查结果同时选，互不影响');
+                        : '';
                 }
 
-                const checkPicker = DayPicker.bind(body, 'check', { value: checkDate, allowClear: true, onChange: (d) => { checkDate = d; render(); } });
-                const planPicker = DayPicker.bind(body, 'plan', { multi: true, value: planDates, onChange: (v) => { planDates = v; render(); } });
-
-                body.querySelectorAll('[data-result]').forEach((btn) => btn.addEventListener('click', () => {
-                    result = result === btn.dataset.result ? null : btn.dataset.result;
+                // 点到有检查记录的日期：载入结果 / 备注 / 照片；换到没记录的日期时，只清掉之前自动载入、且没被改过的内容
+                let loaded = null;   // { note } 当前备注框里的内容来自某条已有记录
+                function setResult(r) {
+                    result = r;
                     body.querySelectorAll('[data-result]').forEach((b) => b.classList.toggle('selected', b.dataset.result === result));
-                    // 需重新过关 / 未过关：顺手打开「计划背诵」，方便选哪天再背（不选也能保存）
-                    if (result === 'retry' || result === 'fail') planOn = true;
-                    // 检查日期块的颜色跟所选结果的颜色一致
                     const rs = RecitationModel.RESULT_MAP[result];
                     checkPicker.setColor(rs && rs.color, rs && rs.text);
+                }
+                function loadCheckFor(d) {
+                    const ex = d && RecitationModel.checksFor(roundId, studentId).find((c) => c.date === d);
+                    if (ex) {
+                        setResult(ex.result);
+                        noteEl.value = ex.note || '';
+                        photoEditor.setKept(ex.photoIds || []);
+                        loaded = { note: ex.note || '' };
+                    } else if (loaded) {
+                        if (noteEl.value === loaded.note) noteEl.value = '';
+                        photoEditor.setKept([]);
+                        loaded = null;
+                    }
+                }
+
+                const checkPicker = DayPicker.bind(body, 'check', { value: checkDate, allowClear: true, onChange: (d) => { checkDate = d; loadCheckFor(d); render(); } });
+                const planPicker = DayPicker.bind(body, 'plan', {
+                    multi: true, value: planDates,
+                    onChange: (v) => {
+                        const added = v.filter((d) => !planDates.includes(d));
+                        planDates = v;
+                        if (added.length) setFocus(added[added.length - 1]);           // 新点的日期：载入它已有的备注
+                        else if (!planDates.includes(focusDate)) setFocus(planDates[planDates.length - 1] || null);
+                        else render();
+                    }
+                });
+
+                body.querySelectorAll('[data-result]').forEach((btn) => btn.addEventListener('click', () => {
+                    setResult(result === btn.dataset.result ? null : btn.dataset.result);
                     render();
                 }));
-                body.querySelector('[data-plan-toggle]').addEventListener('click', () => { planOn = !planOn; render(); });
                 // 默认选中的结果：按钮高亮 + 检查日期块用该结果的颜色
-                body.querySelectorAll('[data-result]').forEach((b) => b.classList.toggle('selected', b.dataset.result === result));
-                const defRs = RecitationModel.RESULT_MAP[result];
-                checkPicker.setColor(defRs.color, defRs.text);
+                setResult(result);
                 body.querySelector('[data-plan-chips]').addEventListener('click', (e) => {
+                    const go = e.target.closest('[data-focus-plan]');
+                    if (go) { e.preventDefault(); setFocus(go.dataset.focusPlan); return; }
                     const rm = e.target.closest('[data-rm-plan-date]');
                     if (!rm) return;
                     planDates = planDates.filter((d) => d !== rm.dataset.rmPlanDate);
                     planPicker.set(planDates);
-                    render();
+                    if (!planDates.includes(focusDate)) setFocus(planDates[planDates.length - 1] || null);
+                    else render();
                 });
 
                 saveBtn.addEventListener('click', async () => {
@@ -142,18 +181,24 @@
                             await RecitationModel.addCheck({
                                 roundId, studentId, result,
                                 date: checkDate,
-                                note: body.querySelector('[data-note]').value.trim(),
+                                note: noteEl.value.trim(),
                                 photoIds: await photoEditor.finalize()
                             });
                         }
-                        const withPlan = planOn && planChanged();
-                        const add = withPlan ? addedDates() : [];
-                        const drop = withPlan ? removedDates() : [];
+                        const add = addedDates();
+                        const drop = removedDates();
                         if (drop.length) {
                             const ids = RecitationModel.pendingPlans(roundId, studentId).filter((p) => drop.includes(p.date)).map((p) => p.id);
                             await AppState._commit((s) => { s.recPlans = s.recPlans.filter((p) => !ids.includes(p.id)); });
                         }
-                        if (add.length) await RecitationModel.addPlans(roundId, [studentId], add);
+                        const notes = {};
+                        planDates.forEach((d) => { notes[d] = noteOf(d); });
+                        if (add.length) await RecitationModel.addPlans(roundId, [studentId], add, notes);
+                        // 已有计划（含已完成的）的备注改动
+                        for (const d of planDates) {
+                            const p = plansAll().find((x) => x.date === d);
+                            if (p && noteOf(d) !== (p.note || '')) await RecitationModel.setPlanNote(p.id, noteOf(d));
+                        }
                         close();
                         if (add.length || drop.length) {
                             Toast.success([add.length ? `已加入计划：${add.map((d) => Utils.formatDate(d)).join('、')}` : '', drop.length ? `已取消计划：${drop.map((d) => Utils.formatDate(d)).join('、')}` : ''].filter(Boolean).join('；'));
@@ -178,7 +223,9 @@
                                 // 这天的计划已经没了：从「已有计划」和日期选择里一并去掉，免得保存时又被当成改动
                                 existingDates = existingDates.filter((d) => d !== plan.date);
                                 planDates = planDates.filter((d) => d !== plan.date);
+                                delete planNotes[plan.date];
                                 planPicker.set(planDates);
+                                if (focusDate === plan.date) setFocus(planDates[planDates.length - 1] || null);
                             }
                             Toast.info('已删除该计划');
                             refreshLists();
@@ -288,7 +335,8 @@
                     const done = RecitationModel.isPlanDone(p);
                     return `<li class="${done ? 'plan-done' : ''}">${planPill()} <span class="record-date">${Utils.formatDate(p.date)} · ${Utils.relativeDay(p.date)}</span>
                         ${done ? '<span class="hint">✓ 已检查</span>' : (p.date < Utils.today() ? '<span class="hint text-danger">已逾期</span>' : '')}
-                        <button type="button" class="link-btn" data-rm-plan="${p.id}">${done ? '删除' : '取消计划'}</button></li>`;
+                        <button type="button" class="link-btn" data-rm-plan="${p.id}">${done ? '删除' : '取消计划'}</button>
+                        ${p.note ? `<div class="record-comment">💬 ${esc(p.note)}</div>` : ''}</li>`;
                 }).join('')}
             </ul>`;
     }

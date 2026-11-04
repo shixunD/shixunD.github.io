@@ -23,7 +23,7 @@
     const SEND_LIMIT_BYTES = 8 * 1024 * 1024;
     const SEND_MAX_SIDE = 4096;
     const CONNECT_TIMEOUT = 20000;   // 直连打通一般几秒；ICE 自己判定失败有时要 30 秒，这里提前放弃并重试
-    const RETRY_DELAY = 4000;
+    const RETRY_DELAY = 1000;
     const HEARTBEAT = 4000;          // 连上后每 4 秒 ping 一次
     const PONG_TIMEOUT = 12000;      // 这么久没收到电脑的任何消息（且没有照片在传）就认为连接已失效
     const MAX_AUTO_TRIES = 3;        // 一张照片自动重发几次后改为「点我重发」

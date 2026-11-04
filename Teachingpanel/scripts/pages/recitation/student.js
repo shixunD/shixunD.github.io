@@ -13,8 +13,19 @@
         view.innerHTML = `
             <div class="card">${summaryHtml(id, true)}</div>
         `;
-        view.querySelectorAll('[data-check-round]').forEach((btn) => {
-            btn.addEventListener('click', () => RecitationDialogs.openCheck(btn.dataset.checkRound, id));
+        // 点时间轴的块：跳到该轮次最近一条记录的检查历史，并闪两次定位
+        view.querySelectorAll('[data-jump-round]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const rid = btn.dataset.jumpRound;
+                const target = view.querySelector(`.check-item[data-hist-round="${rid}"][data-hist-kind="check"]`)
+                    || view.querySelector(`.check-item[data-hist-round="${rid}"]`);
+                if (!target) { Toast.info('这一轮还没有检查记录'); return; }
+                target.scrollIntoView({ block: 'center' });
+                target.classList.remove('flash-locate');
+                void target.offsetWidth;   // 重新触发动画
+                target.classList.add('flash-locate');
+                setTimeout(() => target.classList.remove('flash-locate'), 1400);
+            });
         });
     }
 
@@ -30,6 +41,8 @@
         const R = RecitationModel.RESULT_MAP;
         const allChecks = [];
         rows.forEach((r) => r.checks.forEach((c) => allChecks.push({ round: r.round, check: c })));
+        // 计划背诵也放进检查历史（时间轴上不画）
+        rows.forEach((r) => RecitationModel.plansFor(r.round.id, studentId).forEach((p) => allChecks.push({ round: r.round, plan: p, check: p })));
         allChecks.sort((a, b) => b.check.date.localeCompare(a.check.date) || (b.check.createdAt || 0) - (a.check.createdAt || 0));
 
         return `
@@ -49,18 +62,19 @@
                     const next = RecitationModel.nextArrangement(r.round.id, studentId);
                     const tip = `${r.round.title}${r.round.archived ? '（归档）' : ''} · ${s.label} · 检查 ${r.attempts || 0} 次` + (r.firstPassDate ? ` · 首次过关 ${Utils.formatDate(r.firstPassDate)}` : '') + (r.daysToPass == null ? '' : r.daysToPass === 0 ? ' · 当天过关' : ` · 用时 ${r.daysToPass} 天`) + (next ? ` · 下一次 ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}` : '');
                     return full
-                        ? `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-check-round="${r.round.id}" title="${esc(tip)}（点击检查）"></button>`
+                        ? `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-jump-round="${r.round.id}" title="${esc(tip)}（点击跳到检查历史）"></button>`
                         : `<span class="strip-cell" style="background:${s.color}" title="${esc(tip)}"></span>`;
                 }).join('')}
             </div>
             <h3 class="section-title">检查历史</h3>
-            ${allChecks.length ? `<ul class="check-timeline">${allChecks.map(({ round, check }) => `
-                <li class="check-item" style="--dot-color:${(R[check.result] || {}).color || '#9aa0a6'}">
+            ${allChecks.length ? `<ul class="check-timeline">${allChecks.map(({ round, check, plan }) => `
+                <li class="check-item" data-hist-round="${round.id}" data-hist-kind="${plan ? 'plan' : 'check'}" style="--dot-color:${plan ? RecitationModel.PLAN.accent : (R[check.result] || {}).color || '#9aa0a6'}">
                     <div class="check-item-head">
-                        ${RecitationDialogs.statusPill(check.result)}
+                        ${plan ? RecitationDialogs.planPill() : RecitationDialogs.statusPill(check.result)}
                         <span class="check-item-round">${esc(round.title)}</span>
                         <span class="record-date">${Utils.formatDate(check.date)}</span>
                     </div>
+                    ${plan && RecitationModel.isPlanDone(plan) ? '<div class="hint">✓ 已检查</div>' : ''}
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
                     ${Photos.viewHtml(check.photoIds)}
                 </li>`).join('')}</ul>`

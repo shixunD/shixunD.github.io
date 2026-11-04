@@ -58,7 +58,7 @@ state = {
                 records: { [studentId]: { status, comment, madeUpAt? } } }],
   recRounds: [{ id, classId, title, content, createdAt, archived }],
   recChecks: [{ id, roundId, studentId, date, result, note, createdAt }],   // v4 起不带复查日期
-  recPlans:  [{ id, roundId, studentId, date, createdAt }],   // 计划某天背诵（v3 新增）
+  recPlans:  [{ id, roundId, studentId, date, createdAt, note? }],   // 计划某天背诵（v3 新增；note 为该天计划的备注，1.26.0 起，可选字段无需迁移，.db 里落在 extra）
   exams:     [{ id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }],
   remarks:   [{ id, studentId, date, text, createdAt }],   // 「学生趋势 → 其他情况」的学情记录（v5 新增；photoIds? 见 3.5）
   settings:  { reminderNotify: false, passPercent: 60,
@@ -113,8 +113,9 @@ state = {
   与 `attemptsToPass`，供学生趋势"首次过关 / 用时 / 平均几次过关"使用。
 - 检查记录可编辑（`RecitationModel.updateCheck`，检查弹窗历史里的「编辑」→ `RecitationDialogs.openEditCheck`：结果 / 日期 / 备注）。
   子标签图标：✅ 检查、🗓️ 计划背诵、⏰ 时间看板、🧩 总览、📈 学生趋势。
-- 检查弹窗：选「需重新过关 / 未过关」时自动打开「🗓️ 计划背诵」日期块，可顺便选哪天再背（多选），**不选也能保存**（只登记状态）；
-  只加计划（不登记结果）时必须选日期。
+- 检查弹窗（1.26.0 重做）：没有「计划背诵」开关，计划日期选择器始终显示，选了日期就是要计划；顺序 = 结果 → 检查日期 → 检查备注/照片 → 计划日期 → 计划备注。**不选检查日期 = 不登记检查**，只处理计划；只改计划（新增/取消日期或改备注）也可保存。
+  **每天最多一个检查状态、一个计划**：点到有检查记录的检查日期，自动载入当天的结果 / 备注 / 照片（`Photos.bindEditor().setKept`），换到没记录的日期时只清掉自动载入且没改过的内容；计划备注按日期存在 `recPlans[].note`（`planNotes` 映射 + `focusDate` 指当前备注框对应哪天，点「已选」chip 切换），已完成的计划也能改备注（`RecitationModel.setPlanNote`）。没保存就关弹窗由 `Modal.open` 的快照机制统一提示。
+- 背诵学生趋势：检查历史里同时列出该生的计划（计划标识色圆点，备注显示，时间轴上不画）；点时间轴的块 = 跳到该轮次最近一条检查记录并用 `.flash-locate`（透明框闪两次）定位，原先「点块打开检查弹窗」取消。
 - **背诵计划（recPlans）**："计划某天让这个学生背"，**与检查状态互不影响、可同时存在**（1.5.0 起，用户要求"改了状态不要删计划"）。
   一个学生可以有多个计划日期（每个日期一条记录）。入口：检查弹窗的「🗓️ 计划背诵」开关（独立于检查结果，
   一次保存可同时登记结果 + 加计划；结果按钮再点一次可取消）、背诵页的「🗓️ 计划背诵」子标签（`planView.js`：选轮次 → 点日期 → 点学生即加入/取消这天的计划，自动保存；
@@ -143,7 +144,7 @@ state = {
 ### 3.5 照片（`components/photos.js`）
 
 - 作业登记（`records[studentId].photoIds`）、背诵检查（`recChecks[].photoIds`，含编辑检查）、学情记录（`remarks[].photoIds`）都可带照片；记录里只存 id 数组（可选字段，无需升 schema）。
-- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。压缩档位（1.22.0 起，取代原来的 `PRESETS` 画质挡位 / localStorage `teachingPanel.photoQuality`）：`Photos.LEVELS` = WebP 质量 0.01 / 0.03 / 0.05 / 0.08 + 0.1–1.0 每 0.1 一档 + `raw`（不压缩）；收到照片（拍照 / 手机回传 / 上传，都走 `addFiles`）后先试读一次，读得了就排进 `chooseQueue`，由 `chooseLevel(file)` 弹预览框（`.photo-choose-overlay`，z-index 8500）：共用一张 canvas 依次编码各档并显示大小，用户点「确定」只留所选那份 Blob 进 `pending`，原图丢弃；「放弃这张」不加入。队列在 `.camera-overlay` / `.phonelink-overlay` 还开着时等待，避免挡住连拍；`addFiles` 在入队后立即返回，所以手机回执不被预览框阻塞（试读失败仍会让手机显示「电脑读不了」）。预览框内可编辑（1.23.0）：状态 `rot`（顺时针 90° 次数）+ `crop`（旋转后整图上的比例矩形），`applyEdit()` 重建 canvas、作废所有档位并重算（`gen` 计数让过期编码作废）；编辑后 `raw` 档不再是原文件，改按 0.92 重新编码。裁剪框 `.pc-box` 平时与图片等大，拖四周 8 个手柄（`.pc-h`）松手并入 `crop`。预览区 `.photo-choose-view` 内 `.photo-stage` 整体 translate+scale 实现滚轮缩放 / 拖动平移 / 双指缩放（取代旧的 `.actual` 滚动条方式）。分辨率不缩（最长边超过 `MAX_SIDE`=4096 才等比缩）。默认预览档存 localStorage `teachingPanel.photoPreviewLevel`（默认 `q60`），主页「⚙️ 设置」里选。旋转（`rotateBlob`）要重新编码，质量取默认档与 0.6 的较大者，默认档为 raw 时用 0.92。页内相机请求 4096×3072（4:3，不能要 16:9，否则传感器被裁上下），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
+- 照片本体在 IndexedDB 的 `photos` 存储（`state.js`，key = 照片 id，value = `{blob, createdAt}`），**不进 state 整份存储**，否则每次提交都要重写所有照片。压缩档位（1.22.0 起，取代原来的 `PRESETS` 画质挡位 / localStorage `teachingPanel.photoQuality`）：`Photos.LEVELS` = WebP 质量 0.001 / 0.005 / 0.01 / 0.03 / 0.05 / 0.08 + 0.1–1.0 每 0.1 一档 + `raw`（不压缩），另有动态的 `custom` 自定义档（1.25.0：默认值存 localStorage `teachingPanel.photoCustomQuality`、主页设置里改；预览框输入框只改本次）。预览框打开时只自动算 `AUTO_KEYS`（custom、0.001、0.005、0.01、0.1、0.5，从左到右），其余档位点到才算（`encodeOne`）；收到照片（拍照 / 手机回传 / 上传，都走 `addFiles`）后先试读一次，读得了就排进 `chooseQueue`，由 `chooseLevel(file)` 弹预览框（`.photo-choose-overlay`，z-index 8500）：共用一张 canvas 依次编码各档并显示大小，用户点「确定」只留所选那份 Blob 进 `pending`，原图丢弃；「放弃这张」不加入。队列在 `.camera-overlay` / `.phonelink-overlay` 还开着时等待，避免挡住连拍；`addFiles` 在入队后立即返回，所以手机回执不被预览框阻塞（试读失败仍会让手机显示「电脑读不了」）。预览框内可编辑（1.23.0）：状态 `rot`（顺时针 90° 次数）+ `crop`（旋转后整图上的比例矩形），`applyEdit()` 重建 canvas、作废所有档位并重算（`gen` 计数让过期编码作废）；编辑后 `raw` 档不再是原文件，改按 0.92 重新编码。裁剪框 `.pc-box` 平时与图片等大，拖四周 8 个手柄（`.pc-h`）松手并入 `crop`。预览区 `.photo-choose-view` 内 `.photo-stage` 整体 translate+scale 实现滚轮缩放 / 拖动平移 / 双指缩放（取代旧的 `.actual` 滚动条方式）。分辨率不缩（最长边超过 `MAX_SIDE`=4096 才等比缩）。默认预览档存 localStorage `teachingPanel.photoPreviewLevel`（默认 `q60`），主页「⚙️ 设置」里选。旋转（`rotateBlob`）要重新编码，质量取默认档与 0.6 的较大者，默认档为 raw 时用 0.92。页内相机请求 4096×3072（4:3，不能要 16:9，否则传感器被裁上下），按 `track.getCapabilities()` 提供：连续自动对焦、变焦滑块、点画面单次对焦，右上角显示实际分辨率；虚拟摄像头（Phone Link / DroidCam 等）通常不开放这些，没有就不显示。
 - 「📷 拍照」按设备分两条路：主输入是触摸（`matchMedia('(pointer: coarse)')`，手机/平板）用 `<input capture=environment>` 拉起系统相机；电脑上 `capture` 无效（只会弹文件选择框），改用 `getUserMedia` 在页面里开摄像头预览（`openCamera`，z-index 8000，可连拍、切换前后置）。`getUserMedia` 要 https / localhost；无摄像头、被拒绝或非安全上下文时 Toast 提示并退回选文件。
 - 手机回传 1.18.0 起：常见格式、8 MB 以内的原图原样发送（以前超过 2.5 MB 就在手机上用画布重压到 3600px，相机原图和相册小图走的是两条路），更大的或 HEIC 才在手机上转成 4096px JPEG 0.95。手机端牵线服务器断开时不再销毁 Peer（销毁会连直连一起关掉，从相机回来时最常见），只在后台重连牵线；手机编号被占用（`unavailable-id`）就换新编号。手机页「连接诊断」新增事件日志（拍照、进入后台/回到页面、得到的文件名/类型/大小、原样发送或转换、发送/回执/重连、各类错误），可「复制日志」发给开发者。
 - **手机端网页内相机（1.19.0）**：拍照页主按钮「📷 拍照」用 `getUserMedia` 在本页全屏取景（请求 4096×3072、后置），可连拍，取景上显示「已拍 N 张 · 已传 M 张」；支持 `ImageCapture` 的浏览器（Chromium 系）用 `takePhoto({imageWidth: 最大})` 拍全分辨率照片（2 秒取能力 / 5 秒拍照超时，失败一次本次打开期间就改为截取取景画面），按摄像头能力提供连续对焦、变焦滑块、点画面单次对焦、前后切换；切到后台时关摄像头、回来重开。原因：「系统相机」要跳到相机 App 再由浏览器把照片交回网页，这一步各浏览器实现不一，用户在狐猴浏览器（Chromium 系，安卓）上「选系统相机 → 拍完 → 什么都没发生」。系统相机保留为备选「📱 用系统相机拍」；file 控件从 `hidden`（display:none）改为视觉隐藏 `.vh`，部分安卓浏览器对不显示的 file 控件拍照后不回传。照片标签改为「发送中，等电脑确认… / ✓ 电脑已收到 / 没收到确认，等待重发 / 没发成功，点我重发」，强调以电脑回执为准。

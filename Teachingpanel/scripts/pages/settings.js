@@ -64,8 +64,12 @@
                             <button type="button" class="btn-toggle ${settings.reminderNotify ? 'btn-toggle-on' : ''}" data-notify>${settings.reminderNotify ? '已开启' : '已关闭'}</button>
                         </div>
                         <div class="setting-row">
-                            <div><div>照片压缩：默认预览档位</div><div class="hint">拍照 / 手机拍 / 上传的照片收到后会弹出预览框，可逐档（WebP 质量 0.1–1.0，每 0.1 一档，或不压缩）对比，点「确定」后只保留所选那一份，完整原图丢弃。这里选打开预览框时默认选中哪一档。只影响以后新拍/上传的照片</div></div>
-                            <select data-photo-quality>${Photos.LEVELS.map((l) => `<option value="${l.key}" ${l.key === Photos.getLevel().key ? 'selected' : ''}>${esc(l.desc)}</option>`).join('')}</select>
+                            <div><div>照片压缩：默认预览档位</div><div class="hint">拍照 / 手机拍 / 上传的照片收到后会弹出预览框，可逐档（WebP 质量 0.001–1.0，或不压缩）对比，点「确定」后只保留所选那一份，完整原图丢弃。这里选打开预览框时默认选中哪一档。只影响以后新拍/上传的照片</div></div>
+                            <select data-photo-quality>${Photos.levelOptions().map((l) => `<option value="${l.key}" ${l.key === Photos.getLevel().key ? 'selected' : ''}>${esc(l.desc)}</option>`).join('')}</select>
+                        </div>
+                        <div class="setting-row">
+                            <div><div>照片压缩：自定义档位的质量</div><div class="hint">预览框里「自定义」档的默认质量（0.001–1）。预览框里可临时改，但下次打开仍恢复这里的值</div></div>
+                            <div class="inline-input"><input type="number" min="0.001" max="1" step="0.001" value="${Photos.getCustomQuality()}" data-photo-custom></div>
                         </div>
                         <div class="setting-row">
                             <div><div>考试及格线</div><div class="hint">占满分的百分比</div></div>
@@ -161,6 +165,12 @@
             await AppState.updateSettings({ reminderNotify: on });
         });
         q('[data-photo-quality]').addEventListener('change', (e) => Photos.setLevel(e.target.value));
+        q('[data-photo-custom]').addEventListener('change', (e) => {
+            Photos.setCustomQuality(e.target.value);
+            e.target.value = Photos.getCustomQuality();
+            const opt = q('[data-photo-quality] option[value="custom"]');
+            if (opt) opt.textContent = Photos.levelOptions()[0].desc;
+        });
         q('[data-pass-percent]').addEventListener('change', (e) => {
             const v = Math.max(1, Math.min(100, Number(e.target.value) || 60));
             AppState.updateSettings({ passPercent: v });

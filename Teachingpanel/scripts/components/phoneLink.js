@@ -211,8 +211,8 @@
                     if (closed) return;
                     if (err.type === 'unavailable-id') {
                         // 刷新页面或浏览器意外关闭后，牵线服务上还留着旧的同名连接，实测约 1 分钟才释放：同一个码重试 2 分钟（换码的话手机要重新扫）
-                        if (idRetries++ < 30) {
-                            retryTimer = setTimeout(restart, 4000);
+                        if (idRetries++ < 120) {
+                            retryTimer = setTimeout(restart, 1000);
                             setState('error', '配对码还被上一次的连接占着（刷新页面或浏览器意外关闭后常见，通常 1 分钟内释放），正在重试…');
                         } else {
                             setState('error', '配对码一直被占用（电脑上是否在别的窗口也打开了本面板？），可点「重新生成二维码」');
@@ -220,7 +220,7 @@
                     } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
                         broker = '连不上（' + err.type + '）';
                         setState('error', '连不上牵线服务器（0.peerjs.com），请检查电脑网络；正在重试…');
-                        retryTimer = setTimeout(restart, 5000);
+                        retryTimer = setTimeout(restart, 1000);
                     }
                     // 其余错误属于某一条手机连接（如 negotiation-failed），由上面的连接监听处理
                 });

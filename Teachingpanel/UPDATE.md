@@ -3,6 +3,19 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.26.0 — 2026-11-04
+
+- 变更：`checkDialog.js` `openCheck` 重写：去掉 `data-plan-toggle` 和 `planOn`，计划日期选择器常驻；新增计划备注框（`planNotes` / `focusDate`），点检查日期自动载入当天已有的结果 / 备注 / 照片
+- 新增：`recPlans[].note` 可选字段（`RecitationModel.addPlans` 第 4 个参数 notes、`setPlanNote`）；`Photos.bindEditor` 返回的对象加 `setKept(ids)`
+- 变更：`student.js` 检查历史加入计划条目；时间轴块 `data-check-round` → `data-jump-round`，点击跳转并 `.flash-locate` 闪两次（`recitation.css`）
+
+## 1.25.0 — 2026-11-04
+
+- 变更：`phone.js` `RETRY_DELAY` 4000→1000ms；`phoneLink.js` 牵线服务重连、配对码被占用重试都改为 1 秒（占用重试次数 30→120，总时长仍约 2 分钟）
+- 新增：`photos.js` 档位加 `q0.1`（0.001）、`q0.5`（0.005）和 `custom` 自定义档；自定义值存 localStorage `teachingPanel.photoCustomQuality`（默认 0.2），主页设置可改；预览框内输入框只改本次
+- 变更：压缩预览框只自动算 `AUTO_KEYS`（custom、0.001、0.005、0.01、0.1、0.5），其余档位点击时才算（`encodeOne`）
+- 新增：`homeworkPage.js` 登记页统计行加「补改完成率」= (按时 + 已补交 + 已补改) / 全班
+
 ## 1.24.5 — 2026-11-03
 
 - 变更：`homeworkPage.js` 侧栏每个作业的统计行，「未按要求」前单独加一个粉红（`#f48fb1`）圆点，「未交」仍为红色圆点

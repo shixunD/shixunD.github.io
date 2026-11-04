@@ -27,21 +27,36 @@
     // 拍照 / 上传 / 手机回传收到的照片先不保存，弹出预览框让用户逐档对比（chooseLevel），确定后只留所选档位那一份，完整原图丢弃。
     // 「不压缩」= 原样保存收到的那份文件。默认选中的档位在主页「⚙️ 设置」里选。
     // 质量 0.01 / 0.03 / 0.05 / 0.08 四个极限压缩档（1.23.1 起），0.1–1.0 每 0.1 一档，外加「不压缩」
-    const LEVELS = [1, 3, 5, 8, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => {
-        const q = n / 100;
-        const text = n < 10 || n % 10 ? q.toFixed(2) : q.toFixed(1);
+    // 1.25.0 起再加 0.001 / 0.005 两档，并有「自定义」档（质量值在主页设置里改，预览框里可临时改）
+    const LEVELS = [0.1, 0.5, 1, 3, 5, 8, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => {
+        const q = Math.round(n * 10) / 1000;
+        const text = q < 0.01 ? q.toFixed(3) : (q < 0.1 || Math.round(q * 100) % 10 ? q.toFixed(2) : q.toFixed(1));
         return { key: 'q' + n, label: text, quality: q, desc: '质量 ' + text };
     }).concat([{ key: 'raw', label: '不压缩', quality: null, desc: '不压缩（保留收到的原图）' }]);
+    // 预览框打开时自动计算的档位（从左到右）；其余档位点到才算，省资源
+    const AUTO_KEYS = ['custom', 'q0.1', 'q0.5', 'q1', 'q10', 'q50'];
     const DEFAULT_LEVEL = 'q60';
     const LS_LEVEL = 'teachingPanel.photoPreviewLevel';
+    const LS_CUSTOM = 'teachingPanel.photoCustomQuality';
+    const DEFAULT_CUSTOM = 0.2;
+    const clampQ = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.min(1, Math.max(0.001, Math.round(n * 1000) / 1000)) : DEFAULT_CUSTOM; };
+    function getCustomQuality() { return clampQ(Utils.lsGet(LS_CUSTOM, DEFAULT_CUSTOM)); }
+    function setCustomQuality(v) { Utils.lsSet(LS_CUSTOM, clampQ(v)); }
+    function customLevel(q = getCustomQuality()) {
+        return { key: 'custom', label: '自定义 ' + q, quality: q, desc: '自定义（质量 ' + q + '）' };
+    }
+    function levelOf(key, customQ) {
+        return key === 'custom' ? customLevel(customQ) : LEVELS.find((l) => l.key === key);
+    }
+    function levelOptions() { return [customLevel()].concat(LEVELS); }
     const MAX_SIDE = 4096;       // 超过才缩小，防止超大图撑爆内存/存储
     const ROTATE_Q = 0.92;       // 旋转时重新编码用的质量（默认档是「不压缩」时也用它）
 
     function getLevel() {
         const key = Utils.lsGet(LS_LEVEL, DEFAULT_LEVEL);
-        return LEVELS.find((l) => l.key === key) || LEVELS.find((l) => l.key === DEFAULT_LEVEL);
+        return levelOf(key) || levelOf(DEFAULT_LEVEL);
     }
-    function setLevel(key) { if (LEVELS.some((l) => l.key === key)) Utils.lsSet(LS_LEVEL, key); }
+    function setLevel(key) { if (levelOf(key)) Utils.lsSet(LS_LEVEL, key); }
     // 旋转要重新编码：不低于默认档质量，免得转一下反而更糊；默认档是「不压缩」就用 ROTATE_Q
     function rotateQuality() { const q = getLevel().quality; return q ? Math.max(q, 0.6) : ROTATE_Q; }
 
@@ -113,6 +128,10 @@
         put('raw', file);
         let selected = getLevel().key;
         let closed = false;
+        let customQ = getCustomQuality();   // 本次预览框里的自定义质量，可临时改；下次打开恢复主页设置里的值
+        const lvOf = (key) => levelOf(key, customQ);
+        const idleText = (key) => (AUTO_KEYS.includes(key) ? '计算中…' : '点击计算');
+        const sizeEl = (key) => overlay.querySelector(`[data-lv="${key}"] [data-size]`);
 
         // 编辑状态：rot = 顺时针 90° 的次数；crop = 旋转后整图上保留的区域（0–1 比例）
         let rot = 0;
@@ -142,8 +161,9 @@
                     <span class="hint">拖动图片四周边角即可裁剪；滚轮缩放、左键拖动平移</span>
                 </div>
                 <div class="photo-choose-info" data-info></div>
-                <div class="photo-choose-levels">${LEVELS.map((l) => `<button type="button" class="photo-choose-lv" data-lv="${l.key}"><b>${Utils.escapeHtml(l.label)}</b><span data-size>${l.key === 'raw' ? fmtSize(file.size) : '计算中…'}</span></button>`).join('')}</div>
-                <div class="hint">点档位对比效果；确定后只保留所选的一份，收到的完整原图会丢弃。数字是 WebP 质量，越大越清楚、文件越大。</div>
+                <div class="photo-choose-levels">${levelOptions().map((l) => `<button type="button" class="photo-choose-lv" data-lv="${l.key}"><b>${Utils.escapeHtml(l.label)}</b><span data-size>${l.key === 'raw' ? fmtSize(file.size) : idleText(l.key)}</span></button>`).join('')}</div>
+                <div class="photo-choose-custom">自定义质量 <input type="number" min="0.001" max="1" step="0.001" value="${customQ}" data-custom-q> <span class="hint">（0.001–1；只改这一次，默认值在主页「⚙️ 设置」里改）</span></div>
+                <div class="hint">点档位对比效果；确定后只保留所选的一份，收到的完整原图会丢弃。数字是 WebP 质量，越大越清楚、文件越大。打开时只先算前几档，其余点到才算。</div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-zoom>放大到 100%</button>
                     <button type="button" class="btn-secondary" data-skip>放弃这张</button>
@@ -292,7 +312,8 @@
             results.clear();
             if (!edited) put('raw', file);
             overlay.querySelectorAll('[data-lv] [data-size]').forEach((el) => {
-                el.textContent = !edited && el.closest('[data-lv]').dataset.lv === 'raw' ? fmtSize(file.size) : '计算中…';
+                const key = el.closest('[data-lv]').dataset.lv;
+                el.textContent = !edited && key === 'raw' ? fmtSize(file.size) : idleText(key);
             });
             overlay.querySelector('[data-reset-edit]').disabled = !edited;
             s = 1;
@@ -306,7 +327,7 @@
             const r = results.get(selected);
             okBtn.disabled = !r;
             img.classList.toggle('busy', !r);
-            const level = LEVELS.find((l) => l.key === selected);
+            const level = lvOf(selected);
             const infoEl = overlay.querySelector('[data-info]');
             const editNote = edited ? `（已编辑 → ${canvas.width}×${canvas.height}）` : '';
             if (r) {
@@ -318,24 +339,35 @@
             }
         }
 
-        // 选中的档位优先算，其余依次在后台算；全部共用同一张 canvas
+        // 只算一档（已算过 / 正在算的跳过）；全部共用同一张 canvas
+        const inflight = new Set();
+        async function encodeOne(key, my) {
+            if (closed || my !== gen || results.has(key) || inflight.has(key)) return;
+            const q = key === 'raw' ? (edited ? ROTATE_Q : null) : lvOf(key).quality;
+            if (!q) return;
+            inflight.add(key);
+            const el = sizeEl(key);
+            if (el) el.textContent = '计算中…';
+            try {
+                const blob = await encodeImage(canvas, q);
+                if (closed || my !== gen || (key === 'custom' && lvOf(key).quality !== q)) return;   // 编辑过 / 自定义值又改了：作废
+                put(key, blob);
+                if (el) el.textContent = fmtSize(blob.size);
+                if (key === selected) show();
+            } catch (e) {
+                if (!closed && my === gen && el) el.textContent = '失败';
+            } finally {
+                inflight.delete(key);
+            }
+        }
+        // 选中的档位优先算，再按 AUTO_KEYS 从左到右算；其余档位点到才算
         async function encodeAll() {
             const my = ++gen;
-            const order = [selected].concat(LEVELS.map((l) => l.key).filter((k) => k !== selected && (k !== 'raw' || edited)));
-            for (const key of order) {
+            inflight.clear();
+            const order = [selected].concat(AUTO_KEYS).concat(edited ? ['raw'] : []);
+            for (const key of [...new Set(order)]) {
                 if (closed || my !== gen) return;
-                const level = LEVELS.find((l) => l.key === key);
-                const q = key === 'raw' ? (edited ? ROTATE_Q : null) : level.quality;
-                if (!q) continue;
-                try {
-                    const blob = await encodeImage(canvas, q);
-                    if (closed || my !== gen) return;
-                    put(key, blob);
-                    overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = fmtSize(blob.size);
-                    if (key === selected) show();
-                } catch (e) {
-                    if (!closed && my === gen) overlay.querySelector(`[data-lv="${key}"] [data-size]`).textContent = '失败';
-                }
+                await encodeOne(key, my);
             }
         }
 
@@ -353,7 +385,7 @@
             document.addEventListener('keydown', onKey, true);
             overlay.addEventListener('click', (e) => {
                 const lv = e.target.closest('[data-lv]');
-                if (lv) { selected = lv.dataset.lv; show(); return; }
+                if (lv) { selected = lv.dataset.lv; show(); encodeOne(selected, gen); return; }
                 const rt = e.target.closest('[data-rot]');
                 if (rt) { rotate(Number(rt.dataset.rot)); return; }
                 if (e.target.closest('[data-reset-edit]')) {
@@ -369,6 +401,18 @@
                     const r = results.get(selected);
                     if (r) finish(r.blob);
                 }
+            });
+            overlay.querySelector('[data-custom-q]').addEventListener('change', (e) => {
+                customQ = clampQ(e.target.value);
+                e.target.value = customQ;
+                const old = results.get('custom');
+                if (old) { URL.revokeObjectURL(old.url); results.delete('custom'); }
+                overlay.querySelector('[data-lv="custom"] b').textContent = lvOf('custom').label;
+                sizeEl('custom').textContent = '计算中…';
+                inflight.delete('custom');
+                selected = 'custom';
+                show();
+                encodeOne('custom', gen);
             });
             document.body.appendChild(overlay);
             layout();
@@ -776,6 +820,8 @@
         });
 
         return {
+            // 换一批已保存的照片（切换日期时载入那天已有记录的照片）；新选还没保存的照片不动
+            setKept(ids) { kept = (ids || []).slice(); render(); },
             // 把新选的照片写进存储，返回最终要记在记录上的 photoIds（旧的未被移除的 + 新的）
             async finalize() {
                 const ids = kept.slice();
@@ -793,5 +839,5 @@
         };
     }
 
-    window.Photos = { editorHtml, bindEditor, viewHtml, LEVELS, getLevel, setLevel };
+    window.Photos = { editorHtml, bindEditor, viewHtml, LEVELS, levelOptions, getLevel, setLevel, getCustomQuality, setCustomQuality };
 })();

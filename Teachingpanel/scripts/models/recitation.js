@@ -199,18 +199,30 @@
     }
 
     // 批量加入计划：studentIds × dates（dates 可以是单个日期或数组）；已存在的同一天计划跳过。返回实际新增数量
-    function addPlans(roundId, studentIds, dates) {
+    // notes（可选）：{ 'YYYY-MM-DD': 备注 } —— 给新增的那天的计划写备注（1.26.0）
+    function addPlans(roundId, studentIds, dates, notes) {
         const list = (Array.isArray(dates) ? dates : [dates]).filter(Boolean);
         return AppState._commit((s) => {
             let added = 0;
             studentIds.forEach((studentId) => {
                 list.forEach((date) => {
                     if (s.recPlans.some((p) => p.roundId === roundId && p.studentId === studentId && p.date === date)) return;
-                    s.recPlans.push({ id: Utils.uid('plan'), roundId, studentId, date, createdAt: Date.now() });
+                    const plan = { id: Utils.uid('plan'), roundId, studentId, date, createdAt: Date.now() };
+                    if (notes && notes[date]) plan.note = notes[date];
+                    s.recPlans.push(plan);
                     added++;
                 });
             });
             return added;
+        });
+    }
+
+    // 改计划的备注（comment）；空串 = 删除备注字段
+    function setPlanNote(id, note) {
+        return AppState._commit((s) => {
+            const p = s.recPlans.find((x) => x.id === id);
+            if (!p) return;
+            if (note) p.note = note; else delete p.note;
         });
     }
 
@@ -287,7 +299,7 @@
         RESULTS, RESULT_MAP, NONE, PLAN, isPassed, moveRound,
         rounds, getRound, createRound, updateRound, removeRound,
         checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
-        plansFor, pendingPlans, isPlanDone, addPlans, removePlan,
+        plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
         schedule, nextArrangement, dueToday, reminderCounts, studentOverview
     };
 })();

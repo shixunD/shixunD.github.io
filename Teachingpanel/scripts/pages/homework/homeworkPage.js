@@ -123,6 +123,7 @@
                 <div class="seg-legend">
                     ${HomeworkModel.STATUSES.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)} <b>${c[s.key]}</b></span>`).join('')}
                     <span class="seg-rate">按时完成率 ${Utils.percent(c.done, total)}</span>
+                    <span class="seg-rate seg-rate-fixed">补改完成率 ${Utils.percent(c.done + c.missing_fixed + c.poor_fixed, total)}</span>
                 </div>
                 <div class="brush-bar">
                     ${BRUSHES.map((b) => `<button type="button" class="btn-toggle ${ui.brush === b.key ? 'btn-toggle-on' : ''}" data-brush="${b.key || ''}">${esc(b.label)}</button>`).join('')}
