@@ -29,6 +29,20 @@
         });
     }
 
+    // 按周（周一起）分组：不同周的记录各用一条竖线，不连在一起；allChecks 已按日期倒序
+    function weekGroups(list) {
+        const groups = [];
+        list.forEach((it) => {
+            const d = new Date(it.check.date + 'T00:00:00');
+            d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+            const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            let g = groups[groups.length - 1];
+            if (!g || g.key !== key) { g = { key, items: [] }; groups.push(g); }
+            g.items.push(it);
+        });
+        return groups;
+    }
+
     function summaryHtml(studentId, full) {
         const rows = RecitationModel.studentOverview(studentId);
         if (!rows.length) return '<div class="empty-message">暂无背诵轮次</div>';
@@ -67,7 +81,7 @@
                 }).join('')}
             </div>
             <h3 class="section-title">检查历史</h3>
-            ${allChecks.length ? `<ul class="check-timeline">${allChecks.map(({ round, check, plan }) => `
+            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week"><ul class="check-timeline">${g.items.map(({ round, check, plan }) => `
                 <li class="check-item" data-hist-round="${round.id}" data-hist-kind="${plan ? 'plan' : 'check'}" style="--dot-color:${plan ? RecitationModel.PLAN.accent : (R[check.result] || {}).color || '#9aa0a6'}">
                     <div class="check-item-head">
                         ${plan ? RecitationDialogs.planPill() : RecitationDialogs.statusPill(check.result)}
@@ -77,7 +91,7 @@
                     ${plan && RecitationModel.isPlanDone(plan) ? '<div class="hint">✓ 已检查</div>' : ''}
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
                     ${Photos.viewHtml(check.photoIds)}
-                </li>`).join('')}</ul>`
+                </li>`).join('')}</ul></div>`).join('')
                 : '<div class="hint">还没有检查记录</div>'}
         `;
     }
