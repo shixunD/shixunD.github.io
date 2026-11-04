@@ -93,7 +93,13 @@
         }
         let baseline = '';
         let touched = false;
-        const isDirty = () => baseline !== '' && snapshot() !== baseline;
+        // 弹窗可传 dirtyKey(): 返回表示「真正有意义的内容」的字符串；传了就只比较它（打开时 vs 现在），不再比整个 DOM
+        let keyFn = null;
+        let keyBaseline = null;
+        const isDirty = () => {
+            if (keyFn) return keyBaseline !== null && keyFn() !== keyBaseline;
+            return baseline !== '' && snapshot() !== baseline;
+        };
 
         function close() {
             overlay.remove();
@@ -132,6 +138,7 @@
         current = close;
 
         if (onMount) onMount(bodyEl, close);
+        if (typeof opts.dirtyKey === 'function') { keyFn = opts.dirtyKey; keyBaseline = keyFn(); }
         baseline = snapshot();
         // 个别组件挂载后下一帧才补渲染内容：用户还没操作时重新取一次基准，避免误报
         requestAnimationFrame(() => { if (!touched && document.body.contains(overlay)) baseline = snapshot(); });

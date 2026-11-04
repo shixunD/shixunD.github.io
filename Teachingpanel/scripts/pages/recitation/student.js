@@ -57,7 +57,7 @@
         rows.forEach((r) => r.checks.forEach((c) => allChecks.push({ round: r.round, check: c })));
         // 计划背诵也放进检查历史（时间轴上不画）
         rows.forEach((r) => RecitationModel.plansFor(r.round.id, studentId).forEach((p) => allChecks.push({ round: r.round, plan: p, check: p })));
-        allChecks.sort((a, b) => b.check.date.localeCompare(a.check.date) || (b.check.createdAt || 0) - (a.check.createdAt || 0));
+        allChecks.sort((a, b) => b.check.date.localeCompare(a.check.date) || (!!a.plan - !!b.plan) || (b.check.createdAt || 0) - (a.check.createdAt || 0));
 
         return `
             <div class="stat-row">

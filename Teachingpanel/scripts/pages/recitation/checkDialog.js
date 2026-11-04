@@ -26,11 +26,18 @@
         let existingDates = RecitationModel.pendingPlans(roundId, studentId).map((p) => p.date);
         let planDates = existingDates.slice();
         const P = RecitationModel.PLAN;
+        let noteVal = () => '';
+        let photoFp = () => '';
 
         Modal.open({
             title: `${stu.name} · ${round.title}`,
             // 宽弹窗：两组 7 天日期块需要横向空间，日期+星期才能一行放下
             wide: true,
+            // 是否有未保存改动：只看「是否选了结果（及其日期/备注/照片）」和「计划日期是否变了」，选了又取消 = 没改动
+            dirtyKey: () => JSON.stringify([
+                result ? [result, checkDate, noteVal(), photoFp()] : null,
+                planDates.slice().sort()
+            ]),
             html: `
                 <div class="dialog-meta" data-cur-status>当前：${statusPill(pg.status)}</div>
                 <div class="status-options status-options-5">
@@ -65,6 +72,8 @@
                 const noteEl = body.querySelector('[data-note]');
                 QuickPhrases.bind(body, noteEl);
                 const photoEditor = Photos.bindEditor(body, []);
+                noteVal = () => noteEl.value.trim();
+                photoFp = () => photoEditor.fingerprint();
                 const saveBtn = body.querySelector('[data-save]');
                 const show = (sel, on) => { body.querySelector(sel).hidden = !on; };
 

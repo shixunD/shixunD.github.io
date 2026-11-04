@@ -822,6 +822,8 @@
         return {
             // 换一批已保存的照片（切换日期时载入那天已有记录的照片）；新选还没保存的照片不动
             setKept(ids) { kept = (ids || []).slice(); render(); },
+            // 当前照片的指纹（保留的旧照片 id + 新选照片张数），用来判断有没有改动
+            fingerprint() { return kept.join(',') + '|' + pending.length; },
             // 把新选的照片写进存储，返回最终要记在记录上的 photoIds（旧的未被移除的 + 新的）
             async finalize() {
                 const ids = kept.slice();
