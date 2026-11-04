@@ -3,6 +3,22 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.26.4 — 2026-11-04
+
+- 变更：`openCheck` 的 `checkDate` 初值改为今天，`result` 初值 null，挂载后 `loadCheckFor(checkDate)`：今天有记录就载入结果 / 备注 / 照片（取代 1.26.3「没检查过才留空」的判断）
+
+## 1.26.3 — 2026-11-04
+
+- 变更：`openCheck` 的 `result` 初值：状态为 `none`（没检查过）的学生为 null，其余仍默认 `pass`
+
+## 1.26.2 — 2026-11-04
+
+- 变更：`openCheck` 的检查日期块（`data-date-row`）不再随结果取消而隐藏；备注块仍只在选了结果时显示
+
+## 1.26.1 — 2026-11-04
+
+- 变更：`checkDialog.js` 三个备注 textarea（`data-note` / `data-plan-note` / `data-edit-note`）`rows` 2→5
+
 ## 1.26.0 — 2026-11-04
 
 - 变更：`checkDialog.js` `openCheck` 重写：去掉 `data-plan-toggle` 和 `planOn`，计划日期选择器常驻；新增计划备注框（`planNotes` / `focusDate`），点检查日期自动载入当天已有的结果 / 备注 / 照片

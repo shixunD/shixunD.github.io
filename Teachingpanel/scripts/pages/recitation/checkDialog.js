@@ -17,9 +17,10 @@
         if (!round || !stu) return;
 
         const pg = RecitationModel.progressOf(roundId, studentId);
-        let result = 'pass';        // 'excel' | 'pass' | 'cond' | 'retry' | 'fail' | null（再点一次已选的结果可以取消）
-        // 检查日期默认不选，需要手动点；不选日期 = 这次不登记检查结果（只处理计划）。再点一次已选的日期可以取消
-        let checkDate = null;
+        // 默认检查日期 = 今天；今天已有检查记录就载入它的结果 / 备注 / 照片，没有就结果留空（不再默认「过关」）
+        let result = null;        // 'excel' | 'pass' | 'cond' | 'retry' | 'fail' | null（再点一次已选的结果可以取消）
+        // 再点一次已选的检查日期可以取消；不选日期 = 这次不登记检查结果（只处理计划）
+        let checkDate = Utils.today();
         // 该生本轮已有的（未完成）计划日期：直接显示为选中，再点一次 = 取消那天的计划
         const plansAll = () => RecitationModel.plansFor(roundId, studentId);
         let existingDates = RecitationModel.pendingPlans(roundId, studentId).map((p) => p.date);
@@ -49,7 +50,7 @@
                 <div data-note-wrap>
                     <label class="field-label">备注（comment）</label>
                     ${QuickPhrases.chipsHtml('recitation')}
-                    <textarea rows="2" data-note placeholder="如：第二段不熟、卡在第 5 句…"></textarea>
+                    <textarea rows="5" data-note placeholder="如：第二段不熟、卡在第 5 句…"></textarea>
                     ${Photos.editorHtml()}
                 </div>
                 <div data-plan-wrap>
@@ -57,7 +58,7 @@
                     ${DayPicker.html('plan', { count: 7, dimPast: true, color: P.color, textColor: P.text })}
                     <div class="date-chips" data-plan-chips></div>
                     <label class="field-label" data-plan-note-label></label>
-                    <textarea rows="2" data-plan-note placeholder="这一天计划背诵的备注，如：重点背第二段"></textarea>
+                    <textarea rows="5" data-plan-note placeholder="这一天计划背诵的备注，如：重点背第二段"></textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
@@ -100,8 +101,7 @@
                         ? `计划备注（comment）· ${Utils.formatDate(focusDate)}`
                         : '计划备注（comment）· 先点上面的计划日期，再写这一天的备注';
 
-                    // 检查日期 / 备注只在选了检查结果后才出现
-                    show('[data-date-row]', !!result);
+                    // 检查日期始终显示；备注只在选了检查结果后才出现
                     show('[data-note-wrap]', !!result);
 
                     // 同一天只能有一个检查状态：这天已有记录时提醒，保存会改成新的结果
@@ -164,6 +164,7 @@
                 }));
                 // 默认选中的结果：按钮高亮 + 检查日期块用该结果的颜色
                 setResult(result);
+                loadCheckFor(checkDate);   // 今天已有记录就直接载入
                 body.querySelector('[data-plan-chips]').addEventListener('click', (e) => {
                     const go = e.target.closest('[data-focus-plan]');
                     if (go) { e.preventDefault(); setFocus(go.dataset.focusPlan); return; }
@@ -275,7 +276,7 @@
                 ${DayPicker.html('editCheck', { count: 7, dimFuture: true })}
                 <label class="field-label">备注（comment）</label>
                 ${QuickPhrases.chipsHtml('recitation')}
-                <textarea rows="2" data-edit-note>${esc(check.note)}</textarea>
+                <textarea rows="5" data-edit-note>${esc(check.note)}</textarea>
                 ${Photos.editorHtml()}
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-edit-back>返回</button>
