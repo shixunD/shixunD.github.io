@@ -1,0 +1,9 @@
+// Cloudflare Workers 纯静态资源部署配置（无 Worker 脚本）
+// Workers Builds 设置（Settings → Build）：Build command 留空；Deploy command: npx wrangler deploy（默认）
+{
+    "name": "student-tracker",
+    "compatibility_date": "2026-10-01",
+    "assets": {
+        "directory": "./"
+    }
+}
