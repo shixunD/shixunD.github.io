@@ -56,7 +56,7 @@ state = {
   students:  [{ id, classId, name, studentNo, note }],    // 姓名在同一班级内唯一（addStudent/updateStudent/bulkAdd 校验）
   homework:  [{ id, classId, date, title, note, createdAt,
                 records: { [studentId]: { status, comment, madeUpAt? } } }],
-  recRounds: [{ id, classId, title, content, createdAt, archived }],
+  recRounds: [{ id, classId, title, content, createdAt, archived, weekStart? }],   // weekStart = 所属周的周一（1.28.0 起新建/编辑必选；可选字段无需迁移，老轮次按 createdAt 所在周，见 RecitationModel.roundWeek）
   recChecks: [{ id, roundId, studentId, date, result, note, createdAt }],   // v4 起不带复查日期
   recPlans:  [{ id, roundId, studentId, date, createdAt, note? }],   // 计划某天背诵（v3 新增；note 为该天计划的备注，1.26.0 起，可选字段无需迁移，.db 里落在 extra）
   exams:     [{ id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }],
@@ -214,6 +214,7 @@ scripts/components/modal.js        Modal.confirm / Modal.open（表单弹窗）/
 scripts/components/ui.js           UI：二级标签栏、学生链接、图例、统计块
 scripts/components/quickPhrases.js QuickPhrases：弹窗内快捷词按钮条（点击追加到 comment）+ 主页编辑卡片
 scripts/components/dayPicker.js    DayPicker：本周/下周日期块（单选/多选）+ 日历框兜底
+scripts/components/weekPicker.js   WeekPicker：月历选周（可翻月，点一天选中整周；新建背诵轮次用）
 scripts/components/svgChart.js     SvgChart.line / bars（手写 SVG）
 scripts/components/classSwitcher.js 班级切换器（导航栏常驻）
 scripts/components/studentTrend.js  学生趋势共享：选中学生、小块选择器、类型切换（全局 data-profile-id 委托）
@@ -223,6 +224,7 @@ scripts/updateChecker.js           部署指纹判重 + 更新弹窗
 scripts/dbFile.js                  DbFile：state ↔ .db（SQLite）互转，表结构映射 TABLES；按需加载 sql.js
 scripts/importExport.js            本地导入导出 .db（下载 / 读取文件 → AppState.replaceState）
 scripts/vendor/peerjs.min.js, qrcode.js  PeerJS 1.5.4 / qrcode-generator 1.4.4（均 MIT），手机拍照回传按需加载
+scripts/vendor/msal-browser.min.js  @azure/msal-browser 2.38.3（MIT），OneDrive 登录；本地优先，CDN 后备
 scripts/vendor/sql-wasm.{js,wasm}  sql.js 1.10.3（SQLite 的 WebAssembly 版，MIT，见 sql.js-LICENSE）；离线可用，SW 预缓存
 scripts/persistence.js             navigator.storage.persist
 scripts/pwaInstall.js              安装到桌面

@@ -324,6 +324,8 @@
                     <input type="text" name="title" value="${esc(isEdit ? round.title : '')}" placeholder="如：第三单元 古诗两首" autocomplete="off" required>
                     <label>背诵内容/要求（可选）</label>
                     <textarea name="content" rows="3" placeholder="篇目、段落范围、过关标准等">${esc(isEdit ? round.content : '')}</textarea>
+                    <label>所属周数（必选：点日历里的任意一天，即选中那一周）</label>
+                    ${WeekPicker.html('roundWeek')}
                     <div class="modal-actions">
                         <button type="button" class="btn-secondary" data-dialog-close>取消</button>
                         <button type="submit" class="btn-primary">${isEdit ? '保存' : '创建'}</button>
@@ -333,9 +335,10 @@
                 const form = body.querySelector('[data-form]');
                 const f = form.elements;
                 f.title.focus();
+                const weekPicker = WeekPicker.bind(body, 'roundWeek', { value: isEdit ? RecitationModel.roundWeek(round) : Utils.today() });
                 form.addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    const data = { title: f.title.value.trim() || '背诵', content: f.content.value.trim() };
+                    const data = { title: f.title.value.trim() || '背诵', content: f.content.value.trim(), weekStart: weekPicker.get() };
                     close();
                     if (isEdit) await RecitationModel.updateRound(round.id, data);
                     else {

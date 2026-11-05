@@ -13,9 +13,11 @@
         const el = container();
         if (!el) return;
         const settings = AppState.getState().settings;
-        const rc = RecitationModel.reminderCounts();
-        const owe = HomeworkModel.countOutstanding();
-        const todayHw = HomeworkModel.list({ from: Utils.today(), to: Utils.today() }).length;
+        const rem = RecitationModel.remainingCounts();
+        const today = Utils.today();
+        const monday = RecitationModel.weekStartOf(today);
+        const oweToday = HomeworkModel.countOutstandingBetween(today, today);
+        const oweWeek = HomeworkModel.countOutstandingBetween(monday, Utils.addDays(monday, 6));
         const persist = Persistence.getStatus();
         const notifyPerm = 'Notification' in window ? Notification.permission : 'unsupported';
 
@@ -24,16 +26,16 @@
 
             <div class="overview-row">
                 <button type="button" class="overview-tile" data-go="recitation:timeline" style="--tile-color:#f2b705">
-                    <div class="ov-value">${rc.today}</div><div class="ov-label">今天背诵安排</div>
-                </button>
-                <button type="button" class="overview-tile" data-go="recitation:timeline" style="--tile-color:#d93025">
-                    <div class="ov-value">${rc.overdue}</div><div class="ov-label">背诵安排已逾期</div>
+                    <div class="ov-value">${rem.today}</div><div class="ov-label">今日背诵剩余人数</div>
                 </button>
                 <button type="button" class="overview-tile" data-go="homework:pending" style="--tile-color:#f48fb1">
-                    <div class="ov-value">${owe}</div><div class="ov-label">作业未补上（项）</div>
+                    <div class="ov-value">${oweToday}</div><div class="ov-label">今日作业未补</div>
                 </button>
-                <button type="button" class="overview-tile" data-go="homework:register" style="--tile-color:#1e8e3e">
-                    <div class="ov-value">${todayHw}</div><div class="ov-label">今天已布置作业</div>
+                <button type="button" class="overview-tile" data-go="recitation:overview" style="--tile-color:#d93025">
+                    <div class="ov-value">${rem.week}</div><div class="ov-label">本周背诵剩余人数</div>
+                </button>
+                <button type="button" class="overview-tile" data-go="homework:pending" style="--tile-color:#e8590c">
+                    <div class="ov-value">${oweWeek}</div><div class="ov-label">本周作业未补</div>
                 </button>
             </div>
 
@@ -70,6 +72,10 @@
                         <div class="setting-row">
                             <div><div>照片压缩：自定义档位的质量</div><div class="hint">预览框里「自定义」档的默认质量（0.001–1）。预览框里可临时改，但下次打开仍恢复这里的值</div></div>
                             <div class="inline-input"><input type="number" min="0.001" max="1" step="0.001" value="${Photos.getCustomQuality()}" data-photo-custom></div>
+                        </div>
+                        <div class="setting-row">
+                            <div><div>手机拍：关窗后保持连接</div><div class="hint">手机已连上时，关掉「📱 手机拍」窗口后连接再保持这么多分钟，期间在别的块再点「手机拍」会直接复用，不用重新连接；到时间自动断开。填 0 = 关窗即断开（0–60，默认 2）</div></div>
+                            <div class="inline-input"><input type="number" min="0" max="60" step="0.5" value="${PhoneLink.getKeepMinutes()}" data-phone-keep> 分钟</div>
                         </div>
                         <div class="setting-row">
                             <div><div>考试及格线</div><div class="hint">占满分的百分比</div></div>
@@ -170,6 +176,10 @@
             e.target.value = Photos.getCustomQuality();
             const opt = q('[data-photo-quality] option[value="custom"]');
             if (opt) opt.textContent = Photos.levelOptions()[0].desc;
+        });
+        q('[data-phone-keep]').addEventListener('change', (e) => {
+            PhoneLink.setKeepMinutes(e.target.value);
+            e.target.value = PhoneLink.getKeepMinutes();
         });
         q('[data-pass-percent]').addEventListener('change', (e) => {
             const v = Math.max(1, Math.min(100, Number(e.target.value) || 60));

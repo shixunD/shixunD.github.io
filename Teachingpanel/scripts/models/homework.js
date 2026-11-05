@@ -176,6 +176,11 @@
         return outstanding().reduce((n, g) => n + g.items.length, 0);
     }
 
+    // 作业日期在 [from, to] 内的欠交人次（一人一份作业算一次）
+    function countOutstandingBetween(from, to) {
+        return outstanding({ from, to }).reduce((n, g) => n + g.items.length, 0);
+    }
+
     // 某学生的统计：各状态次数、按时完成率、最终完成率、按时间顺序的记录（旧 -> 新）
     function studentStats(studentId, filter) {
         const hws = list(filter).slice().reverse();
@@ -214,6 +219,6 @@
         STATUSES, STATUS_MAP, FIX_MAP,
         list, sideList, sideLayout, moveSide, removeGroup, get, create, update, remove,
         getRecord, setRecord, markFixed, snapshotRecord, restoreRecord, isProblem, isOutstanding,
-        summarize, outstanding, countOutstanding, studentStats, weeklyRates
+        summarize, outstanding, countOutstanding, countOutstandingBetween, studentStats, weeklyRates
     };
 })();

@@ -53,8 +53,18 @@
         return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
     }
 
+    // 关窗后保持连接的分钟数（主页设置里改，0 = 关窗即断开）。存 localStorage，不进业务数据
+    const LS_KEEP = 'teachingPanel.phoneKeepMinutes';
+    const DEFAULT_KEEP = 2;
+    const clampKeep = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.min(60, Math.max(0, Math.round(n * 10) / 10)) : DEFAULT_KEEP; };
+    function getKeepMinutes() { return clampKeep(Utils.lsGet(LS_KEEP, DEFAULT_KEEP)); }
+    function setKeepMinutes(v) { Utils.lsSet(LS_KEEP, clampKeep(v)); }
+
+    let lingering = null;   // 面板已关、但连接还留着（等下一块再点「手机拍」时直接复用）：{ attach, destroy }
+
     async function open(onPhoto) {
         if (active) return;
+        if (lingering) return lingering.attach(onPhoto);
         try {
             await Promise.all([loadScript('./scripts/vendor/peerjs.min.js'), loadScript('./scripts/vendor/qrcode.js')]);
         } catch (err) {
@@ -64,6 +74,9 @@
         active = true;
 
         return new Promise((resolve) => {
+            let onPhotoCur = onPhoto;      // 当前由哪个块接收照片；面板收起（连接保留）期间为 null
+            let resolveCur = resolve;
+            let keepTimer = null;
             const isLocal = /^(localhost|127\.|\[::1\])/.test(location.hostname);
             const overlay = document.createElement('div');
             overlay.className = 'phonelink-overlay';
@@ -71,7 +84,7 @@
                 <div class="phonelink-box" role="dialog" aria-modal="true">
                     <h2>📱 用手机拍</h2>
                     <div class="phonelink-qr" data-pl-qr></div>
-                    <p class="hint">用手机自带的相机或浏览器扫上面的二维码（<b>不要用微信扫</b>），打开拍照页后点「📷 拍照」，用手机自带的相机拍，拍完自动传到电脑，可以连续拍。<b>手机和电脑连同一个 WiFi 最稳</b>，不行就让电脑连手机热点。手机第一次扫过后会记住电脑，以后只要电脑上打开这个窗口，手机打开同一个页面就会自动连上。</p>
+                    <p class="hint">用手机自带的相机或浏览器扫上面的二维码（<b>不要用微信扫</b>），打开拍照页后点「📷 拍照」，用手机自带的相机拍，拍完自动传到电脑，可以连续拍。<b>手机和电脑连同一个 WiFi 最稳</b>，不行就让电脑连手机热点。手机第一次扫过后会记住电脑，以后只要电脑上打开这个窗口，手机打开同一个页面就会自动连上。手机连上后关掉本窗口，连接还会保持 ${getKeepMinutes()} 分钟（主页「⚙️ 设置」里改），期间换一块再点「手机拍」不用重新连接。</p>
                     ${isLocal ? '<p class="phonelink-warn">当前是本地调试地址，手机打不开。请在线上网址使用。</p>' : ''}
                     <div class="phonelink-status" data-pl-status>正在连接…</div>
                     <div class="phonelink-tips" data-pl-tips hidden><b>手机找到了这台电脑，但两边之间连不通，可以这样试：</b>${cfg.TIPS_HTML}</div>
@@ -171,8 +184,9 @@
                         // 第一份还在处理时第二份就到了，等第一份处理完再回执
                         if (processing.has(msg.id)) await processing.get(msg.id).catch(() => {});
                         if (seenIds.has(msg.id)) { conn.send({ type: 'ack', id: msg.id }); refreshStatus(); return; }
+                        if (!onPhotoCur) { conn.send({ type: 'error', id: msg.id, text: '电脑上的「手机拍」窗口已关闭，请先在电脑上点「📱 手机拍」再拍' }); return; }
                         const blob = new Blob([msg.buf], { type: msg.mime || 'image/jpeg' });
-                        const job = onPhoto(blob);
+                        const job = onPhotoCur(blob);
                         processing.set(msg.id, job);
                         try {
                             await job;
@@ -232,17 +246,54 @@
                 start();
             }
 
-            function finish() {
+            // 彻底断开：销毁 peer、释放缩略图
+            function destroy() {
                 if (closed) return;
                 closed = true;
                 clearTimeout(retryTimer);
+                clearTimeout(keepTimer);
                 if (peer) { try { peer.destroy(); } catch (e) { /* 忽略 */ } }
                 urls.forEach((u) => URL.revokeObjectURL(u));
                 overlay.remove();
                 document.removeEventListener('keydown', onKey, true);
                 active = false;
-                resolve(received);
+                if (lingering === api) lingering = null;
             }
+            // 关闭面板：手机已连着且设置了保持时间 → 只收起面板，连接保留，到时间再断；否则直接断开
+            function finish() {
+                if (closed || !onPhotoCur) return;
+                const got = received;
+                const res = resolveCur;
+                onPhotoCur = null;
+                resolveCur = null;
+                const keepMs = getKeepMinutes() * 60000;
+                if (keepMs > 0 && conns.size && peer && !peer.destroyed) {
+                    overlay.remove();
+                    document.removeEventListener('keydown', onKey, true);
+                    active = false;
+                    lingering = api;
+                    keepTimer = setTimeout(destroy, keepMs);
+                } else {
+                    destroy();
+                }
+                res(got);
+            }
+            // 下一块再点「手机拍」：复用还连着的手机，面板重新显示，照片改交给新的块
+            function attach(newOnPhoto) {
+                clearTimeout(keepTimer);
+                lingering = null;
+                onPhotoCur = newOnPhoto;
+                received = 0;
+                urls.forEach((u) => URL.revokeObjectURL(u));
+                urls.length = 0;
+                thumbs.innerHTML = '';
+                active = true;
+                document.addEventListener('keydown', onKey, true);
+                document.body.appendChild(overlay);
+                refreshStatus();
+                return new Promise((res) => { resolveCur = res; });
+            }
+            const api = { attach, destroy };
             const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(); } };
 
             overlay.querySelector('[data-pl-done]').addEventListener('click', finish);
@@ -262,5 +313,5 @@
         });
     }
 
-    window.PhoneLink = { open };
+    window.PhoneLink = { open, getKeepMinutes, setKeepMinutes };
 })();

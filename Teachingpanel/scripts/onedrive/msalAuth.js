@@ -11,12 +11,14 @@
     const MSAL_SCOPES = ['Files.ReadWrite.AppFolder'];
 
     const MSAL_CDN_URLS = [
+        './scripts/vendor/msal-browser.min.js', // 本地自带（国内 CDN 常打不开），优先
         'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
         'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
     ];
 
     let msalInstance = null;
     let initPromise = null;
+    let lastInitError = '';
 
     function buildConfig() {
         const redirectUri = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -76,7 +78,9 @@
                 msalInstance = instance;
                 return instance;
             } catch (e) {
-                console.warn('[MsalAuth] 初始化失败:', e.message);
+                console.warn('[MsalAuth] 初始化失败:', e);
+                lastInitError = (e && (e.message || e.errorCode)) || String(e);
+                initPromise = null; // 允许下次重试
                 return null;
             }
         })();
@@ -94,7 +98,7 @@
     // 登录：返回 { account } 或抛出错误（'user_cancelled' 等）
     async function login() {
         const instance = await getInstance();
-        if (!instance) throw new Error('MSAL 未初始化，无法登录');
+        if (!instance) throw new Error('MSAL 初始化失败：' + lastInitError);
 
         if (isMobileDevice()) {
             await instance.loginRedirect({ scopes: MSAL_SCOPES, prompt: 'select_account' });
@@ -130,7 +134,7 @@
     // 静默获取 access token；SSO 会话过期时抛出需要交互登录的错误
     async function getAccessToken() {
         const instance = await getInstance();
-        if (!instance) throw new Error('MSAL 未初始化');
+        if (!instance) throw new Error('MSAL 初始化失败：' + lastInitError);
         const account = instance.getAllAccounts()[0];
         if (!account) throw new Error('not_logged_in');
 

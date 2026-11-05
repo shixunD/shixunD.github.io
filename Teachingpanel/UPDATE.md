@@ -3,6 +3,15 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.28.0 — 2026-11-05
+
+- 变更：主页概览四卡片改为 今日背诵剩余人数 / 今日作业未补 / 本周背诵剩余人数 / 本周作业未补（`RecitationModel.remainingCounts()`、`HomeworkModel.countOutstandingBetween()`）；导航栏背诵角标不变
+- 新增：`components/weekPicker.js`（WeekPicker 周选择日历，可翻月，点一天选中整周）+ `dayPicker.css` 样式；背诵轮次新增可选字段 `weekStart`（所属周的周一，无需升 schema，.db 落在 `rec_rounds.extra`），新建 / 编辑轮次弹窗必选；老轮次无此字段时 `roundWeek()` 按创建日所在周
+
+## 1.27.7 — 2026-11-05
+
+- 修复：OneDrive 登录「MSAL 未初始化」——新增 `scripts/vendor/msal-browser.min.js`（msal-browser 2.38.3 本地副本，SW 预缓存），`msalAuth.js` 优先加载本地、CDN 作后备；初始化失败不再缓存失败结果（可重试），错误信息带具体原因
+
 ## 1.27.6 — 2026-11-05
 
 - 变更：`recitationPage.js` 左侧轮次副标题「未过关 N」（原为需重新过关 + 未过关人数）改为「未检查 N」（`roundSummary().none`）

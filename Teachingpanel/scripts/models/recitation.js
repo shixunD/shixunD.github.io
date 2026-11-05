@@ -58,7 +58,8 @@
                 title: data.title || '背诵',
                 content: data.content || '',
                 createdAt: Date.now(),
-                archived: false
+                archived: false,
+                weekStart: data.weekStart || weekStartOf(Utils.today())
             };
             s.recRounds.push(round);
             return round;
@@ -258,6 +259,30 @@
         return pendingPlans(roundId, studentId).some((p) => p.date === today);
     }
 
+    // 某天所在周的周一
+    function weekStartOf(dateStr) {
+        return Utils.addDays(dateStr, -((Utils.parseDate(dateStr).getDay() + 6) % 7));
+    }
+
+    // 轮次所属周（周一日期）：新建时选的；老数据没有就按创建当天所在周
+    function roundWeek(r) {
+        return r.weekStart || weekStartOf(Utils.toDateStr(new Date(r.createdAt || Date.now())));
+    }
+
+    // 今日背诵剩余人数：今天还有未完成计划的学生（跨轮次去重）
+    // 本周背诵剩余人数：本周轮次里，状态不是 超额完成 / 过关 / 有条件过关 的学生人次
+    function remainingCounts() {
+        const today = Utils.today();
+        const thisWeek = weekStartOf(today);
+        const todayIds = new Set(schedule().filter((x) => !x.overdue && x.nextDate === today).map((x) => x.student.id));
+        let week = 0;
+        const students = AppState.getStudents();
+        rounds().filter((r) => roundWeek(r) === thisWeek).forEach((r) => {
+            students.forEach((s) => { if (!isPassed(statusOf(r.id, s.id))) week++; });
+        });
+        return { today: todayIds.size, week };
+    }
+
     function reminderCounts() {
         const today = Utils.today();
         const items = schedule();
@@ -291,6 +316,6 @@
         rounds, roundLayout, getRound, createRound, updateRound, removeRound,
         checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
         plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
-        schedule, nextArrangement, dueToday, reminderCounts, studentOverview
+        schedule, nextArrangement, dueToday, reminderCounts, remainingCounts, weekStartOf, roundWeek, studentOverview
     };
 })();
