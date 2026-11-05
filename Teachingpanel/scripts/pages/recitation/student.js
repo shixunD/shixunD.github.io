@@ -88,7 +88,6 @@
                         <span class="check-item-round">${esc(round.title)}</span>
                         <span class="record-date">${Utils.formatDate(check.date)}</span>
                     </div>
-                    ${plan && RecitationModel.isPlanDone(plan) ? '<div class="hint">✓ 已检查</div>' : ''}
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
                     ${Photos.viewHtml(check.photoIds)}
                 </li>`).join('')}</ul></div>`).join('')

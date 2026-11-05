@@ -106,7 +106,7 @@
             <button type="button" class="side-item ${r.id === ui.selectedId ? 'active' : ''}" data-select="${r.id}" draggable="true" title="按住拖动可调整顺序">
                 <div class="side-item-row">
                     <div class="side-item-title">${esc(r.title)}</div>
-                    <div class="side-item-sub">过关 ${c.passed}/${students.length}${c.retry + c.fail ? ` · 未过关 ${c.retry + c.fail}` : ''}</div>
+                    <div class="side-item-sub">过关 ${c.passed}/${students.length}${c.none ? ` · 未检查 ${c.none}` : ''}</div>
                 </div>
                 <div class="mini-bar">${miniBar(c)}</div>
             </button>`;

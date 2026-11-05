@@ -80,7 +80,7 @@
 .check-week + .check-week { margin-top: 1rem; }
 .check-item { position: relative; }
 .check-item::before { content: ''; position: absolute; left: -1.1rem; top: 0.32rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--dot-color); box-shadow: 0 0 0 3px #fff; }
-.check-item-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; font-size: 0.86rem; }
+.check-item-head { display: grid; grid-template-columns: 4.9rem auto minmax(0, 1fr); align-items: center; gap: 0.4rem; font-size: 0.86rem; }
 .check-item-round { font-weight: 600; }
 .check-comment { margin-top: 0.35rem; padding: 0.5rem 0.7rem; background: #fcf9f6; border-left: 3px solid var(--dot-color); border-radius: 0 8px 8px 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .check-comment-icon { margin-right: 0.35rem; }

@@ -3,10 +3,18 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.27.6 — 2026-11-05
+
+- 变更：`recitationPage.js` 左侧轮次副标题「未过关 N」（原为需重新过关 + 未过关人数）改为「未检查 N」（`roundSummary().none`）
+- 新增：总览矩阵分组折叠——`SideGroups.columns()` 生成列分段，`UI.matrixGroupRow/bindMatrixGroups` 渲染分组表头行并切换 `group.collapsed`；`matrix.js` / `overview.js` 按分段输出列与格子，折叠列显示汇总；背诵总览整体倒序以保持原来的左旧右新
+- 新增：总览列头拖动换位（`UI.bindMatrixColDrag` → `moveSide`），顺序与侧栏共用；背诵总览去掉整体倒序，改为侧栏靠前 = 总览靠左
+- 变更：`board.css` 总览表头上下内边距加大；标题换行改用 `Utils.balancedTitleHtml`（空格 / 左括号处断，最多两行、长度均衡，每行过长省略）；`matrix.js` 作业列头不再 `slice(0, 4)`
+
 ## 1.27.5 — 2026-11-04
 
 - 变更：`layout.css` 新增 `.check-item-head .status-pill { min-width: 5.6em; text-align: left }`，检查历史里的状态标签等宽、文字左对齐
 - 变更：`student.js` 检查历史排序加一级：同日期时计划（`plan`）排在检查记录之后（倒序列表里即显示在下面）
+- 变更：`student.js` 检查历史里的计划条目去掉「✓ 已检查」提示（检查弹窗里的计划列表不变）
 
 ## 1.27.4 — 2026-11-04
 

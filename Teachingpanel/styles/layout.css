@@ -28,7 +28,7 @@
 .side-item.drag-after { box-shadow: 0 3px 0 0 var(--primary-color, #ff8a3d); }
 .side-item-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
 .side-item-date { font-size: 0.72rem; color: var(--text-secondary); }
-.side-item-title { font-weight: 600; font-size: 0.92rem; margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-item-title { font-weight: 600; font-size: 0.644rem; margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-item-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.05rem 0.5rem; }
 .side-item-row .side-item-title { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .side-item-row .side-item-sub { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
@@ -42,7 +42,7 @@
 .side-group-arrow { flex: none; color: var(--text-secondary); transform: rotate(90deg); transition: transform 0.15s; }
 .side-group.collapsed .side-group-arrow { transform: none; }
 .side-group-icon { flex: none; color: var(--primary-dark, #e06a1f); }
-.side-group-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-group-title { font-size: 0.7rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-group-count { flex: none; min-width: 1.25rem; padding: 0 0.4rem; border-radius: 999px; background: #fff; border: 1px solid var(--border-color); font-size: 0.7rem; font-weight: 600; line-height: 1.25rem; text-align: center; color: var(--text-secondary); }
 .side-group-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 .side-group-head:hover .side-group-btn, .side-group-btn:focus-visible { opacity: 0.75; }
@@ -105,6 +105,6 @@
     display: inline-block; font-size: 0.74rem; font-weight: 700; padding: 0.05rem 0.5rem;
     border-radius: 999px; white-space: nowrap;
 }
-/* 检查历史里的状态标签：等宽（按最长 5 字），文字左对齐 */
-.check-item-head .status-pill { min-width: 5.6em; text-align: left; box-sizing: content-box; }
+/* 检查历史里的状态标签：药丸贴合文字宽度，靠固定宽度的首列让后面的轮次标题上下对齐 */
+.check-item-head .status-pill { justify-self: start; }
 .row-no { color: var(--text-secondary); font-size: 0.78rem; margin-right: 0.4rem; font-weight: normal; }

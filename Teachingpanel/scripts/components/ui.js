@@ -155,5 +155,59 @@
         try { input.showPicker(); } catch (err) { /* 不支持 showPicker 或已打开：忽略 */ }
     });
 
-    window.UI = { sideTreeHtml, bindSideTree, subTabs, studentLink, legend, emptyStudentsHint, statTile };
+    // 总览矩阵的分组表头行：segs 来自 SideGroups.columns()；没有任何分组夹时返回空串。
+    // 展开的分组夹横跨它的所有列，折叠的分组夹只占一列；点击切换折叠（和侧栏共用 group.collapsed）
+    function matrixGroupRow(segs) {
+        if (!segs.some((s) => s.group)) return '';
+        const arrow = '<svg class="mg-arrow" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M5.5 3.5 10 8l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        return `<tr class="matrix-group-row"><th class="sticky-col"></th>${segs.map((s) => {
+            if (!s.group) return '<th class="mg-empty"></th>';
+            const g = s.group;
+            return `<th class="matrix-group-head ${g.collapsed ? 'collapsed' : ''}" colspan="${g.collapsed ? 1 : s.items.length}">
+                <button type="button" data-matrix-group="${g.id}" title="${esc(g.title)}：点击${g.collapsed ? '展开' : '折叠'}"><span class="mg-count">${s.items.length}</span><span class="mg-name">${arrow}<span class="mg-title">${esc(g.title)}</span></span></button></th>`;
+        }).join('')}<th></th></tr>`;
+    }
+
+    function bindMatrixGroups(root) {
+        root.querySelectorAll('[data-matrix-group]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const g = SideGroups.getGroup(btn.dataset.matrixGroup);
+                if (g) SideGroups.updateGroup(g.id, { collapsed: !g.collapsed });
+            });
+        });
+    }
+
+    // 总览列头拖动换位：th[data-col-id] 可拖，放到另一列上 = 移到那一列的位置（往右拖放在它后面，往左拖放在它前面）
+    // move(dragId, drop) 里 drop 的格式见 SideGroups.move；顺序和侧栏共用，所以登记页的顺序同步变化
+    function bindMatrixColDrag(root, move) {
+        const heads = Array.from(root.querySelectorAll('th[data-col-id]'));
+        let dragId = null;
+        const clear = () => heads.forEach((h) => h.classList.remove('col-drop-before', 'col-drop-after', 'col-dragging'));
+        const sideOf = (th) => (heads.indexOf(th) > heads.findIndex((h) => h.dataset.colId === dragId) ? 'after' : 'before');
+        heads.forEach((th) => {
+            th.addEventListener('dragstart', (e) => {
+                dragId = th.dataset.colId;
+                th.classList.add('col-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                try { e.dataTransfer.setData('text/plain', dragId); } catch (err) { /* 部分浏览器不允许 */ }
+            });
+            th.addEventListener('dragend', () => { dragId = null; clear(); });
+            th.addEventListener('dragover', (e) => {
+                if (!dragId || th.dataset.colId === dragId) return;
+                e.preventDefault();
+                heads.forEach((h) => h.classList.remove('col-drop-before', 'col-drop-after'));
+                th.classList.add(sideOf(th) === 'after' ? 'col-drop-after' : 'col-drop-before');
+            });
+            th.addEventListener('drop', (e) => {
+                if (!dragId || th.dataset.colId === dragId) return;
+                e.preventDefault();
+                const after = sideOf(th) === 'after';
+                const id = dragId;
+                dragId = null; clear();
+                move(id, { type: 'item', id: th.dataset.colId, after });
+            });
+        });
+    }
+
+    window.UI = { bindMatrixColDrag, matrixGroupRow, bindMatrixGroups, sideTreeHtml, bindSideTree, subTabs, studentLink, legend, emptyStudentsHint, statTile };
 })();

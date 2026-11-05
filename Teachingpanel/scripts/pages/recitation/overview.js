@@ -92,6 +92,9 @@
         const students = AppState.getStudents();
         const rounds = RecitationModel.rounds().slice().reverse();
         const R = RecitationModel.RESULT_MAP;
+        // 列顺序和分组跟背诵页侧栏一致（侧栏靠前 = 总览靠左），分组夹可折叠
+        const segs = SideGroups.columns(RecitationModel.roundLayout());
+        const folded = (seg) => seg.group && seg.group.collapsed;
 
         let body;
         if (!students.length) body = UI.emptyStudentsHint();
@@ -100,22 +103,31 @@
             body = `
                 <div class="matrix-scroll">
                     <table class="matrix">
-                        <thead><tr>
+                        <thead>
+                            ${UI.matrixGroupRow(segs)}
+                            <tr class="matrix-col-row">
                             <th class="sticky-col">学生</th>
-                            ${rounds.map((r) => {
-                                const c = RecitationModel.roundSummary(r.id, students);
-                                return `<th class="matrix-col-head" title="${esc(r.title)}">
-                                    <button type="button" class="matrix-head-btn" data-open-round="${r.id}">
-                                        <span class="mh-title">${esc(r.title)}</span>
-                                        <span class="mh-rate">${Utils.percent(c.passed, students.length)}</span>
-                                    </button></th>`;
+                            ${segs.map((seg) => {
+                                if (folded(seg)) {
+                                    const passed = seg.items.reduce((n, r) => n + RecitationModel.roundSummary(r.id, students).passed, 0);
+                                    return `<th class="matrix-col-head" title="${esc(seg.group.title)}（已折叠，共 ${seg.items.length} 轮）">
+                                        <span class="matrix-head-btn mh-folded"><span class="mh-title">${seg.items.length} 轮</span><span class="mh-rate">${Utils.percent(passed, students.length * seg.items.length)}</span></span></th>`;
+                                }
+                                return seg.items.map((r) => {
+                                    const c = RecitationModel.roundSummary(r.id, students);
+                                    return `<th class="matrix-col-head" draggable="true" data-col-id="${r.id}" title="${esc(r.title)}（按住左右拖动可调整顺序）">
+                                        <button type="button" class="matrix-head-btn" data-open-round="${r.id}">
+                                            <span class="mh-title">${Utils.balancedTitleHtml(r.title)}</span>
+                                            <span class="mh-rate">${Utils.percent(c.passed, students.length)}</span>
+                                        </button></th>`;
+                                }).join('');
                             }).join('')}
                             <th>过关</th>
                         </tr></thead>
                         <tbody>
                             ${students.map((stu) => {
                                 let passed = 0;
-                                const cells = rounds.map((r) => {
+                                const cellOf = (r) => {
                                     const checks = RecitationModel.checksFor(r.id, stu.id);
                                     const key = RecitationModel.statusOf(r.id, stu.id);
                                     if (RecitationModel.isPassed(key)) passed++;
@@ -129,13 +141,20 @@
                                         : '未检查';
                                     return `<td><button type="button" class="cell cell-text cell-bar ${checks.length ? '' : 'cell-empty'}"
                                         data-round="${r.id}" data-sid="${stu.id}" title="${esc(r.title)} · ${esc(tip)}">${segs}${checks.length ? `<b class="cell-count">${checks.length}</b>` : ''}</button></td>`;
+                                };
+                                const cells = segs.map((seg) => {
+                                    if (!folded(seg)) return seg.items.map(cellOf).join('');
+                                    // 折叠的分组：显示该生在这组里过关几轮（折叠时不走 cellOf，所以这里单独累加总过关数）
+                                    const ok = seg.items.filter((r) => RecitationModel.isPassed(RecitationModel.statusOf(r.id, stu.id))).length;
+                                    passed += ok;
+                                    return `<td class="cell-folded ${ok === seg.items.length ? 'folded-ok' : ''}" title="${esc(seg.group.title)}：过关 ${ok}/${seg.items.length}">${ok}/${seg.items.length}</td>`;
                                 }).join('');
                                 return `<tr><th class="sticky-col"><span class="row-no">${esc(stu.studentNo)}</span>${UI.studentLink(stu)}</th>${cells}<td class="owe">${passed}/${rounds.length}</td></tr>`;
                             }).join('')}
                         </tbody>
                     </table>
                 </div>
-                <div class="hint">每个色块按这个学生在该轮所有检查的结果数量分段：深绿 = 超额完成、绿 = 过关、浅绿 = 有条件过关、黄 = 需重新过关、红 = 未过关（数字是检查次数，灰色 = 未检查）；点击格子登记检查；点击列头进入该轮次；最右列按当前状态统计。</div>`;
+                <div class="hint">每个色块按这个学生在该轮所有检查的结果数量分段：深绿 = 超额完成、绿 = 过关、浅绿 = 有条件过关、黄 = 需重新过关、红 = 未过关（数字是检查次数，灰色 = 未检查）；点击格子登记检查；点击列头进入该轮次；点上方的分组名折叠 / 展开该分组（折叠后每人显示该分组里过关几轮）；最右列按当前状态统计。</div>`;
         }
 
         view.innerHTML = `
@@ -144,6 +163,8 @@
             </div>
             <div class="card">${body}</div>
         `;
+        UI.bindMatrixGroups(view);
+        UI.bindMatrixColDrag(view, (drag, drop) => RecitationModel.moveSide({ type: 'item', id: drag }, drop));
         view.querySelectorAll('.cell').forEach((cell) => {
             cell.addEventListener('click', () => RecitationDialogs.openCheck(cell.dataset.round, cell.dataset.sid));
         });

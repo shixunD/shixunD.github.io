@@ -13,6 +13,30 @@
             .replace(/'/g, '&#39;');
     }
 
+    // 总览列头的标题换行：只在「空格」或「左括号前」断，最多断一次，上下两行长度尽量接近；没有可断的位置就保持一行
+    // 返回 HTML（已转义），每行一个 <span class="mh-line">，由 CSS 控制单行省略
+    function balancedTitleHtml(title) {
+        const t = String(title == null ? '' : title).trim();
+        const w = (s) => Array.from(s).reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0); // 汉字算 1，西文 / 数字算约半个
+        const cuts = []; // { a: 第一行, b: 第二行 }
+        for (let i = 1; i < t.length; i++) {
+            if (/\s/.test(t[i])) {
+                const a = t.slice(0, i).trimEnd(), b = t.slice(i).trimStart();
+                if (a && b) cuts.push({ a, b });
+            } else if (t[i] === '(' || t[i] === '（') {
+                cuts.push({ a: t.slice(0, i).trimEnd(), b: t.slice(i) });
+            }
+        }
+        const line = (s) => `<span class="mh-line">${escapeHtml(s)}</span>`;
+        if (!cuts.length) return line(t);
+        let best = cuts[0], bestDiff = Infinity;
+        cuts.forEach((c) => {
+            const d = Math.abs(w(c.a) - w(c.b));
+            if (d < bestDiff) { best = c; bestDiff = d; }
+        });
+        return line(best.a) + line(best.b);
+    }
+
     function uid(prefix) {
         return `${prefix || 'id'}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     }
@@ -125,7 +149,7 @@
     }
 
     window.Utils = {
-        escapeHtml, uid, toDateStr, parseDate, today, addDays, diffDays,
+        escapeHtml, balancedTitleHtml, uid, toDateStr, parseDate, today, addDays, diffDays,
         formatDate, weekdayName, weekdaysOf, relativeDay, timestampName, compareStudentNo, formatNumber, percent,
         downloadText, lsGet, lsSet
     };

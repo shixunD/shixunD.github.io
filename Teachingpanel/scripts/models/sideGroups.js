@@ -55,6 +55,22 @@
         return out;
     }
 
+    // 总览矩阵的列分段：[{ group: 分组夹 | null, items: [条目] }]，顺序跟侧栏一致；没进分组的条目各自一段（group = null）
+    // opts.keep(obj)：只保留满足条件的条目（没剩条目的分组夹整个省略）；opts.reverse：整体倒过来（含分组夹内部）
+    function columns(top, opts) {
+        const o = opts || {};
+        const keep = o.keep || (() => true);
+        const t = top.map((e) => (e.type === 'item' ? e : { type: 'group', obj: e.obj, children: e.children.slice() }));
+        if (o.reverse) { t.reverse(); t.forEach((e) => { if (e.children) e.children.reverse(); }); }
+        const segs = [];
+        t.forEach((e) => {
+            if (e.type === 'item') { if (keep(e.obj)) segs.push({ group: null, items: [e.obj] }); return; }
+            const items = e.children.map((c) => c.obj).filter(keep);
+            if (items.length) segs.push({ group: e.obj, items });
+        });
+        return segs;
+    }
+
     function renumber(top) {
         top.forEach((e, i) => {
             e.obj.order = i;
@@ -127,5 +143,5 @@
         });
     }
 
-    window.SideGroups = { layout, flatten, move, createGroup, updateGroup, removeGroup, getGroup };
+    window.SideGroups = { layout, flatten, columns, move, createGroup, updateGroup, removeGroup, getGroup };
 })();

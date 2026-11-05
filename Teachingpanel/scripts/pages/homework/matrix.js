@@ -36,6 +36,10 @@
     function renderMatrix(view) {
         const students = AppState.getStudents();
         const hws = HomeworkModel.list(filter());
+        // 列顺序和分组跟作业页侧栏一致（分组夹可折叠）
+        const inRange = new Set(hws.map((h) => h.id));
+        const segs = SideGroups.columns(HomeworkModel.sideLayout(), { keep: (h) => inRange.has(h.id) });
+        const folded = (seg) => seg.group && seg.group.collapsed;
 
         let body;
         if (!students.length) body = UI.emptyStudentsHint();
@@ -44,29 +48,45 @@
             body = `
                 <div class="matrix-scroll">
                     <table class="matrix">
-                        <thead><tr>
+                        <thead>
+                            ${UI.matrixGroupRow(segs)}
+                            <tr class="matrix-col-row">
                             <th class="sticky-col">学生</th>
-                            ${hws.map((hw) => {
-                                const c = HomeworkModel.summarize(hw, students);
-                                return `<th class="matrix-col-head" title="${esc(hw.title)}">
-                                    <button type="button" class="matrix-head-btn" data-open-hw="${hw.id}">
-                                        <span class="mh-date">${Utils.formatDate(hw.date)}</span>
-                                        <span class="mh-sub">${esc(hw.title.slice(0, 4))}</span>
-                                        <span class="mh-rate">${Utils.percent(c.done, students.length)}</span>
-                                    </button>
-                                </th>`;
+                            ${segs.map((seg) => {
+                                if (folded(seg)) {
+                                    const done = seg.items.reduce((n, hw) => n + HomeworkModel.summarize(hw, students).done, 0);
+                                    return `<th class="matrix-col-head" title="${esc(seg.group.title)}（已折叠，共 ${seg.items.length} 项）">
+                                        <span class="matrix-head-btn mh-folded"><span class="mh-sub">${seg.items.length} 项</span><span class="mh-rate">${Utils.percent(done, students.length * seg.items.length)}</span></span></th>`;
+                                }
+                                return seg.items.map((hw) => {
+                                    const c = HomeworkModel.summarize(hw, students);
+                                    return `<th class="matrix-col-head" draggable="true" data-col-id="${hw.id}" title="${esc(hw.title)}（按住左右拖动可调整顺序）">
+                                        <button type="button" class="matrix-head-btn" data-open-hw="${hw.id}">
+                                            <span class="mh-date">${Utils.formatDate(hw.date)}</span>
+                                            <span class="mh-sub">${Utils.balancedTitleHtml(hw.title)}</span>
+                                            <span class="mh-rate">${Utils.percent(c.done, students.length)}</span>
+                                        </button>
+                                    </th>`;
+                                }).join('');
                             }).join('')}
                             <th>未补</th>
                         </tr></thead>
                         <tbody>
                             ${students.map((stu) => {
                                 let owe = 0;
-                                const cells = hws.map((hw) => {
-                                    const rec = HomeworkModel.getRecord(hw, stu.id);
-                                    const st = HomeworkModel.STATUS_MAP[rec.status];
-                                    if (HomeworkModel.isOutstanding(rec.status)) owe++;
-                                    return `<td><button type="button" class="cell ${rec.comment ? 'has-comment' : ''}" style="background:${st.color}"
-                                        data-hw="${hw.id}" data-sid="${stu.id}" title="${esc(hw.title)} · ${esc(st.label)}${rec.comment ? '：' + esc(rec.comment) : ''}"></button></td>`;
+                                const cells = segs.map((seg) => {
+                                    if (folded(seg)) {
+                                        const n = seg.items.filter((hw) => HomeworkModel.isOutstanding(HomeworkModel.getRecord(hw, stu.id).status)).length;
+                                        owe += n;
+                                        return `<td class="cell-folded ${n ? 'owe-bad' : ''}" title="${esc(seg.group.title)}：${n ? n + ' 项未补' : '全部完成'}">${n || '✓'}</td>`;
+                                    }
+                                    return seg.items.map((hw) => {
+                                        const rec = HomeworkModel.getRecord(hw, stu.id);
+                                        const st = HomeworkModel.STATUS_MAP[rec.status];
+                                        if (HomeworkModel.isOutstanding(rec.status)) owe++;
+                                        return `<td><button type="button" class="cell ${rec.comment ? 'has-comment' : ''}" style="background:${st.color}"
+                                            data-hw="${hw.id}" data-sid="${stu.id}" title="${esc(hw.title)} · ${esc(st.label)}${rec.comment ? '：' + esc(rec.comment) : ''}"></button></td>`;
+                                    }).join('');
                                 }).join('');
                                 return `<tr>
                                     <th class="sticky-col"><span class="row-no">${esc(stu.studentNo)}</span>${UI.studentLink(stu)}</th>
@@ -77,11 +97,13 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="hint">点击色块修改状态；带角标的格子有 comment；点击列头进入该作业的登记页。</div>`;
+                <div class="hint">点击色块修改状态；带角标的格子有 comment；点击列头进入该作业的登记页；点上方的分组名折叠 / 展开该分组（折叠后每人显示该分组里未补几项）。</div>`;
         }
 
         view.innerHTML = `${toolbar()}<div class="card">${body}</div>`;
         bindToolbar(view, () => renderMatrix(view));
+        UI.bindMatrixGroups(view);
+        UI.bindMatrixColDrag(view, (drag, drop) => HomeworkModel.moveSide({ type: 'item', id: drag }, drop));
 
         view.querySelectorAll('.cell').forEach((cell) => {
             cell.addEventListener('click', () => HomeworkDialogs.openStatus(cell.dataset.hw, cell.dataset.sid));

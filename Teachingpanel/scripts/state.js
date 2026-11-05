@@ -288,10 +288,21 @@
         delete next.exportedAt;
         delete next._photos;
         // 导入 = 整体替换：照片也以导入文件为准（旧版本的 .db 没有照片，等于清空）
-        await photoClear();
-        for (const p of photos) await photoPut(p.id, p.blob, p.createdAt);
+        // 顺序：先写入导入的照片 → 再保存状态 → 最后才删掉不在导入文件里的旧照片。
+        // 这样中途失败（磁盘满、照片损坏等）时，原有数据和照片都还在，不会出现"状态没换但照片已清空"。
+        const keep = new Set();
+        for (const p of photos) { await photoPut(p.id, p.blob, p.createdAt); keep.add(p.id); }
+        const prev = state;
         state = next;
-        await persist();
+        try {
+            await idbSet(STATE_KEY, state);
+        } catch (e) {
+            state = prev;
+            throw new Error('保存失败：' + (e && e.message ? e.message : e));
+        }
+        const keys = await photoTx('readonly', (store, set) => reqValue(store.getAllKeys(), set));
+        const stale = keys.filter((k) => !keep.has(k));
+        if (stale.length) await photoTx('readwrite', (store) => { stale.forEach((k) => store.delete(k)); });
         notify();
     }
 

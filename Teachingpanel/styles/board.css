@@ -50,7 +50,24 @@
 .matrix-scroll { overflow: auto; max-height: calc(100vh - 260px); }
 .matrix { border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
 .matrix th, .matrix td { padding: 3px; text-align: center; border-bottom: 1px solid var(--border-color); background: #fff; }
-.matrix thead th { position: sticky; top: 0; z-index: 2; vertical-align: bottom; }
+.matrix thead th { position: sticky; top: 0; z-index: 2; vertical-align: bottom; padding-top: 8px; padding-bottom: 8px; }
+/* 有分组时表头是两行：上面一行分组名（固定 40px 高：数量在上、分组名在下），下面一行列头贴在它下面 */
+.matrix .matrix-group-row th { top: 0; height: 40px; padding: 2px 3px; vertical-align: middle; border-bottom: 1px solid var(--border-color); }
+.matrix .matrix-group-row ~ .matrix-col-row th { top: 40px; }
+.matrix-group-head { background: var(--primary-soft, #fff4ea) !important; }
+.matrix-group-head button { display: inline-flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.2; border: none; background: transparent; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); max-width: 100%; }
+.matrix-group-head .mg-name { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.matrix-group-head .mg-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 10em; }
+.matrix-group-head .mg-count { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); }
+.matrix-group-head .mg-arrow { transition: transform 0.15s; transform: rotate(90deg); flex: none; }
+.matrix-group-head.collapsed .mg-arrow { transform: none; }
+.matrix th.col-dragging { opacity: 0.4; }
+.matrix th.col-drop-before { box-shadow: inset 3px 0 0 var(--primary-color, #ff8a3d); }
+.matrix th.col-drop-after { box-shadow: inset -3px 0 0 var(--primary-color, #ff8a3d); }
+.mh-folded { min-width: 40px; cursor: default; }
+.cell-folded { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); background: var(--bg-color) !important; min-width: 40px; }
+.cell-folded.owe-bad { color: #d93025; }
+.cell-folded.folded-ok { color: #1e8e3e; }
 .matrix .sticky-col { position: sticky; left: 0; z-index: 1; text-align: left; padding: 3px 10px 3px 4px; white-space: nowrap; }
 .matrix thead .sticky-col { z-index: 3; }
 .matrix-head-btn {
@@ -58,9 +75,19 @@
     display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px; border-radius: 6px; min-width: 40px;
 }
 .matrix-head-btn:hover { background: var(--bg-color); }
+/* 各列表头高度不一（标题有的一行有的两行）：日期/标题顶对齐，过关率底对齐。
+   th 设 height:1px 是让按钮的 height:100% 能撑满整行高度的惯用写法（行高仍由最高内容决定） */
+.matrix th.matrix-col-head { height: 1px; vertical-align: top; }
+/* “学生”“未补/过关”表头也顶对齐，文字起点与列头里的日期/标题一致（+2px 是按钮的内边距） */
+.matrix .matrix-col-row th:not(.matrix-col-head) { vertical-align: top; padding-top: 10px; }
+.matrix-col-head .matrix-head-btn { height: 100%; box-sizing: border-box; }
+.matrix-col-head .mh-rate { margin-top: auto; }
 .mh-date { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); }
 .mh-sub, .mh-rate { font-size: 0.68rem; color: var(--text-secondary); font-weight: normal; }
-.mh-title { font-size: 0.72rem; font-weight: 700; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 标题在空格 / 左括号处断成最多两行（Utils.balancedTitleHtml），每行单行显示，太长才省略 */
+.mh-sub, .mh-title { max-width: 84px; line-height: 1.25; }
+.mh-title { font-size: 0.72rem; font-weight: 700; }
+.mh-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell {
     width: 30px; height: 24px; border: none; border-radius: 5px; cursor: pointer; position: relative; display: block; margin: 0 auto;
     font-size: 0.72rem; font-weight: 700; font-family: inherit;
