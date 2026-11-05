@@ -28,6 +28,9 @@
 .side-item.drag-after { box-shadow: 0 3px 0 0 var(--primary-color, #ff8a3d); }
 .side-item-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
 .side-item-date { font-size: 0.72rem; color: var(--text-secondary); }
+/* 顶行（日期 + 统计）字号同标题一起缩小 30%：0.72→0.504rem，0.7→0.49rem */
+.side-item-top .side-item-date { font-size: 0.504rem; }
+.side-item-top .side-item-sub { font-size: 0.49rem; }
 .side-item-title { font-weight: 600; font-size: 0.644rem; margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-item-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.05rem 0.5rem; }
 .side-item-row .side-item-title { flex: 0 1 auto; min-width: 0; max-width: 100%; }

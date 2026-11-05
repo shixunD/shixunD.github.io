@@ -52,10 +52,11 @@
 .matrix th, .matrix td { padding: 3px; text-align: center; border-bottom: 1px solid var(--border-color); background: #fff; }
 .matrix thead th { position: sticky; top: 0; z-index: 2; vertical-align: bottom; padding-top: 8px; padding-bottom: 8px; }
 /* 有分组时表头是两行：上面一行分组名（固定 40px 高：数量在上、分组名在下），下面一行列头贴在它下面 */
-.matrix .matrix-group-row th { top: 0; height: 40px; padding: 2px 3px; vertical-align: middle; border-bottom: 1px solid var(--border-color); }
+.matrix .matrix-group-row th { top: 0; height: 40px; padding: 0 3px; vertical-align: middle; border-bottom: 1px solid var(--border-color); }
 .matrix .matrix-group-row ~ .matrix-col-row th { top: 40px; }
-.matrix-group-head { background: var(--primary-soft, #fff4ea) !important; }
-.matrix-group-head button { display: inline-flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.2; border: none; background: transparent; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); max-width: 100%; }
+/* 底色是半透明的，要垫一层白，否则滚动时下面的色块会透出来，看起来像悬浮 */
+.matrix-group-head { background: linear-gradient(var(--primary-soft, #fff4ea), var(--primary-soft, #fff4ea)), #fff !important; }
+.matrix-group-head button { display: inline-flex; vertical-align: top; flex-direction: column; align-items: center; gap: 0; line-height: 1.2; border: none; background: transparent; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); max-width: 100%; }
 .matrix-group-head .mg-name { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
 .matrix-group-head .mg-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 10em; }
 .matrix-group-head .mg-count { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); }
