@@ -76,15 +76,15 @@
 
 /* 检查历史时间线（含老师评语） */
 .check-timeline { list-style: none; position: relative; display: flex; flex-direction: column; gap: 0.7rem; padding-left: 1.1rem; }
-.check-timeline::before { content: ''; position: absolute; left: 0.28rem; top: 0.4rem; bottom: 0.4rem; width: 2px; background: #eadfd3; border-radius: 2px; }
+.check-timeline::before { content: ''; position: absolute; left: 0.28rem; top: 2rem; bottom: 0.4rem; width: 2px; background: #eadfd3; border-radius: 2px; }
 .check-week + .check-week { margin-top: 1rem; }
 .check-timeline + .check-timeline { margin-top: 0.9rem; }
 /* 相邻两周之间一根虚线 */
 .check-week.check-week-split { margin-top: 1.4rem; padding-top: 1rem; border-top: 2px dashed var(--border-color, #c9ced6); }
 .check-item { position: relative; }
 .check-item::before { content: ''; position: absolute; left: -1.1rem; top: 0.32rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--dot-color); box-shadow: 0 0 0 3px #fff; }
-.check-item-head { display: grid; grid-template-columns: var(--pill-w, 4.9rem) auto minmax(0, 1fr); align-items: center; gap: 0.4rem; font-size: 0.86rem; }
-.check-item-round { font-weight: 600; }
+.check-item-head { display: grid; grid-template-columns: 4.9rem minmax(0, 1fr); align-items: center; gap: 0.4rem; font-size: 0.86rem; }
+.check-timeline-title { font-weight: 600; font-size: 0.92rem; margin-left: -1.1rem; }   /* 每条竖线顶上写一次任务名，记录里不再重复 */
 .check-comment { margin-top: 0.35rem; padding: 0.5rem 0.7rem; background: #fcf9f6; border-left: 3px solid var(--dot-color); border-radius: 0 8px 8px 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .check-comment-icon { margin-right: 0.35rem; }
 

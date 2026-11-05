@@ -2,9 +2,9 @@
 // 全局命名空间：window.RecitationModel
 //
 // 轮次（round）= 一项背诵任务，不绑定日期；老师每天抽查一部分人，每次检查新增一条 recCheck。
-// 学生在某轮次的"当前状态" = 最新一条检查记录的结果（超额完成 / 过关 / 需重新过关 / 未过关），没有记录 = 未检查。
+// 学生在某轮次的"当前状态" = 最新一条检查记录的结果（超额完成 / 过关 / 重新过关 / 未过关），没有记录 = 未检查。
 // "超额完成"= 过关里做得特别好的（深绿），所有"算不算过关"的统计都把它算作过关，用 isPassed() 判断。
-// "需重新过关 / 未过关"只是状态，不带日期（1.9.0 起）；"哪天再背"统一用背诵计划（recPlan）表示。
+// "重新过关 / 未过关"只是状态，不带日期（1.9.0 起）；"哪天再背"统一用背诵计划（recPlan）表示。
 // 背诵计划（recPlan）= "计划某天让这个学生背"，与检查状态互不影响、可以同时存在（一个学生可有多个计划日期）。
 //   登记检查不会删除计划；安排之后登记的、日期在计划日当天或之后的检查，会让这条计划算"已完成"
 //   （不再出现在待办/提醒/粉框里，但保留在记录中）；只有老师手动"取消计划"才会删除。
@@ -14,9 +14,9 @@
 
     const RESULTS = [
         { key: 'excel', label: '超额完成', color: '#0b5c2a', text: '#fff' },
-        { key: 'pass', label: '过关', color: '#1e8e3e', text: '#fff' },
-        { key: 'cond', label: '有条件过关', color: '#b9e8b0', text: '#1f5214' },
-        { key: 'retry', label: '需重新过关', color: '#f2b705', text: '#4a3500' },
+        { key: 'pass', label: '完成过关', color: '#1e8e3e', text: '#fff' },
+        { key: 'cond', label: '条件过关', color: '#b9e8b0', text: '#1f5214' },
+        { key: 'retry', label: '重新过关', color: '#f2b705', text: '#4a3500' },
         { key: 'fail', label: '未过关', color: '#d93025', text: '#fff' }
     ];
     const NONE = { key: 'none', label: '未检查', color: '#e5e7eb', text: '#6b7280' };
@@ -27,7 +27,7 @@
 
     function state() { return AppState.getState(); }
 
-    // 超额完成、有条件过关（勉强过）也算过关
+    // 超额完成、条件过关（勉强过）也算过关
     function isPassed(key) { return key === 'pass' || key === 'excel' || key === 'cond'; }
 
     // ---------- 轮次 ----------
@@ -160,7 +160,7 @@
         return AppState._commit((s) => { s.recChecks = s.recChecks.filter((c) => c.id !== id); });
     }
 
-    // 单轮次的状态统计；passed = 超额完成 + 过关 + 有条件过关
+    // 单轮次的状态统计；passed = 超额完成 + 过关 + 条件过关
     function roundSummary(roundId, students) {
         const counts = { excel: 0, pass: 0, cond: 0, retry: 0, fail: 0, none: 0 };
         (students || AppState.getStudents()).forEach((stu) => { counts[statusOf(roundId, stu.id)]++; });
@@ -276,7 +276,7 @@
     }
 
     // 今日背诵剩余人数：今天还有未完成计划的学生（跨轮次去重）
-    // 本周背诵剩余人数：本周轮次里，状态不是 超额完成 / 过关 / 有条件过关 的学生人次
+    // 本周背诵剩余人数：本周轮次里，状态不是 超额完成 / 过关 / 条件过关 的学生人次
     function remainingCounts() {
         const today = Utils.today();
         const thisWeek = weekStartOf(today);

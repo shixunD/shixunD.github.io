@@ -13,10 +13,6 @@
         view.innerHTML = `
             <div class="card">${summaryHtml(id, true)}</div>
         `;
-        // 检查历史里「状态药丸」这一列的宽度 = 页面上最宽的那颗（全是短药丸时不留多余空白）
-        const pills = [...view.querySelectorAll('.check-item-head > .status-pill')];
-        const maxW = Math.max(0, ...pills.map((p) => p.offsetWidth));
-        if (maxW > 0) view.style.setProperty('--pill-w', maxW + 'px');
         // 点时间轴的块：跳到该轮次最近一条记录的检查历史，并闪两次定位
         view.querySelectorAll('[data-jump-round]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -78,7 +74,7 @@
         return `
             <div class="stat-row">
                 ${UI.statTile('已过关', `${passed}/${rows.length}`, null, R.pass.color)}
-                ${UI.statTile('需重新过关/未过关', pending, null, pending ? R.fail.color : null)}
+                ${UI.statTile('重新过关/未过关', pending, null, pending ? R.fail.color : null)}
                 ${UI.statTile('未检查', unchecked)}
                 ${UI.statTile('平均几次过关', avgAttempts == null ? '-' : Utils.formatNumber(avgAttempts, 1))}
             </div>
@@ -97,11 +93,10 @@
                 }).join('')}
             </div>
             <h3 class="section-title">检查历史</h3>
-            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week${g.split ? ' check-week-split' : ''}">${roundRuns(g.items).map((run) => `<ul class="check-timeline">${run.map(({ round, check, plan }) => `
+            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week${g.split ? ' check-week-split' : ''}">${roundRuns(g.items).map((run) => `<ul class="check-timeline"><li class="check-timeline-title">${esc(run[0].round.title)}</li>${run.map(({ round, check, plan }) => `
                 <li class="check-item" data-hist-round="${round.id}" data-hist-kind="${plan ? 'plan' : 'check'}" style="--dot-color:${plan ? RecitationModel.PLAN.accent : (R[check.result] || {}).color || '#9aa0a6'}">
                     <div class="check-item-head">
                         ${plan ? RecitationDialogs.planPill() : RecitationDialogs.statusPill(check.result)}
-                        <span class="check-item-round">${esc(round.title)}</span>
                         <span class="record-date">${Utils.formatDate(check.date)}</span>
                     </div>
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}

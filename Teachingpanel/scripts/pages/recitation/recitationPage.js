@@ -16,11 +16,11 @@
     const FILTERS = [
         { key: '', label: '全部' },
         { key: 'none', label: '未检查' },
-        { key: 'retry', label: '需重新过关' },
+        { key: 'retry', label: '重新过关' },
         { key: 'fail', label: '未过关' },
-        { key: 'pass', label: '已过关' },
+        { key: 'pass', label: '完成过关' },
         { key: 'excel', label: '超额完成' },
-        { key: 'cond', label: '有条件过关' }
+        { key: 'cond', label: '条件过关' }
     ];
 
     const ui = {

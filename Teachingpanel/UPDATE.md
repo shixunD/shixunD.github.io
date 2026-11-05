@@ -3,9 +3,13 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.28.7 — 2026-11-05
+
+- 变更：检查历史每个 `.check-timeline` 顶部加 `li.check-timeline-title` 显示任务名，`.check-item-head` 里去掉 `.check-item-round`（竖线起点下移到标题下面）
+
 ## 1.28.6 — 2026-11-05
 
-- 变更：检查历史 `.check-item-head` 第一列宽度改为 `var(--pill-w)`，由 `RecitationStudent.render()` 渲染后量出页面上最宽的 `.status-pill` 设置（默认回退 4.9rem）
+- 变更：背诵结果显示名改为 完成过关 / 条件过关 / 重新过关（`RecitationModel.RESULTS` 的 label，key `pass`/`cond`/`retry` 不变，无需迁移）；筛选、总览提示、学生趋势、Handbook 同步
 
 ## 1.28.5 — 2026-11-05
 
