@@ -1,11 +1,11 @@
-// weekPicker.js —— 周选择日历：可前后翻月，点任意一天 = 选中它所在的那一周（周一到周日）
+// weekPicker.js —— 日期 + 周选择日历：可前后翻月，点任意一天 = 选中这一天，并高亮它所在的那一周（周一到周日）
 // 全局命名空间：window.WeekPicker
-// 用于新建 / 编辑背诵轮次时选择「第几周」。值 = 该周周一的日期 'YYYY-MM-DD'。
+// 用于新建 / 编辑背诵轮次：值 = 选中的那一天 'YYYY-MM-DD'（精细排序），所在周用 mondayOf(值) 得到（粗略分组）。
 //
 //   WeekPicker.mondayOf(dateStr)            某天所在周的周一
 //   WeekPicker.rangeText(monday)            '11-02(星期一) ~ 11-08(星期日)'
 //   WeekPicker.html(key)                    返回 HTML 外壳
-//   WeekPicker.bind(root, key, { value, onChange })   绑定，返回 { get(), set(monday) }
+//   WeekPicker.bind(root, key, { value, onChange })   绑定，返回 { get(), set(dateStr) }
 
 (function () {
     'use strict';
@@ -27,7 +27,7 @@
     function bind(root, key, opts) {
         const o = opts || {};
         const wrap = root.querySelector(`[data-wp="${key}"]`);
-        let value = o.value ? mondayOf(o.value) : mondayOf(Utils.today());
+        let value = o.value || Utils.today();
         // 当前显示的月份（该月 1 号）
         let shown = Utils.parseDate(value);
         shown = new Date(shown.getFullYear(), shown.getMonth(), 1);
@@ -52,11 +52,11 @@
                     ${HEAD.map((h) => `<span class="wp-dow">${h}</span>`).join('')}
                     ${days.map((d) => {
                         const inMonth = Utils.parseDate(d).getMonth() === shown.getMonth();
-                        const sel = mondayOf(d) === value;
-                        return `<button type="button" class="wp-day ${inMonth ? '' : 'out'} ${sel ? 'sel' : ''} ${d === today ? 'is-today' : ''}" data-wp-day="${d}">${Utils.parseDate(d).getDate()}</button>`;
+                        const sel = mondayOf(d) === mondayOf(value);
+                        return `<button type="button" class="wp-day ${inMonth ? '' : 'out'} ${sel ? 'sel' : ''} ${d === value ? 'sel-day' : ''} ${d === today ? 'is-today' : ''}" data-wp-day="${d}">${Utils.parseDate(d).getDate()}</button>`;
                     }).join('')}
                 </div>
-                <div class="hint wp-picked">已选：${rangeText(value)}${value === mondayOf(today) ? '（本周）' : ''}</div>`;
+                <div class="hint wp-picked">已选：${Utils.formatDate(value)}　所属周：${rangeText(mondayOf(value))}${mondayOf(value) === mondayOf(today) ? '（本周）' : ''}</div>`;
             wrap.querySelector('[data-wp-prev]').addEventListener('click', () => { shown = new Date(shown.getFullYear(), shown.getMonth() - 1, 1); draw(); });
             wrap.querySelector('[data-wp-next]').addEventListener('click', () => { shown = new Date(shown.getFullYear(), shown.getMonth() + 1, 1); draw(); });
             wrap.querySelector('[data-wp-today]').addEventListener('click', () => pick(today));
@@ -64,7 +64,7 @@
         }
 
         function pick(dateStr) {
-            value = mondayOf(dateStr);
+            value = dateStr;
             const d = Utils.parseDate(dateStr);
             shown = new Date(d.getFullYear(), d.getMonth(), 1);
             draw();
@@ -74,7 +74,7 @@
         draw();
         return {
             get: () => value,
-            set: (v) => { value = mondayOf(v); const d = Utils.parseDate(value); shown = new Date(d.getFullYear(), d.getMonth(), 1); draw(); }
+            set: (v) => { value = v; const d = Utils.parseDate(value); shown = new Date(d.getFullYear(), d.getMonth(), 1); draw(); }
         };
     }
 

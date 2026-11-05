@@ -59,7 +59,8 @@
                 content: data.content || '',
                 createdAt: Date.now(),
                 archived: false,
-                weekStart: data.weekStart || weekStartOf(Utils.today())
+                day: data.day || Utils.today(),
+                weekStart: weekStartOf(data.day || Utils.today())
             };
             s.recRounds.push(round);
             return round;
@@ -264,9 +265,14 @@
         return Utils.addDays(dateStr, -((Utils.parseDate(dateStr).getDay() + 6) % 7));
     }
 
-    // 轮次所属周（周一日期）：新建时选的；老数据没有就按创建当天所在周
+    // 轮次设定的具体日期（精细排序用）：新建/编辑时选的那天；1.28.0–1.28.4 只有 weekStart（取周一）；更老的按创建当天
+    function roundDay(r) {
+        return r.day || r.weekStart || Utils.toDateStr(new Date(r.createdAt || Date.now()));
+    }
+
+    // 轮次所属周（周一日期，粗略分组用）：由设定日期推出
     function roundWeek(r) {
-        return r.weekStart || weekStartOf(Utils.toDateStr(new Date(r.createdAt || Date.now())));
+        return weekStartOf(roundDay(r));
     }
 
     // 今日背诵剩余人数：今天还有未完成计划的学生（跨轮次去重）
@@ -316,6 +322,6 @@
         rounds, roundLayout, getRound, createRound, updateRound, removeRound,
         checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
         plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
-        schedule, nextArrangement, dueToday, reminderCounts, remainingCounts, weekStartOf, roundWeek, studentOverview
+        schedule, nextArrangement, dueToday, reminderCounts, remainingCounts, weekStartOf, roundWeek, roundDay, studentOverview
     };
 })();

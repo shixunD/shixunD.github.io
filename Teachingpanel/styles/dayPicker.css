@@ -37,6 +37,7 @@
 }
 .wp-day:hover { background: #f3f4f6; }
 .wp-day.out { color: #b0b4bb; }
-.wp-day.sel { background: var(--primary-color); color: #fff; }
+.wp-day.sel { background: #ffe3cf; color: var(--text-primary); }
+.wp-day.sel-day { background: var(--primary-color); color: #fff; font-weight: 700; }
 .wp-day.is-today { border: 2px solid #8a8f98; }
 .wp-picked { margin-top: 0.3rem; }

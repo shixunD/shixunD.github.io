@@ -3,6 +3,30 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.28.6 — 2026-11-05
+
+- 变更：检查历史 `.check-item-head` 第一列宽度改为 `var(--pill-w)`，由 `RecitationStudent.render()` 渲染后量出页面上最宽的 `.status-pill` 设置（默认回退 4.9rem）
+
+## 1.28.5 — 2026-11-05
+
+- 变更：背诵轮次新增可选字段 `day`（设定的具体日期），`weekStart` 改由 `day` 推出；`RecitationModel.roundDay()` 新增（老数据回退 weekStart → createdAt），`roundWeek()` 由它推出。WeekPicker 的值改为选中的那一天（高亮所在周 + 选中日）。检查历史按 `roundDay` 新→旧排序，再按周分组（无需升 schema）
+
+## 1.28.4 — 2026-11-05
+
+- 变更：检查历史的周分组改按轮次所属周（`RecitationModel.roundWeek(round)`）而非检查日期；周新→旧，相邻周之间虚线
+
+## 1.28.3 — 2026-11-05
+
+- 修复：检查历史的虚线应在相邻两周之间，而 1.28.1 按双周序号画，导致相邻周没有线；`weekGroups()` 去掉双周序号，每个新的周组（除第一组）都带 `split`
+
+## 1.28.2 — 2026-11-05
+
+- 变更：背诵趋势「检查历史」的竖线按背诵任务（轮次）分：每周内再用 `roundRuns()` 按轮次拆成多个 `.check-timeline`，同一任务连一条线
+
+## 1.28.1 — 2026-11-05
+
+- 变更：背诵趋势「检查历史」每两周之间加一根虚线（`student.js` `weekGroups()` 按以 1970-01-05 为起点的双周序号标记 `split`，`recitation.css` `.check-week-split`）
+
 ## 1.28.0 — 2026-11-05
 
 - 变更：主页概览四卡片改为 今日背诵剩余人数 / 今日作业未补 / 本周背诵剩余人数 / 本周作业未补（`RecitationModel.remainingCounts()`、`HomeworkModel.countOutstandingBetween()`）；导航栏背诵角标不变

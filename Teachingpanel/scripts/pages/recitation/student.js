@@ -13,6 +13,10 @@
         view.innerHTML = `
             <div class="card">${summaryHtml(id, true)}</div>
         `;
+        // 检查历史里「状态药丸」这一列的宽度 = 页面上最宽的那颗（全是短药丸时不留多余空白）
+        const pills = [...view.querySelectorAll('.check-item-head > .status-pill')];
+        const maxW = Math.max(0, ...pills.map((p) => p.offsetWidth));
+        if (maxW > 0) view.style.setProperty('--pill-w', maxW + 'px');
         // 点时间轴的块：跳到该轮次最近一条记录的检查历史，并闪两次定位
         view.querySelectorAll('[data-jump-round]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -29,18 +33,27 @@
         });
     }
 
-    // 按周（周一起）分组：不同周的记录各用一条竖线，不连在一起；allChecks 已按日期倒序
+    // 按背诵任务规定的周（轮次的 weekStart，不是检查日期）分组：周新→旧，相邻两周之间画虚线；allChecks 已按任务设定日期倒序
     function weekGroups(list) {
-        const groups = [];
+        const map = new Map();
         list.forEach((it) => {
-            const d = new Date(it.check.date + 'T00:00:00');
-            d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-            const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-            let g = groups[groups.length - 1];
-            if (!g || g.key !== key) { g = { key, items: [] }; groups.push(g); }
-            g.items.push(it);
+            const key = RecitationModel.roundWeek(it.round);
+            if (!map.has(key)) map.set(key, { key, items: [] });
+            map.get(key).items.push(it);
         });
+        const groups = [...map.values()].sort((x, y) => y.key.localeCompare(x.key));
+        groups.forEach((g, i) => { g.split = i > 0; });
         return groups;
+    }
+
+    // 一周内再按背诵任务（轮次）分开：同一任务的记录用一条竖线串起来，不同任务各一条线（按各任务最新一条的先后排）
+    function roundRuns(items) {
+        const map = new Map();
+        items.forEach((it) => {
+            if (!map.has(it.round.id)) map.set(it.round.id, []);
+            map.get(it.round.id).push(it);
+        });
+        return [...map.values()];
     }
 
     function summaryHtml(studentId, full) {
@@ -57,7 +70,10 @@
         rows.forEach((r) => r.checks.forEach((c) => allChecks.push({ round: r.round, check: c })));
         // 计划背诵也放进检查历史（时间轴上不画）
         rows.forEach((r) => RecitationModel.plansFor(r.round.id, studentId).forEach((p) => allChecks.push({ round: r.round, plan: p, check: p })));
-        allChecks.sort((a, b) => b.check.date.localeCompare(a.check.date) || (!!a.plan - !!b.plan) || (b.check.createdAt || 0) - (a.check.createdAt || 0));
+        // 按背诵任务设定的日期新→旧；同一天的任务按创建先后；同一任务内按检查日期新→旧（计划排在同日检查之后）
+        allChecks.sort((a, b) => RecitationModel.roundDay(b.round).localeCompare(RecitationModel.roundDay(a.round))
+            || (b.round.createdAt || 0) - (a.round.createdAt || 0) || (a.round.id < b.round.id ? -1 : a.round.id > b.round.id ? 1 : 0)
+            || b.check.date.localeCompare(a.check.date) || (!!a.plan - !!b.plan) || (b.check.createdAt || 0) - (a.check.createdAt || 0));
 
         return `
             <div class="stat-row">
@@ -81,7 +97,7 @@
                 }).join('')}
             </div>
             <h3 class="section-title">检查历史</h3>
-            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week"><ul class="check-timeline">${g.items.map(({ round, check, plan }) => `
+            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week${g.split ? ' check-week-split' : ''}">${roundRuns(g.items).map((run) => `<ul class="check-timeline">${run.map(({ round, check, plan }) => `
                 <li class="check-item" data-hist-round="${round.id}" data-hist-kind="${plan ? 'plan' : 'check'}" style="--dot-color:${plan ? RecitationModel.PLAN.accent : (R[check.result] || {}).color || '#9aa0a6'}">
                     <div class="check-item-head">
                         ${plan ? RecitationDialogs.planPill() : RecitationDialogs.statusPill(check.result)}
@@ -90,7 +106,7 @@
                     </div>
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
                     ${Photos.viewHtml(check.photoIds)}
-                </li>`).join('')}</ul></div>`).join('')
+                </li>`).join('')}</ul>`).join('')}</div>`).join('')
                 : '<div class="hint">还没有检查记录</div>'}
         `;
     }

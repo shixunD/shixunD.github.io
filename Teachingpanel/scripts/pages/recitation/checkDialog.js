@@ -335,10 +335,10 @@
                 const form = body.querySelector('[data-form]');
                 const f = form.elements;
                 f.title.focus();
-                const weekPicker = WeekPicker.bind(body, 'roundWeek', { value: isEdit ? RecitationModel.roundWeek(round) : Utils.today() });
+                const weekPicker = WeekPicker.bind(body, 'roundWeek', { value: isEdit ? RecitationModel.roundDay(round) : Utils.today() });
                 form.addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    const data = { title: f.title.value.trim() || '背诵', content: f.content.value.trim(), weekStart: weekPicker.get() };
+                    const data = { title: f.title.value.trim() || '背诵', content: f.content.value.trim(), day: weekPicker.get(), weekStart: RecitationModel.weekStartOf(weekPicker.get()) };
                     close();
                     if (isEdit) await RecitationModel.updateRound(round.id, data);
                     else {
