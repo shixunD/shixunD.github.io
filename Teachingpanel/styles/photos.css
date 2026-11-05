@@ -91,10 +91,10 @@
 
 /* 收到照片后的压缩档位预览框：层级 8500，高于相机 / 手机接收面板 / 大图（8000），低于提示条 */
 .photo-choose-overlay { position: fixed; inset: 0; z-index: 8500; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 0.6rem; }
-.photo-choose-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1rem; width: min(900px, 100%); max-height: 96vh; display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; }
+.photo-choose-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1rem; width: min(860px, 100%); height: min(92vh, 780px); display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; }
 .photo-choose-box h2 { margin: 0; font-size: 1.1rem; }
 .photo-choose-box h2 small { font-weight: normal; color: var(--text-secondary); margin-left: 0.5rem; font-size: 0.8rem; }
-.photo-choose-view { flex: none; position: relative; min-height: 200px; height: calc(96vh - 310px); overflow: hidden; background: #111; border-radius: 8px; touch-action: none; user-select: none; }
+.photo-choose-view { flex: 1 1 0; position: relative; min-height: 160px; overflow: hidden; background: #111; border-radius: 8px; touch-action: none; user-select: none; }
 .photo-choose-view.zoomed { cursor: grab; }
 .photo-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .photo-stage img { width: 100%; height: 100%; display: block; -webkit-user-drag: none; }

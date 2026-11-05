@@ -155,15 +155,14 @@
                     </div>
                 </div>
                 <div class="photo-choose-tools">
-                    <button type="button" class="btn-secondary" data-rot="-1" title="向左转 90°">↺ 左转</button>
-                    <button type="button" class="btn-secondary" data-rot="1" title="向右转 90°">↻ 右转</button>
+                    <button type="button" class="btn-secondary" data-rot="-1" title="向左转 90°（快捷键 ←）">↺ 左转</button>
+                    <button type="button" class="btn-secondary" data-rot="1" title="向右转 90°（快捷键 →）">↻ 右转</button>
                     <button type="button" class="btn-secondary" data-reset-edit disabled>还原编辑</button>
                     <span class="hint">拖动图片四周边角即可裁剪；滚轮缩放、左键拖动平移</span>
                 </div>
                 <div class="photo-choose-info" data-info></div>
                 <div class="photo-choose-levels">${levelOptions().map((l) => `<button type="button" class="photo-choose-lv" data-lv="${l.key}"><b>${Utils.escapeHtml(l.label)}</b><span data-size>${l.key === 'raw' ? fmtSize(file.size) : idleText(l.key)}</span></button>`).join('')}</div>
                 <div class="photo-choose-custom">自定义质量 <input type="number" min="0.001" max="1" step="0.001" value="${customQ}" data-custom-q> <span class="hint">（0.001–1；只改这一次，默认值在主页「⚙️ 设置」里改）</span></div>
-                <div class="hint">点档位对比效果；确定后只保留所选的一份，收到的完整原图会丢弃。数字是 WebP 质量，越大越清楚、文件越大。打开时只先算前几档，其余点到才算。</div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-zoom>放大到 100%</button>
                     <button type="button" class="btn-secondary" data-skip>放弃这张</button>
@@ -381,7 +380,20 @@
                 results.forEach((r) => { if (!value || r.blob !== value) URL.revokeObjectURL(r.url); });
                 resolve(value);
             };
-            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(null); } };
+            // 快捷键：Esc 放弃，Enter 确定，← / → 左 / 右转；焦点在输入框里时不抢（Enter 要留给自定义质量），焦点在按钮上时 Enter 仍是点按钮
+            const onKey = (e) => {
+                if (e.key === 'Escape') { e.stopPropagation(); finish(null); return; }
+                const tag = (e.target && e.target.tagName) || '';
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault(); e.stopPropagation();
+                    rotate(e.key === 'ArrowRight' ? 1 : -1);
+                } else if (e.key === 'Enter' && tag !== 'BUTTON') {
+                    e.preventDefault(); e.stopPropagation();
+                    const r = results.get(selected);
+                    if (r) finish(r.blob);
+                }
+            };
             document.addEventListener('keydown', onKey, true);
             overlay.addEventListener('click', (e) => {
                 const lv = e.target.closest('[data-lv]');
