@@ -22,6 +22,7 @@
         else if (pageName === 'recitation') RecitationPage.render();
         else if (pageName === 'exams') ExamsPage.render();
         else if (pageName === 'trend') TrendPage.render();
+        else if (pageName === 'notes') NotesPage.render();
     }
 
     // "回到网站首页"语义：用当前部署域名动态拼，不硬编码作者域名（fork 部署后依然正确）

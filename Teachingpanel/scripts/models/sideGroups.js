@@ -16,6 +16,8 @@
     function state() { return AppState.getState(); }
 
     function groups(kind) {
+        // 笔记（kind 'note'）全班级共用，文件夹的 classId 为空串，不按班级过滤
+        if (kind === 'note') return state().sideGroups.filter((g) => g.kind === 'note');
         const classId = AppState.getActiveClassId();
         return state().sideGroups.filter((g) => g.classId === classId && g.kind === kind);
     }
@@ -119,7 +121,7 @@
 
     function createGroup(kind, title) {
         return AppState._commit((s) => {
-            const g = { id: Utils.uid('grp'), classId: AppState.getActiveClassId(), kind, title: title || '分组', collapsed: false, createdAt: Date.now() };
+            const g = { id: Utils.uid('grp'), classId: kind === 'note' ? '' : AppState.getActiveClassId(), kind, title: title || '分组', collapsed: false, createdAt: Date.now() };
             s.sideGroups.push(g);
             return g;
         });

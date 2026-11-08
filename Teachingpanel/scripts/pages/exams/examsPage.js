@@ -28,6 +28,30 @@
         el.querySelectorAll('[data-subtab]').forEach((btn) => btn.addEventListener('click', () => openTab(btn.dataset.subtab)));
         const view = el.querySelector('#exam-view');
         renderExams(view);
+        flashPending(view);
+    }
+
+    // 从学生趋势跳过来：定位到该学生的成绩行并闪三秒（只闪一次）
+    function flashPending(view) {
+        const sid = ui.flashSid;
+        if (!sid) return;
+        ui.flashSid = null;
+        const side = view.querySelector('.side-item.active');
+        if (side) side.scrollIntoView({ block: 'nearest' });
+        const row = Array.from(view.querySelectorAll('.rank-table tr[data-sid]')).find((r) => r.dataset.sid === sid);
+        if (!row) return;
+        row.scrollIntoView({ block: 'center' });
+        row.classList.add('flash-student');
+        setTimeout(() => row.classList.remove('flash-student'), 3000);
+    }
+
+    // 学生趋势 -> 考试页：选中某场考试，并闪烁某个学生
+    function jumpTo(examId, studentId) {
+        ui.tab = 'exams';
+        Utils.lsSet(LS_TAB, 'exams');
+        ui.selectedId = examId;
+        ui.flashSid = studentId;
+        Navigation.goTo('exams');
     }
 
     function openTab(key) {
@@ -102,7 +126,7 @@
                     <h3 class="section-title">成绩排名</h3>
                     <table class="simple-table rank-table">
                         <thead><tr><th>名次</th><th>学号</th><th>姓名</th><th>成绩</th><th>得分率</th></tr></thead>
-                        <tbody>${st.entries.map((x) => `<tr>
+                        <tbody>${st.entries.map((x) => `<tr data-sid="${x.student.id}">
                             <td>${st.ranks[x.student.id]}</td><td>${esc(x.student.studentNo)}</td><td>${UI.studentLink(x.student)}</td>
                             <td><b>${ExamModel.formatScore(x.score)}</b></td><td>${Utils.percent(x.score, exam.fullScore)}</td></tr>`).join('')}
                         </tbody>
@@ -126,5 +150,5 @@
         });
     }
 
-    window.ExamsPage = { render, openTab };
+    window.ExamsPage = { render, openTab, jumpTo };
 })();

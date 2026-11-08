@@ -53,6 +53,32 @@
         else if (ui.tab === 'plan') RecitationPlan.render(view);
         else if (ui.tab === 'timeline') RecitationOverview.renderTimeline(view);
         else RecitationOverview.renderOverview(view);
+        flashPending(view);
+    }
+
+    // 从学生趋势跳过来：定位到该学生的卡片并闪三秒（只闪一次，之后清掉）
+    function flashPending(view) {
+        const sid = ui.flashSid;
+        if (!sid) return;
+        ui.flashSid = null;
+        const card = Array.from(view.querySelectorAll('.stu-card')).find((c) => c.dataset.sid === sid);
+        const side = view.querySelector('.side-item.active');
+        if (side) side.scrollIntoView({ block: 'nearest' });
+        if (!card) return;
+        card.scrollIntoView({ block: 'center' });
+        card.classList.add('flash-student');
+        setTimeout(() => card.classList.remove('flash-student'), 3000);
+    }
+
+    // 学生趋势 -> 背诵页：打开某个轮次的检查视图，并闪烁某个学生
+    function jumpTo(roundId, studentId) {
+        ui.tab = 'check';
+        Utils.lsSet(LS_TAB, 'check');
+        ui.selectedId = roundId;
+        ui.filter = '';
+        ui.flashSid = studentId;
+        RecitationPlan.setRound(roundId);
+        Navigation.goTo('recitation');
     }
 
     function openTab(key, opts) {
@@ -233,5 +259,5 @@
         });
     }
 
-    window.RecitationPage = { render, openTab };
+    window.RecitationPage = { render, openTab, jumpTo };
 })();

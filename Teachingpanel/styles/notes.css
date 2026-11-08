@@ -1,0 +1,53 @@
+/* notes.css —— 笔记页：左侧目录搜索框、右侧编辑卡片、富文本工具栏与正文样式 */
+
+.note-search { width: 100%; box-sizing: border-box; margin-bottom: 0.6rem; padding: 0.4rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; }
+.note-side-slot .side-list { max-height: calc(100vh - 230px); }
+
+.note-card { padding: 0; overflow: visible; }
+.note-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem 0.5rem; }
+.note-title { flex: 1; min-width: 0; border: 0 !important; border-bottom: 1px solid transparent !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; font-size: 1.15rem; font-weight: 700; padding: 0.25rem 0 !important; }
+.note-title:focus { outline: none; border-bottom-color: var(--primary-color) !important; }
+.note-status { flex: none; font-size: 0.78rem; color: var(--text-secondary); min-width: 3.5rem; text-align: right; }
+
+/* 工具栏：吸顶（导航栏下面），一行放不下自动换行 */
+.ne-toolbar { position: sticky; top: 64px; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 0.35rem 0.6rem; background: #fcf9f6; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+.ne-btn { position: relative; min-width: 1.9rem; height: 1.9rem; padding: 0 0.4rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font-size: 0.9rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.ne-btn:hover { background: rgba(255, 138, 61, 0.14); }
+.ne-btn.on { background: var(--primary-soft); color: var(--primary-dark); }
+.ne-wide { padding: 0 0.55rem; font-size: 0.82rem; white-space: nowrap; }
+.ne-sep { width: 1px; height: 1.2rem; margin: 0 4px; background: var(--border-color); }
+.ne-a { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px; }
+.ne-a-bg { background: #fff3a8; padding: 0 3px; border-radius: 3px; }
+.ne-bar { position: absolute; left: 6px; right: 6px; bottom: 3px; height: 3px; border-radius: 2px; }
+
+.ne-pop { position: absolute; z-index: 30; padding: 0.4rem; background: #fff; border: 1px solid var(--border-color); border-radius: 10px; box-shadow: var(--shadow-hover); display: flex; flex-wrap: wrap; gap: 4px; max-width: 14rem; }
+.ne-pop[hidden] { display: none; }
+.ne-sw { display: flex; flex-wrap: wrap; gap: 6px; }
+.ne-swatch { width: 1.6rem; height: 1.6rem; padding: 0; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; color: var(--text-secondary); background: #fff; position: relative; overflow: hidden; }
+.ne-swatch:hover { transform: scale(1.12); }
+.ne-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
+.ne-size { padding: 0.3rem 0.7rem; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; cursor: pointer; line-height: 1.2; }
+.ne-size:hover { background: var(--primary-soft); }
+
+@media (max-width: 720px) {
+    .ne-toolbar { position: static; }     /* 手机上工具栏会换成好几行，吸顶太占地方 */
+    .note-editor { min-height: 280px; padding: 0.7rem 0.8rem 1.2rem; }
+    .note-side-slot .side-list { max-height: 220px; }
+}
+
+/* 正文 */
+.note-editor { min-height: 360px; max-height: none; padding: 0.9rem 1.1rem 1.4rem; outline: none; font-size: 1rem; line-height: 1.75; word-break: break-word; overflow-wrap: anywhere; }
+.note-editor:empty::before { content: attr(data-placeholder); color: #b6aca4; pointer-events: none; }
+.note-editor img { display: block; max-width: 100%; max-height: 420px; margin: 0.4rem 0; border-radius: 8px; cursor: zoom-in; }
+.note-editor blockquote { margin: 0.5rem 0; padding: 0.2rem 0.9rem; border-left: 4px solid var(--primary-color); background: var(--primary-soft); border-radius: 0 8px 8px 0; color: var(--text-primary); }
+.note-editor hr { border: 0; border-top: 2px solid var(--border-color); margin: 0.9rem 0; }
+.note-editor ul, .note-editor ol { margin: 0.3rem 0; padding-left: 1.6rem; }
+.note-editor h1 { font-size: 1.5rem; } .note-editor h2 { font-size: 1.3rem; } .note-editor h3 { font-size: 1.12rem; }
+
+/* 待办清单：方框用 CSS 画，点 li 左侧切换 */
+.note-editor ul.todo { list-style: none; padding-left: 0.2rem; }
+.note-editor ul.todo > li { position: relative; padding-left: 1.7rem; }
+.note-editor ul.todo > li::before { content: ''; position: absolute; left: 0; top: 0.42em; width: 1.05em; height: 1.05em; border: 2px solid var(--primary-dark); border-radius: 4px; background: #fff; cursor: pointer; box-sizing: border-box; }
+.note-editor ul.todo > li[data-todo="1"]::before { background: var(--primary-color); }
+.note-editor ul.todo > li[data-todo="1"]::after { content: ''; position: absolute; left: 0.34em; top: 0.55em; width: 0.28em; height: 0.52em; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); pointer-events: none; }
+.note-editor ul.todo > li[data-todo="1"] { color: var(--text-secondary); text-decoration: line-through; }

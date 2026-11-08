@@ -94,7 +94,8 @@
 
 /* 时间轴块跳到检查历史后的定位提示：透明框闪两次 */
 .check-item { scroll-margin-top: calc(var(--nav-h, 0px) + var(--picker-h, 0px) + 16px); }
-.check-item.flash-locate::after {
+.record-list > li.flash-locate { position: relative; }
+.check-item.flash-locate::after, .record-list > li.flash-locate::after {
     content: ''; position: absolute; inset: -4px -6px; border: 2px solid var(--primary-color); border-radius: 8px;
     background: rgba(255, 138, 61, 0.12); pointer-events: none; animation: locate-flash 0.7s ease-in-out 2;
 }

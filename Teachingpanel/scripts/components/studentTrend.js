@@ -39,8 +39,9 @@
     // kind 省略时：在作业/背诵/考试页点姓名就定位到该类，其他地方沿用上次看的那类
     function open(id, kind) {
         if (id && !AppState.getStudent(id)) return;
-        if (id) studentId = id;
         const cur = Navigation.getCurrent();
+        if (cur !== 'trend') BackJump.mark();   // 从别的页面跳进趋势：左上角出现返回按钮，回到出发处
+        if (id) studentId = id;
         const key = kind || (KINDS.some((x) => x.key === cur) ? cur : lastKind());
         Utils.lsSet(LS_KIND, key);
         if (cur === 'trend') { TrendPage.render(); } else { Navigation.goTo('trend'); }
@@ -77,5 +78,8 @@
         h2.querySelector('button').addEventListener('click', () => { close(); open(stu.id); });
     }
 
-    window.StudentTrend = { open, currentId, pickerHtml, bind, linkDialogTitle, KINDS, lastKind };
+    // 只改选中的学生，不跳转（返回按钮用）
+    function setCurrent(id) { if (id && AppState.getStudent(id)) studentId = id; }
+
+    window.StudentTrend = { open, setCurrent, currentId, pickerHtml, bind, linkDialogTitle, KINDS, lastKind };
 })();

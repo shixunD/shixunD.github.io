@@ -27,6 +27,10 @@
                 setTimeout(() => target.classList.remove('flash-locate'), 1400);
             });
         });
+        // 检查历史里的任务名 / 日期：跳到背诵页该轮次，并让该学生的卡片闪三秒
+        view.querySelectorAll('[data-jump-rec]').forEach((el) => {
+            el.addEventListener('click', () => { BackJump.mark(id); RecitationPage.jumpTo(el.dataset.jumpRec, id); });
+        });
     }
 
     // 按背诵任务规定的周（轮次的 weekStart，不是检查日期）分组：周新→旧，相邻两周之间画虚线；allChecks 已按任务设定日期倒序
@@ -93,7 +97,7 @@
                 }).join('')}
             </div>
             <h3 class="section-title">检查历史</h3>
-            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week${g.split ? ' check-week-split' : ''}">${roundRuns(g.items).map((run) => `<ul class="check-timeline"><li class="check-timeline-title">${esc(run[0].round.title)}</li>${run.map(({ round, check, plan }) => `
+            ${allChecks.length ? weekGroups(allChecks).map((g) => `<div class="check-week${g.split ? ' check-week-split' : ''}">${roundRuns(g.items).map((run) => `<ul class="check-timeline"><li class="check-timeline-title"><button type="button" class="record-jump" data-jump-rec="${run[0].round.id}" title="跳到背诵页该轮次">${esc(run[0].round.title)}</button></li>${run.map(({ round, check, plan }) => `
                 <li class="check-item" data-hist-round="${round.id}" data-hist-kind="${plan ? 'plan' : 'check'}" style="--dot-color:${plan ? RecitationModel.PLAN.accent : (R[check.result] || {}).color || '#9aa0a6'}">
                     <div class="check-item-head">
                         ${plan ? RecitationDialogs.planPill() : RecitationDialogs.statusPill(check.result)}

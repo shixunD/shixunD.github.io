@@ -14,6 +14,7 @@
 //   exams[]     { id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }
 //   remarks[]   { id, studentId, date, text, photoIds?, createdAt }   「其他」页：对学生的学情记录（v5 新增）
 //   sideGroups[] { id, classId, kind:'hw'|'rec', title, collapsed, order?, createdAt }   作业/背诵侧栏的分组夹（v6 新增）；作业/轮次上可选 groupId、order
+//   notes[]     { id, title, html, photoIds, createdAt, updatedAt, groupId?, order? }   笔记页（v7 新增，全班级共用，不带 classId）；文件夹用 sideGroups kind:'note'（classId 为空串）
 //   settings    { reminderNotify, passPercent, quickPhrases: { homework[], recitation[] } }
 
 (function () {
@@ -25,7 +26,7 @@
     const PHOTO_STORE = 'photos';       // 照片单独存放（key = 照片 id，value = { blob, createdAt }），不进 state 整份存储
     const STATE_KEY = 'main';
 
-    const SCHEMA_VERSION = 6;
+    const SCHEMA_VERSION = 7;
     const APP_ID = 'TeachingPanel';
 
     const DEFAULT_SETTINGS = {
@@ -42,7 +43,7 @@
     };
     const PHRASE_KINDS = Object.keys(DEFAULT_QUICK_PHRASES);
 
-    const COLLECTIONS = ['classes', 'students', 'homework', 'recRounds', 'recChecks', 'recPlans', 'exams', 'remarks', 'sideGroups'];
+    const COLLECTIONS = ['classes', 'students', 'homework', 'recRounds', 'recChecks', 'recPlans', 'exams', 'remarks', 'sideGroups', 'notes'];
 
     let state = emptyState();
     let db = null;
@@ -53,7 +54,7 @@
         return {
             schemaVersion: SCHEMA_VERSION,
             classes: [], students: [],
-            homework: [], recRounds: [], recChecks: [], recPlans: [], exams: [], remarks: [], sideGroups: [],
+            homework: [], recRounds: [], recChecks: [], recPlans: [], exams: [], remarks: [], sideGroups: [], notes: [],
             activeClassId: null,
             settings: defaultSettings()
         };
@@ -137,6 +138,7 @@
         s.homework.forEach((h) => Object.keys(h.records || {}).forEach((sid) => add(h.records[sid] && h.records[sid].photoIds)));
         s.recChecks.forEach((c) => add(c.photoIds));
         s.remarks.forEach((r) => add(r.photoIds));
+        s.notes.forEach((n) => add(n.photoIds));
         return ids;
     }
 
@@ -190,6 +192,7 @@
         }
         // v4 -> v5：新增 remarks（「其他」页的学情记录）。无需转换，normalize() 会把缺失的集合补成空数组
         // v5 -> v6：新增 sideGroups（作业/背诵侧栏分组夹）。无需转换，normalize() 会把缺失的集合补成空数组
+        // v6 -> v7：新增 notes（笔记页，全班级共用）及 sideGroups 的 kind:'note'。无需转换，normalize() 会把缺失的集合补成空数组
         data.schemaVersion = SCHEMA_VERSION;
         return data;
     }
@@ -210,7 +213,12 @@
             s.note = s.note || '';
         });
         out.homework.forEach((h) => { if (!h.records || typeof h.records !== 'object') h.records = {}; });
-        out.sideGroups = out.sideGroups.filter((g) => g.kind === 'hw' || g.kind === 'rec');
+        out.sideGroups = out.sideGroups.filter((g) => g.kind === 'hw' || g.kind === 'rec' || g.kind === 'note');
+        out.notes.forEach((n) => {
+            n.title = String(n.title || '');
+            n.html = String(n.html || '');
+            if (!Array.isArray(n.photoIds)) n.photoIds = [];
+        });
         out.sideGroups.forEach((g) => { g.title = String(g.title || '分组'); g.collapsed = !!g.collapsed; });
         out.exams.forEach((e) => { if (!e.scores || typeof e.scores !== 'object') e.scores = {}; });
 

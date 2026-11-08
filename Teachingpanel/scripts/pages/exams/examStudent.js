@@ -20,6 +20,10 @@
             <div class="card">${summaryHtml(id, {}, ui.mode)}</div>
         `;
         view.querySelectorAll('[data-mode]').forEach((btn) => btn.addEventListener('click', () => { ui.mode = btn.dataset.mode; render(view); }));
+        // 表格里的考试名：跳到考试页该场考试，并让该学生的成绩行闪三秒
+        view.querySelectorAll('[data-jump-exam]').forEach((el) => {
+            el.addEventListener('click', () => { BackJump.mark(id); ExamsPage.jumpTo(el.dataset.jumpExam, id); });
+        });
     }
 
     // mode: 'percent'（得分率，不同满分的考试可比较）| 'raw'（原始分）
@@ -59,7 +63,7 @@
                 <thead><tr><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>名次</th></tr></thead>
                 <tbody>${hist.slice().reverse().map((h) => `<tr>
                     <td>${Utils.formatDate(h.exam.date)}</td>
-                    <td>${esc(h.exam.name)}</td>
+                    <td><button type="button" class="record-jump" data-jump-exam="${h.exam.id}" title="跳到考试页该场考试">${esc(h.exam.name)}</button></td>
                     <td>${h.score == null ? '<span class="hint">缺考</span>' : `<b>${ExamModel.formatScore(h.score)}</b> / ${h.exam.fullScore}`}</td>
                     <td>${Utils.formatNumber(h.avg, 1)}</td>
                     <td>${h.rank ? `${h.rank}/${h.count}` : '-'}</td>

@@ -3,6 +3,26 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.29.0 — 2026-11-08
+
+- 新增：导航页「🗒️ 笔记」（`notes-page`）。schema 6 → 7：新增 `notes[]`（`{id, title, html, photoIds, createdAt, updatedAt, groupId?, order?}`，全班级共用、无 `classId`）；`sideGroups` 新增 `kind:'note'`（`classId` 为空串，`SideGroups.groups` 对 `note` 不按班级过滤）。无需转换，`normalize()` 补空数组；`collectPhotoIds` 加入笔记的 `photoIds`；.db 新增 `notes` 表（`photoIds / groupId / order` 在 `extra`），旧 .db 视为空
+- 新增：`models/notes.js`（`NoteModel`）、`pages/notes/notesPage.js`（目录复用 `UI.sideTreeHtml/bindSideTree`；自动保存 800ms；保存中或有未保存改动时收到的重绘只刷新目录，不动编辑器）、`pages/notes/editor.js`（`contenteditable` + `execCommand`；`sanitize` 白名单清洗，图片只存 `data-photo`）、`styles/notes.css`
+- 新增：`Photos.bindInserter(root, {onPhoto, alive})`（拍照 / 手机拍 / 上传 / 粘贴 / 拖入 → 压缩预览框 → `photoPut` → 回调照片 id）；全局点击放大支持 `.note-editor img[data-photo]`（同篇笔记左右切换、旋转）
+
+## 1.28.10 — 2026-11-08
+
+- 新增：返回按钮右键（`contextmenu`）只关闭按钮、不跳转
+- 新增：`StudentTrend.open` 从非趋势页跳进趋势时调用 `BackJump.mark()`；`BackJump` 记录出发页（`page`）+ 学生 + `scrollY`，返回时 `Navigation.goTo(page)` 并恢复滚动
+
+## 1.28.9 — 2026-11-07
+
+- 新增：考试趋势表格的考试名（`data-jump-exam`）跳到 `ExamsPage.jumpTo`，闪烁排名表里该学生的行
+- 新增：`components/backJump.js`（`BackJump.mark` 记录出发页 + 学生 + `scrollY`，从别的页跳进学生趋势时（`StudentTrend.open`）也记录，左上角固定返回按钮回到原位，点一次后消失；没点则保留，再次跳转时更新，只存内存，刷新后消失）；`StudentTrend.setCurrent`
+
+## 1.28.8 — 2026-11-07
+
+- 新增：作业趋势时间轴块（`data-locate-hw`）在本页定位问题记录；问题记录的作业名（`data-jump-hw`）、背诵趋势的任务名（`data-jump-rec`）可点击，日期不跳；`HomeworkPage.jumpTo` / `RecitationPage.jumpTo` 切到对应项目并让该学生卡片 `.flash-student` 闪 3 秒
+
 ## 1.28.7 — 2026-11-05
 
 - 变更：检查历史每个 `.check-timeline` 顶部加 `li.check-timeline-title` 显示任务名，`.check-item-head` 里去掉 `.check-item-round`（竖线起点下移到标题下面）

@@ -9,7 +9,7 @@
 老师用来登记、追踪学生的**作业完成情况、背诵过关情况、考试成绩**。数据全部保存在浏览器 IndexedDB，
 导入导出（以及 OneDrive 单向快照备份）用 **SQLite 数据库文件（.db）**，全量、按表存放。
 
-五个主页面（`index.html` 里 `.page` + `.active` 切换显隐，不是路由）：
+六个主页面（`index.html` 里 `.page` + `.active` 切换显隐，不是路由）：
 
 | 页面 | 容器 id | 模块 | 子视图 |
 |---|---|---|---|
@@ -18,6 +18,7 @@
 | 背诵 | `recitation-page` | `RecitationPage` | 检查 / 计划背诵 / 时间看板 / 总览 / 学生趋势 |
 | 考试 | `exams-page` | `ExamsPage` | 考试（列表+详情） / 学生趋势 |
 | 学生趋势 | `trend-page` | `TrendPage` | 1.24.0 起导航栏「📈 学生趋势」（原「🗂️ 其它」）：顶部固定的 `.trend-picker`（四块定位按钮 + 全班学生小块，`position: sticky`），下面作业 / 背诵 / 考试 / 其他情况四块从上到下连成一页（`.trend-sec`），点按钮 `scrollIntoView` 定位、滚动时高亮跟随（scroll-spy）；四块共用一个选中学生，选学生后整页重绘并保持滚动位置。作业 / 背诵 / 考试页不再有「📈 学生趋势」子标签 |
+| 笔记 | `notes-page` | `NotesPage` | 1.29.0 起导航栏最右「🗒️ 笔记」：左目录（笔记 + 文件夹，复用 `SideGroups` kind `note`，全班级共用）+ 搜索，右富文本编辑器（见 3.6） |
 
 另有跨页面的**学生趋势跳转**（`StudentTrend`）：任何带 `data-profile-id` 的元素（学生姓名）被点击，都会跳到导航页「📈 学生趋势」并定位到对应那块（当前在作业/背诵/考试页就定位到该类，其他地方沿用上次看的那类，`localStorage` 记 kind）。顶部固定区高度写入 `--nav-h` / `--picker-h`，章节的 `scroll-margin-top` 和「其他情况」右栏吸顶都用它。
 三类趋势页顶部共用 `StudentTrend.pickerHtml()`：作业/背诵/考试趋势快速切换 + 全班「学号 姓名」小块选择器，选中的学生在三类之间共享。
@@ -50,7 +51,7 @@ index.html
 
 ```js
 state = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   classes:   [{ id, name }],
   activeClassId,
   students:  [{ id, classId, name, studentNo, note }],    // 姓名在同一班级内唯一（addStudent/updateStudent/bulkAdd 校验）
@@ -62,6 +63,7 @@ state = {
   exams:     [{ id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }],
   sideGroups: [{ id, classId, kind: 'hw'|'rec', title, collapsed, order?, createdAt }],   // 作业/背诵侧栏的分组夹（v6 新增）；作业/轮次上可选 groupId、order
   remarks:   [{ id, studentId, date, text, createdAt }],   // 「学生趋势 → 其他情况」的学情记录（v5 新增；photoIds? 见 3.5）
+  notes:     [{ id, title, html, photoIds, createdAt, updatedAt, groupId?, order? }],   // 笔记页（v7 新增），全班级共用，无 classId；文件夹是 sideGroups kind 'note'（classId 为空串）
   settings:  { reminderNotify: false, passPercent: 60,
                quickPhrases: { homework: [], recitation: ['复习体系混乱', '复习体系有条理', '书写有一定问题', '格式需要改善'] } }
 }
@@ -76,7 +78,7 @@ state = {
 - `settings.quickPhrases`：comment 快捷词，作业/背诵两套独立。`normalize()` 对它做深合并——缺哪一组补默认值、过滤空串/重复项，所以旧数据和旧备份导入后也一定有这个字段（因此加它不需要升 schema）。
 - **schema 历史**：v1（1.0.0）带 `subjects` 列表和各记录的 `subjectId`；v2（1.1.0）`migrate()` 把它们删掉；
   v3（1.2.0）新增 `recPlans`（无需转换，`normalize()` 补空数组）；v4（1.9.0）把检查记录上的 `nextDates` 转成 `recPlans`
-  （计划 `createdAt` = 原检查记录的 `createdAt`，同一学生同一轮同一天不重复）并删除 `nextDates`；v5（1.13.0）新增 `remarks`（无需转换，`normalize()` 补空数组）。删除学生/轮次/班级都会级联删除计划。v6（1.27.0）新增 `sideGroups`（无需转换，`normalize()` 补空数组；删除班级级联删除其分组夹）。
+  （计划 `createdAt` = 原检查记录的 `createdAt`，同一学生同一轮同一天不重复）并删除 `nextDates`；v5（1.13.0）新增 `remarks`（无需转换，`normalize()` 补空数组）。删除学生/轮次/班级都会级联删除计划。v6（1.27.0）新增 `sideGroups`（无需转换，`normalize()` 补空数组；删除班级级联删除其分组夹）；v7（1.29.0）新增 `notes` 与 `sideGroups` 的 `kind:'note'`（无需转换，`normalize()` 补空数组）。
 - **迁移**：`load()` 和 `replaceState()`（本地导入、云端恢复共用）都走 `normalize()` → `migrate()`。
   以后改结构：递增 `SCHEMA_VERSION`，在 `migrate()` 里按版本逐级升级，并同步改 `validateSnapshot()`，
   然后**实际跑一遍"导出 → 导入"**确认旧备份仍能导入。
@@ -161,6 +163,14 @@ state = {
 - 弹窗用 `Photos.editorHtml()` + `Photos.bindEditor(body, 已有ids)`；保存时先 `await editor.finalize()` 拿到最终 `photoIds` 再提交记录。展示用 `Photos.viewHtml(ids)`（`<img data-photo>` 由全局 MutationObserver 补 src，点击放大）。
 - 无人引用的照片由 `AppState.gcPhotos()` 在每次 `_commit` 后清理（存了不满 1 分钟的不动）。导入 .db = 整体替换，照片也以导入文件为准。
 
+### 3.6 笔记（`models/notes.js` + `pages/notes/`）
+
+- `notes[]`：`html` 是编辑器产出的**白名单 HTML**（`NoteEditor.sanitize`：b/strong/i/em/u/s/strike/del/span/div/p/br/ul/ol/li/blockquote/hr/h1-3/img，style 只留颜色 / 背景 / 字号关键字 / 粗斜体 / 下划线 / 对齐）；保存、粘贴、载入都过一遍。图片只存 `data-photo`（照片 id），没有 src（src 是 object URL，由 `photos.js` 的 MutationObserver 按 id 补）。`photoIds` 保存时从 DOM 收集，`collectPhotoIds` 靠它判断照片是否还被引用（删笔记 / 删图后照片由 gc 清理）。
+- **全班级共用**（用户要求）：笔记没有 `classId`；文件夹复用 `SideGroups`，`kind:'note'`、`classId` 为空串，`SideGroups.groups('note')` 不按班级过滤。目录布局、拖动、折叠与作业 / 背诵侧栏完全同一套（`UI.sideTreeHtml/bindSideTree`）；没手动排过的笔记按 `updatedAt` 新→旧。搜索时显示扁平的命中列表。
+- **自动保存与重绘（重要）**：`AppState._commit` 会让 app.js 重绘当前页，会毁掉正在编辑的 `contenteditable`。`NotesPage.render(false)` 在「保存中（`saving`）或有未保存改动（`dirty`）」时只重绘目录（`renderList`，目录整块替换所以可重绑监听），编辑器原地不动；主动切换 / 新建 / 删除才整页重建（`render(true)`）。保存防抖 800ms；切换笔记、离开本页（`Navigation.onPageChange`）、`pagehide` / 页面隐藏前都会 `saveNow()`。**不要**改成每次输入直接整页重绘。
+- 编辑器用 `contenteditable` + `document.execCommand`（已弃用但所有浏览器仍可用，换来零依赖）；`styleWithCSS` 打开，颜色 / 背景会直接加在已有的 b / i / u 上，所以 sanitize 对除 br / hr 外的标签都保留受限 style。工具栏按钮 `mousedown` 里 `preventDefault` 保住选区；颜色 / 字号浮层打开时先 `remember()` 选区，应用前 `restore()`。待办清单 = `<ul class="todo"><li data-todo="0|1">`，勾选框是 CSS 画的，点 li 左侧 26px 内切换。
+- 插图：`Photos.bindInserter` 取照片（选择 / 拍照 / 手机拍 / 粘贴 / 拖入）→ 压缩预览框（`chooseLevel`，可裁剪翻转）→ `photoPut` → `onPhoto(id)` 把 `<img data-photo>` 插到记住的光标处（没有就接在末尾）。点图片放大走 `photos.js` 里针对 `.note-editor img[data-photo]` 的全局点击（同篇笔记左右切换，旋转写回照片）。
+
 ### 3.3 考试（`models/exams.js`）
 
 - TXT 格式：每行 `姓名 成绩`；分隔符兼容半角/全角空格、Tab、逗号；姓名可含空格以外字符，成绩取最后一段。
@@ -193,6 +203,7 @@ styles/charts.css                  SVG 图表
 styles/trend.css                   学生趋势选择器（类型切换 + 学生小块）、其他情况记录列表
 styles/quickPhrases.css            快捷词按钮条与编辑卡片
 styles/photos.css                  照片编辑块、缩略图、放大
+styles/notes.css                   笔记页：目录搜索框、编辑卡片、工具栏、正文 / 待办样式
 styles/dayPicker.css               日期块选择器
 styles/onedrive.css / update.css   云备份面板 / 更新弹窗
 styles/responsive.css              所有断点（1000px 单栏、720px 移动端）
@@ -204,6 +215,7 @@ scripts/models/homework.js         HomeworkModel
 scripts/models/recitation.js       RecitationModel
 scripts/models/exams.js            ExamModel
 scripts/models/remarks.js          RemarkModel（学生趋势「其他情况」的学情记录）
+scripts/models/notes.js            NoteModel（笔记：增删改、目录布局、搜索）
 scripts/components/photos.js       Photos：拍照/上传编辑块、缩略图、点击放大
 scripts/components/phoneLink.js    PhoneLink：电脑端「📱 手机拍」二维码面板 + PeerJS 接收
 scripts/phoneConfig.js             手机拍照回传的共用配置（配对码键、ICE 服务器）
@@ -218,6 +230,7 @@ scripts/components/weekPicker.js   WeekPicker：月历选日期（可翻月，�
 scripts/components/svgChart.js     SvgChart.line / bars（手写 SVG）
 scripts/components/classSwitcher.js 班级切换器（导航栏常驻）
 scripts/components/studentTrend.js  学生趋势共享：选中学生、小块选择器、类型切换（全局 data-profile-id 委托）
+scripts/components/backJump.js      从学生趋势跳到作业/背诵/考试后，左上角「返回」按钮（记住学生和滚动位置）
 scripts/navigation.js              页面切换
 scripts/reminders.js               背诵计划角标 / 每日一次提醒 / 系统通知
 scripts/updateChecker.js           部署指纹判重 + 更新弹窗
@@ -235,6 +248,7 @@ scripts/pages/roster.js            学生名单卡片
 scripts/pages/homework/*.js        statusPicker（状态弹窗/作业表单/markFixed）/ homeworkPage（外壳+登记）/ matrix（总览+欠交）/ student
 scripts/pages/recitation/*.js      checkDialog（检查弹窗/轮次表单）/ recitationPage（外壳+检查）/ planView（计划背诵子标签）/ overview（时间看板+总览）/ student
 scripts/pages/exams/*.js           examDialogs / examsPage / examStudent
+scripts/pages/notes/*.js           editor（富文本编辑器 + sanitize）/ notesPage（目录 + 自动保存）
 scripts/pages/trend/*.js           trendPage（导航页「📈 学生趋势」：固定选择器 + 四块流式排列）/ otherRecords（其他情况）
 scripts/app.js                     启动入口（最后加载）
 ```
@@ -312,6 +326,7 @@ scripts/app.js                     启动入口（最后加载）
   exams(id, class_id, name, date, full_score, created_at, extra)
   remarks(id, student_id, date, text, created_at, extra)   1.13.0 新增；旧 .db 没有这张表，导入时视为空
   side_groups(id, class_id, kind, title, collapsed, sort_order, created_at, extra)   1.27.0 新增；旧 .db 没有这张表，导入时视为空（条目上的 groupId / order 在各自表的 extra 里）
+  notes(id, title, html, created_at, updated_at, extra)    1.29.0 新增；笔记（photoIds / groupId / order 在 extra），旧 .db 没有这张表，导入时视为空
   photos(id, mime, data BLOB, created_at)                  1.14.0 新增；照片本体（记录的 photoIds 指向这里），旧 .db 没有则视为无照片
   exam_scores(exam_id, student_id, score)
   ```

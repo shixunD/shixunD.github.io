@@ -853,5 +853,66 @@
         };
     }
 
-    window.Photos = { editorHtml, bindEditor, viewHtml, LEVELS, levelOptions, getLevel, setLevel, getCustomQuality, setCustomQuality };
+    // ---------- 笔记编辑器用：逐张取照片 → 压缩预览 → 存进照片库 → 回调照片 id ----------
+    // root 里需有 [data-ins-camera] / [data-ins-phone](仅电脑) / [data-ins-upload] 按钮，上传用 root 里的 <input type=file data-ins-input> 与 camera 用的 data-ins-input-cam。
+    // opts.onPhoto(id)：照片已存好（photoPut），调用方把 <img data-photo=id> 插进内容；opts.alive()：返回 false（页面已切走）就放弃这张。
+    // 返回 { addFiles }，粘贴 / 拖入的图片文件也走它，所以同样会弹出压缩预览框（可裁剪、翻转、选档位）。
+    function bindInserter(root, opts) {
+        const alive = opts.alive || (() => true);
+        async function addFiles(files, { quiet = false } = {}) {
+            let added = 0;
+            for (const file of Array.from(files)) {
+                try {
+                    const probe = await decode(file);
+                    if (probe.close) probe.close();
+                    added++;
+                    enqueueChoose(async () => {
+                        if (!alive()) return;
+                        const blob = await chooseLevel(file);
+                        if (!blob) return;
+                        const id = Utils.uid('ph');
+                        await AppState.photoPut(id, blob);
+                        if (alive()) opts.onPhoto(id);
+                    });
+                } catch (err) {
+                    if (!quiet) Toast.error(err.message);
+                }
+            }
+            return added;
+        }
+        const camInput = root.querySelector('[data-ins-input-cam]');
+        const upInput = root.querySelector('[data-ins-input]');
+        const camBtn = root.querySelector('[data-ins-camera]');
+        if (camBtn) camBtn.addEventListener('click', async () => {
+            if (isTouchDevice() || !hasLiveCamera()) { camInput.click(); return; }
+            try {
+                await openCamera(async (blob) => { await addFiles([blob]); });
+            } catch (err) {
+                Toast.warning(`无法打开摄像头（${err.message}），请选择图片文件`);
+                camInput.click();
+            }
+        });
+        const phoneBtn = root.querySelector('[data-ins-phone]');
+        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob) => {
+            if (!(await addFiles([blob], { quiet: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+        }));
+        const upBtn = root.querySelector('[data-ins-upload]');
+        if (upBtn) upBtn.addEventListener('click', () => upInput.click());
+        [camInput, upInput].forEach((input) => input && input.addEventListener('change', async () => {
+            await addFiles(input.files);
+            input.value = '';
+        }));
+        return { addFiles };
+    }
+
+    // 笔记里的图片点击放大：同一篇笔记里已加载好的图片可左右切换，可旋转（写回照片本身）
+    document.addEventListener('click', (e) => {
+        const img = e.target.closest('.note-editor img[data-photo]');
+        if (!img || !img.src) return;
+        const box = img.closest('.note-editor');
+        const imgs = Array.from(box.querySelectorAll('img[data-photo]')).filter((im) => im.src);
+        openLightbox(imgs.map(lightboxItem), Math.max(0, imgs.indexOf(img)));
+    });
+
+    window.Photos = { editorHtml, bindEditor, bindInserter, viewHtml, LEVELS, levelOptions, getLevel, setLevel, getCustomQuality, setCustomQuality };
 })();

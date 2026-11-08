@@ -41,6 +41,30 @@
         if (ui.tab === 'register') renderRegister(view);
         else if (ui.tab === 'matrix') HomeworkMatrix.renderMatrix(view);
         else HomeworkMatrix.renderPending(view);
+        flashPending(view);
+    }
+
+    // 从学生趋势跳过来：定位到该学生的卡片并闪三秒（只闪一次，之后清掉）
+    function flashPending(view) {
+        const sid = ui.flashSid;
+        if (!sid) return;
+        ui.flashSid = null;
+        const card = Array.from(view.querySelectorAll('.stu-card')).find((c) => c.dataset.sid === sid);
+        const side = view.querySelector('.side-item.active');
+        if (side) side.scrollIntoView({ block: 'nearest' });
+        if (!card) return;
+        card.scrollIntoView({ block: 'center' });
+        card.classList.add('flash-student');
+        setTimeout(() => card.classList.remove('flash-student'), 3000);
+    }
+
+    // 学生趋势 -> 作业页：打开某项作业的登记视图，并闪烁某个学生
+    function jumpTo(homeworkId, studentId) {
+        ui.tab = 'register';
+        Utils.lsSet(LS_TAB, 'register');
+        ui.selectedId = homeworkId;
+        ui.flashSid = studentId;
+        Navigation.goTo('homework');
     }
 
     function openTab(key, opts) {
@@ -178,5 +202,5 @@
         });
     }
 
-    window.HomeworkPage = { render, openTab, ui };
+    window.HomeworkPage = { render, openTab, jumpTo, ui };
 })();
