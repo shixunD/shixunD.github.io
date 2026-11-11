@@ -85,6 +85,8 @@
 /* 作业与背诵的分隔（汇总表、逐项明细共用）：表头不画线，背诵列的表头用深一号的绿色成组；表身一条连续的细实线。
    不用虚线：边框是按单元格画的，虚线每行重新起头，看起来忽长忽短 */
 .rp-table th.rp-rec-th { background: #166b30; }
+.rp-key-label.rp-key-rec { color: #166b30; }
+.rp-reclist .rp-key-item b { background: #166b30; }   /* 背诵用深一号绿，与表头背诵列一致 */
 .rp-table td.rp-sep { border-left: 1px solid #cfdad5; }
 .rp-detail td.rp-sep { padding-left: 8px; }
 .rp-two { display: flex; gap: 12px; align-items: flex-start; }

@@ -154,9 +154,9 @@
         if (rp.n) {
             hwCards.push({ tag: '作业', label: '全班总分', v: signed(s.total) });
             hwCards.push({ tag: '作业', label: '人均得分', v: signed(s.avg) });
+            hwCards.push({ tag: '作业', label: '正分 / 0 / 负分', v: `${s.pos} / ${s.zero} / ${s.neg}` });
             hwCards.push({ tag: '作业', label: `全部按时完成 ${signed(rp.rules.bonusAll)}`, v: s.full, unit: '人' });
             if (rp.n >= 2) hwCards.push({ tag: '作业', label: `部分按时完成 ${signed(rp.rules.bonusOneOff)}`, v: s.oneOff, unit: '人' });
-            hwCards.push({ tag: '作业', label: '正分 / 0 / 负分', v: `${s.pos} / ${s.zero} / ${s.neg}` });
         }
         // 背诵卡片：「背诵 任务名」一行放得下就一行；放不下时任务名换到第二行，再放不下用 … 截断（见 .rp-card-l 的 flex-wrap）
         s.rec.forEach((x) => recCards.push({ tag: '背诵', label: x.round.title, sub: true, v: x.pass, unit: `人过关 · ${Utils.percent(x.pass, s.students)}` }));
@@ -199,7 +199,7 @@
                     ${h(rp.n ? '逐项明细' : '背诵卡片颜色')}
                     <div class="rp-key">
                         ${rp.n ? `<div class="rp-key-label">作业</div><div class="rp-key-items rp-hwlist">${rp.hws.map((hw, i) => `<span class="rp-key-item"><b>${i + 1}</b><span>${esc(hw.title)}</span><small>${esc(Utils.formatDate(hw.date))}</small></span>`).join('')}</div>` : ''}
-                        ${rp.rounds.length ? `<div class="rp-key-label">背诵</div><div class="rp-key-items rp-reclist">${rp.rounds.map((r, i) => `<span class="rp-key-item"><b>${i + 1}</b><span>${esc(r.title)}</span></span>`).join('')}</div>` : ''}
+                        ${rp.rounds.length ? `<div class="rp-key-label rp-key-rec">背诵</div><div class="rp-key-items rp-reclist">${rp.rounds.map((r, i) => `<span class="rp-key-item"><b>${i + 1}</b><span>${esc(r.title)}</span></span>`).join('')}</div>` : ''}
                     </div>
                     ${detail}
                     ${hwLegend ? `<div class="rp-rules rp-rules-after rp-legend"><b>作业卡片颜色：</b>${hwLegend}</div>` : ''}
