@@ -3,6 +3,18 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.30.1 — 2026-11-12
+
+- 调整：导出统计报表（预览 / PDF 打印共用 `ReportOutput.html`）的图例改为「作业卡片颜色：…」「背诵卡片颜色：…」两行，放在逐项明细表下方；背诵图例去掉「（过关）/（不过关）」后缀；`.rp-legend` 打印时 `flex-wrap: nowrap` + 11px，保证 7 项一行放下；明细上方「背诵」任务列表的编号去掉「背」字，按 1、2、3 排（明细表表头仍是 背1、背2）；作业图例和逐项明细表的色块都去掉里面的 ✕ △ 补 改 符号，只留纯色；表头「作业最终得分」改名「作业得分」；「仍未补交 / 未补改」改为按作业归类（每项作业一行，后面列出学生，前面小圆点表示状态），PDF / Markdown / Excel 一致（`unfixedByHw`）
+
+## 1.30.0 — 2026-11-11
+
+- 新增：主页「📤 导出统计」卡片（`ExportReport.cardHtml`，在 comment 快捷词上面）+ 导出弹窗（作业 / 背诵任务按侧栏布局的复选树，分组夹复选框三态；实时预览；上次勾选记 localStorage `teachingPanel.export.<班级 id>`）
+- 新增：`models/scoreReport.js`（`ScoreReport.build({hwIds, roundIds, sort, title})`：N = 勾选作业总数；全绿 +`bonusAll`，N ≥ 2 且 N−1 项绿 +`bonusOneOff`；按状态扣 `penalty[status]`；背诵按检查页卡片底色判，与 `recitationPage.studentCard` 的 `planIsLast` 同一规则）。规则存 `settings.scoreRules`，读取时与默认值合并，**不升 schema**（.db 的 settings 表按 key 存 JSON，自动带上）
+- 新增：`reportOutput.js`（Markdown / 预览与打印共用的 HTML / Excel）；PDF 走 `window.print()`（`#tp-print-root` + `@media print`），不引入 PDF 库（中文字体太大）
+- 新增：`xlsxLite.js`（零依赖 .xlsx 生成器：手写 stored ZIP + CRC32、样式表、inlineStr 富文本、冻结窗格、合并单元格）
+- 新增：`styles/exportReport.css`；设置卡片新增「导出统计：加减分规则」行（`ExportReport.openRules`）
+
 ## 1.29.0 — 2026-11-08
 
 - 新增：导航页「🗒️ 笔记」（`notes-page`）。schema 6 → 7：新增 `notes[]`（`{id, title, html, photoIds, createdAt, updatedAt, groupId?, order?}`，全班级共用、无 `classId`）；`sideGroups` 新增 `kind:'note'`（`classId` 为空串，`SideGroups.groups` 对 `note` 不按班级过滤）。无需转换，`normalize()` 补空数组；`collectPhotoIds` 加入笔记的 `photoIds`；.db 新增 `notes` 表（`photoIds / groupId / order` 在 `extra`），旧 .db 视为空

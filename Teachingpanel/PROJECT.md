@@ -13,7 +13,7 @@
 
 | 页面 | 容器 id | 模块 | 子视图 |
 |---|---|---|---|
-| 主页 | `home-page` | `SettingsPage` + `RosterSection` | 今日概览、学生名单、comment 快捷词、数据、设置、应用信息 |
+| 主页 | `home-page` | `SettingsPage` + `RosterSection` | 今日概览、学生名单、导出统计、comment 快捷词、数据、设置、应用信息 |
 | 作业 | `homework-page` | `HomeworkPage` | 登记 / 总览矩阵 / 欠交清单 / 学生趋势 |
 | 背诵 | `recitation-page` | `RecitationPage` | 检查 / 计划背诵 / 时间看板 / 总览 / 学生趋势 |
 | 考试 | `exams-page` | `ExamsPage` | 考试（列表+详情） / 学生趋势 |
@@ -64,7 +64,7 @@ state = {
   sideGroups: [{ id, classId, kind: 'hw'|'rec', title, collapsed, order?, createdAt }],   // 作业/背诵侧栏的分组夹（v6 新增）；作业/轮次上可选 groupId、order
   remarks:   [{ id, studentId, date, text, createdAt }],   // 「学生趋势 → 其他情况」的学情记录（v5 新增；photoIds? 见 3.5）
   notes:     [{ id, title, html, photoIds, createdAt, updatedAt, groupId?, order? }],   // 笔记页（v7 新增），全班级共用，无 classId；文件夹是 sideGroups kind 'note'（classId 为空串）
-  settings:  { reminderNotify: false, passPercent: 60,
+  settings:  { reminderNotify: false, passPercent: 60, scoreRules?（导出统计的加减分规则，见 3.7；缺省 = 默认值）,
                quickPhrases: { homework: [], recitation: ['复习体系混乱', '复习体系有条理', '书写有一定问题', '格式需要改善'] } }
 }
 ```
@@ -171,6 +171,15 @@ state = {
 - 编辑器用 `contenteditable` + `document.execCommand`（已弃用但所有浏览器仍可用，换来零依赖）；`styleWithCSS` 打开，颜色 / 背景会直接加在已有的 b / i / u 上，所以 sanitize 对除 br / hr 外的标签都保留受限 style。工具栏按钮 `mousedown` 里 `preventDefault` 保住选区；颜色 / 字号浮层打开时先 `remember()` 选区，应用前 `restore()`。待办清单 = `<ul class="todo"><li data-todo="0|1">`，勾选框是 CSS 画的，点 li 左侧 26px 内切换。
 - 插图：`Photos.bindInserter` 取照片（选择 / 拍照 / 手机拍 / 粘贴 / 拖入）→ 压缩预览框（`chooseLevel`，可裁剪翻转）→ `photoPut` → `onPhoto(id)` 把 `<img data-photo>` 插到记住的光标处（没有就接在末尾）。点图片放大走 `photos.js` 里针对 `.note-editor img[data-photo]` 的全局点击（同篇笔记左右切换，旋转写回照片）。
 
+### 3.7 导出统计（`models/scoreReport.js` + `reportOutput.js` + `pages/exportReport.js`）
+
+- 只读统计，不改业务数据。`ScoreReport.build({hwIds, roundIds, sort, title})` → 报表对象（rows / summary / unfixed / recFails），三种输出都吃这一个对象。
+- **作业**：一次导出 = 一个统计周期，N = 勾选的作业总数（跨分组夹也合在一起算，用户明确要求）。全部绿 +`bonusAll`(2)；N ≥ 2 且恰好 N−1 项绿 +`bonusOneOff`(1)；N = 1 时只有「全绿加分 / 0」两档。扣分 = Σ 各状态数量 × `penalty[status]`（默认粉 0.5、红 1、两种蓝 0）；蓝色不算绿。
+- **背诵**：每个任务一列，判定 = 检查页卡片底色（`recOf` 与 `recitationPage.studentCard` 的 `planIsLast` 规则必须保持一致）：最新结果是 excel / pass /（`condPass` 时）cond，且（`planBlocks` 时）最后一天不是「只有未完成的计划」→ ✓。
+- **规则**存 `settings.scoreRules = { bonusAll, bonusOneOff, penalty: {poor, missing, poor_fixed, missing_fixed}, condPass, planBlocks }`，`ScoreReport.getRules()` 读取时与 `DEFAULT_RULES` 合并，所以**不需要升 schema**；在「⚙️ 设置」里的弹窗（`ExportReport.openRules`）修改。
+- **PDF** = `ReportOutput.print()`：把报表渲染进 `body > #tp-print-root`，`@media print` 只显示它，`document.title` 临时改成文件名，`afterprint` 清理。不用 PDF 库：内嵌中文字体要几 MB。**Excel** = `XlsxLite.build()`（手写 stored ZIP，零依赖；数字用 `+General;-General;0` 格式显示正负号）。**Markdown** 符号：✅ 🩵 💙 🩷 🔴（Unicode 没有粉色圆形 emoji）。
+- 中途转入的学生在转入前的作业上默认算绿色（records 里没有记录 = done），目前不处理。
+
 ### 3.3 考试（`models/exams.js`）
 
 - TXT 格式：每行 `姓名 成绩`；分隔符兼容半角/全角空格、Tab、逗号；姓名可含空格以外字符，成绩取最后一段。
@@ -202,6 +211,7 @@ styles/recitation.css              计划日期 chips、计划背诵子标签、
 styles/charts.css                  SVG 图表
 styles/trend.css                   学生趋势选择器（类型切换 + 学生小块）、其他情况记录列表
 styles/quickPhrases.css            快捷词按钮条与编辑卡片
+styles/exportReport.css            导出统计：选择弹窗、报表本体（预览/打印共用）、@media print
 styles/photos.css                  照片编辑块、缩略图、放大
 styles/notes.css                   笔记页：目录搜索框、编辑卡片、工具栏、正文 / 待办样式
 styles/dayPicker.css               日期块选择器
@@ -216,6 +226,10 @@ scripts/models/recitation.js       RecitationModel
 scripts/models/exams.js            ExamModel
 scripts/models/remarks.js          RemarkModel（学生趋势「其他情况」的学情记录）
 scripts/models/notes.js            NoteModel（笔记：增删改、目录布局、搜索）
+scripts/models/scoreReport.js      ScoreReport（导出统计：加减分规则、作业计分、背诵过关判定）
+scripts/xlsxLite.js                XlsxLite：零依赖 .xlsx 生成器（只写）
+scripts/reportOutput.js            ReportOutput：报表 → Markdown / HTML（预览+打印成 PDF）/ Excel
+scripts/pages/exportReport.js      主页「📤 导出统计」卡片、导出弹窗、加减分规则弹窗
 scripts/components/photos.js       Photos：拍照/上传编辑块、缩略图、点击放大
 scripts/components/phoneLink.js    PhoneLink：电脑端「📱 手机拍」二维码面板 + PeerJS 接收
 scripts/phoneConfig.js             手机拍照回传的共用配置（配对码键、ICE 服务器）

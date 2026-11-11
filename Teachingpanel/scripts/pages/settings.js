@@ -1,4 +1,4 @@
-// settings.js —— 主页（设置页）：今日概览、学生名单（RosterSection）、comment 快捷词（QuickPhrases）、数据导入导出与云备份、应用设置
+// settings.js —— 主页（设置页）：今日概览、学生名单（RosterSection）、导出统计（ExportReport）、comment 快捷词（QuickPhrases）、数据导入导出与云备份、应用设置
 // 全局命名空间：window.SettingsPage
 
 (function () {
@@ -44,6 +44,7 @@
                     ${RosterSection.rosterHtml()}
                 </div>
                 <div class="home-side">
+                    ${ExportReport.cardHtml()}
                     ${QuickPhrases.cardHtml()}
                     ${CameraPicker.cardHtml()}
 
@@ -81,6 +82,7 @@
                             <div><div>考试及格线</div><div class="hint">占满分的百分比</div></div>
                             <div class="inline-input"><input type="number" min="1" max="100" value="${settings.passPercent}" data-pass-percent> %</div>
                         </div>
+                        ${ExportReport.settingRowHtml()}
                     </div>
 
                     <div class="card">
@@ -102,6 +104,7 @@
 
     function bind(el) {
         RosterSection.bind(el);
+        ExportReport.bindCard(el);
         QuickPhrases.bindCard(el);
         CameraPicker.bindCard(el);
         const q = (sel) => el.querySelector(sel);

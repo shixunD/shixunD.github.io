@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/remind-version-bump.js", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}
