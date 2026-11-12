@@ -44,7 +44,7 @@
             <div class="stat-row">
                 ${UI.statTile('参加考试', `${taken.length}/${hist.length}`)}
                 ${UI.statTile('平均得分率', avgPct == null ? '-' : `${Math.round(avgPct * 100)}%`)}
-                ${UI.statTile('平均名次', avgRank == null ? '-' : Utils.formatNumber(avgRank, 1))}
+                ${UI.statTile('平均班级排名', avgRank == null ? '-' : Utils.formatNumber(avgRank, 1))}
                 ${UI.statTile('较上次', trend == null ? '-' : `${trend >= 0 ? '↑' : '↓'} ${Utils.formatNumber(Math.abs(trend), 1)}%`, '得分率变化', trend == null ? null : trend >= 0 ? '#1e8e3e' : '#d93025')}
             </div>
             <div class="exam-trend-split">
@@ -60,13 +60,14 @@
                 yFormat: (v) => pct ? `${Math.round(v)}%` : Utils.formatNumber(v, 0)
             })}
             <table class="simple-table">
-                <thead><tr><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>名次</th></tr></thead>
+                <thead><tr><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>班级排名</th><th>年级排名</th></tr></thead>
                 <tbody>${hist.slice().reverse().map((h) => `<tr>
                     <td>${Utils.formatDate(h.exam.date)}</td>
                     <td><button type="button" class="record-jump" data-jump-exam="${h.exam.id}" title="跳到考试页该场考试">${esc(h.exam.name)}</button></td>
                     <td>${h.score == null ? '<span class="hint">缺考</span>' : `<b>${ExamModel.formatScore(h.score)}</b> / ${h.exam.fullScore}`}</td>
                     <td>${Utils.formatNumber(h.avg, 1)}</td>
                     <td>${h.rank ? `${h.rank}/${h.count}` : '-'}</td>
+                    <td>${h.score == null ? '-' : (h.gradeRank || 'NA')}</td>
                 </tr>`).join('')}</tbody>
             </table>
             </div>`;

@@ -108,9 +108,9 @@
             title: `导入成绩 · ${exam.name}`,
             wide: true,
             html: `
-                <div class="hint">每行「姓名 成绩」，用空格分隔，例如：<code>杨迪 101</code>。可直接粘贴，或选择 .txt 文件。</div>
+                <div class="hint">每行「姓名 成绩 班级排名 年级排名」，用空格分隔，例如：<code>杨迪 101 3 25</code>。<b>姓名、成绩、班级排名必填</b>；年级排名可不写（或写 <code>NA</code>），就显示 NA。可直接粘贴，或选择 .txt 文件。</div>
                 <input type="file" accept=".txt,text/plain" data-file>
-                <textarea rows="8" data-text placeholder="杨迪 101&#10;罗门 103"></textarea>
+                <textarea rows="8" data-text placeholder="杨迪 101 3 25&#10;罗门 103 1 NA"></textarea>
                 <div data-preview></div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
@@ -127,8 +127,9 @@
                     body.querySelector('[data-preview]').innerHTML = textarea.value.trim() ? `
                         <div class="import-preview">
                             <div class="ok">✔ 匹配成功 <b>${parsed.matched.length}</b> 人${overwrite ? `（其中 ${overwrite} 人会覆盖已有成绩）` : ''}</div>
+                            ${parsed.matched.some((m) => m.grade == null) && parsed.matched.length ? `<div class="warn">其中 ${parsed.matched.filter((m) => m.grade == null).length} 人没有年级排名（显示 NA）</div>` : ''}
                             ${parsed.unknown.length ? `<div class="bad">✘ 名单中找不到 ${parsed.unknown.length} 人（将跳过）：${parsed.unknown.map((u) => esc(u.name)).join('、')}</div>` : ''}
-                            ${parsed.invalid.length ? `<div class="bad">✘ 无法识别 ${parsed.invalid.length} 行（将跳过）：${parsed.invalid.map((l) => `「${esc(l)}」`).join(' ')}</div>` : ''}
+                            ${parsed.invalid.length ? `<div class="bad">✘ 无法识别 ${parsed.invalid.length} 行（缺少班级排名或格式不对，将跳过）：${parsed.invalid.map((l) => `「${esc(l)}」`).join(' ')}</div>` : ''}
                             ${parsed.duplicates.length ? `<div class="warn">⚠ 重复出现（以最后一行为准）：${parsed.duplicates.map(esc).join('、')}</div>` : ''}
                             ${missing.length && parsed.matched.length ? `<div class="warn">本次文件未包含 ${missing.length} 人：${missing.map((s) => esc(s.name)).join('、')}</div>` : ''}
                         </div>` : '';
@@ -144,9 +145,13 @@
                 });
                 applyBtn.addEventListener('click', async () => {
                     const scores = {};
-                    parsed.matched.forEach((m) => { scores[m.student.id] = m.score; });
+                    const ranks = {};
+                    parsed.matched.forEach((m) => {
+                        scores[m.student.id] = m.score;
+                        ranks[m.student.id] = { cls: m.cls, grade: m.grade };
+                    });
                     close();
-                    await ExamModel.setScores(examId, scores);
+                    await ExamModel.setScores(examId, scores, ranks);
                     Toast.success(`已导入 ${parsed.matched.length} 人的成绩`);
                 });
                 textarea.focus();

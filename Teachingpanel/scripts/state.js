@@ -11,7 +11,7 @@
 //   recRounds[] { id, classId, title, content, createdAt, archived, order? }   order：手动拖动排序后才有（可选，无需迁移）
 //   recChecks[] { id, roundId, studentId, date, result, note, createdAt }          （v4 起不再有 nextDates）
 //   recPlans[]  { id, roundId, studentId, date, createdAt }   计划某天背诵（还没检查），检查后自动消耗
-//   exams[]     { id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number } }
+//   exams[]     { id, classId, name, date, fullScore, createdAt, scores: { [studentId]: number }, classRanks?: { [studentId]: number }, gradeRanks?: { [studentId]: number } }
 //   remarks[]   { id, studentId, date, text, photoIds?, createdAt }   「其他」页：对学生的学情记录（v5 新增）
 //   sideGroups[] { id, classId, kind:'hw'|'rec', title, collapsed, order?, createdAt }   作业/背诵侧栏的分组夹（v6 新增）；作业/轮次上可选 groupId、order
 //   notes[]     { id, title, html, photoIds, createdAt, updatedAt, groupId?, order? }   笔记页（v7 新增，全班级共用，不带 classId）；文件夹用 sideGroups kind:'note'（classId 为空串）
@@ -417,7 +417,11 @@
             s.recChecks = s.recChecks.filter((c) => c.studentId !== id);
             s.recPlans = s.recPlans.filter((p) => p.studentId !== id);
             s.remarks = s.remarks.filter((r) => r.studentId !== id);
-            s.exams.forEach((e) => { delete e.scores[id]; });
+            s.exams.forEach((e) => {
+                delete e.scores[id];
+                if (e.classRanks) delete e.classRanks[id];
+                if (e.gradeRanks) delete e.gradeRanks[id];
+            });
         });
     }
 
