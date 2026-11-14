@@ -54,9 +54,10 @@
                             <th class="sticky-col">学生</th>
                             ${segs.map((seg) => {
                                 if (folded(seg)) {
-                                    const done = seg.items.reduce((n, hw) => n + HomeworkModel.summarize(hw, students).done, 0);
+                                    let done = 0, all = 0;
+                                    seg.items.forEach((hw) => { const c = HomeworkModel.summarize(hw, students); done += c.done; all += c.total; });
                                     return `<th class="matrix-col-head" title="${esc(seg.group.title)}（已折叠，共 ${seg.items.length} 项）">
-                                        <span class="matrix-head-btn mh-folded"><span class="mh-sub">${seg.items.length} 项</span><span class="mh-rate">${Utils.percent(done, students.length * seg.items.length)}</span></span></th>`;
+                                        <span class="matrix-head-btn mh-folded"><span class="mh-sub">${seg.items.length} 项</span><span class="mh-rate">${Utils.percent(done, all)}</span></span></th>`;
                                 }
                                 return seg.items.map((hw) => {
                                     const c = HomeworkModel.summarize(hw, students);
@@ -64,7 +65,7 @@
                                         <button type="button" class="matrix-head-btn" data-open-hw="${hw.id}">
                                             <span class="mh-date">${Utils.formatDate(hw.date)}</span>
                                             <span class="mh-sub">${Utils.balancedTitleHtml(hw.title)}</span>
-                                            <span class="mh-rate">${Utils.percent(c.done, students.length)}</span>
+                                            <span class="mh-rate">${Utils.percent(c.done, c.total)}</span>
                                         </button>
                                     </th>`;
                                 }).join('');
@@ -76,11 +77,15 @@
                                 let owe = 0;
                                 const cells = segs.map((seg) => {
                                     if (folded(seg)) {
-                                        const n = seg.items.filter((hw) => HomeworkModel.isOutstanding(HomeworkModel.getRecord(hw, stu.id).status)).length;
+                                        const n = seg.items.filter((hw) => HomeworkModel.appliesTo(hw, stu) && HomeworkModel.isOutstanding(HomeworkModel.getRecord(hw, stu.id).status)).length;
                                         owe += n;
                                         return `<td class="cell-folded ${n ? 'owe-bad' : ''}" title="${esc(seg.group.title)}：${n ? n + ' 项未补' : '全部完成'}">${n || '✓'}</td>`;
                                     }
                                     return seg.items.map((hw) => {
+                                        if (!HomeworkModel.appliesTo(hw, stu)) {
+                                            const na = HomeworkModel.NA;
+                                            return `<td><span class="cell cell-na" style="background:${na.color}" title="${esc(hw.title)} · 入班（${esc(Utils.formatDate(stu.joinedOn))}）前的作业，不计入"></span></td>`;
+                                        }
                                         const rec = HomeworkModel.getRecord(hw, stu.id);
                                         const st = HomeworkModel.STATUS_MAP[rec.status];
                                         if (HomeworkModel.isOutstanding(rec.status)) owe++;
@@ -105,7 +110,7 @@
         UI.bindMatrixGroups(view);
         UI.bindMatrixColDrag(view, (drag, drop) => HomeworkModel.moveSide({ type: 'item', id: drag }, drop));
 
-        view.querySelectorAll('.cell').forEach((cell) => {
+        view.querySelectorAll('button.cell').forEach((cell) => {
             cell.addEventListener('click', () => HomeworkDialogs.openStatus(cell.dataset.hw, cell.dataset.sid));
         });
         view.querySelectorAll('[data-open-hw]').forEach((btn) => {

@@ -6,7 +6,9 @@
 //
 // 数据结构（详见 PROJECT.md「数据模型」）：
 //   classes[]   { id, name }
-//   students[]  { id, classId, name, studentNo, note }     姓名在同一班级内唯一
+//   students[]  { id, classId, name, studentNo, note, joinedOn?, status?, statusOn? }     姓名在同一班级内唯一（含已转出/休学的）
+//               joinedOn = 入班日期（中途转入；这天之前的作业不算他的）；status = 'out' 转出 | 'leave' 休学（没有 = 在读），statusOn = 设为该状态的日期
+//               三个都是可选字段（1.33.0），不升 schema：.db 里落在 students.extra，旧版本读到也不会丢
 //   homework[]  { id, classId, date, title, note, createdAt, records: { [studentId]: {status, comment, madeUpAt} } }
 //   recRounds[] { id, classId, title, content, createdAt, archived, order? }   order：手动拖动排序后才有（可选，无需迁移）
 //   recChecks[] { id, roundId, studentId, date, result, note, createdAt }          （v4 起不再有 nextDates）
@@ -49,6 +51,15 @@
     let db = null;
     let dbReadyPromise = null;
     const listeners = [];
+    // 数据变化监听（备份提醒用，见 backupReminder.js）：fn(kind)，kind = 'edit'（改了数据）| 'replace'（导入 / 云端恢复整体替换）
+    // 与 subscribe 分开：subscribe 是"要重绘"，这里是"数据真的变了"（切换班级这种界面状态不算）
+    const changeListeners = [];
+    function onDataChange(fn) { changeListeners.push(fn); }
+    function emitChange(kind) {
+        changeListeners.forEach((fn) => {
+            try { fn(kind); } catch (e) { console.error('[AppState] change listener error', e); }
+        });
+    }
 
     function emptyState() {
         return {
@@ -197,6 +208,10 @@
         return data;
     }
 
+    const isDateStr = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    // 学生的非在读状态（转出 / 休学）：不出现在登记、统计、导出里，但所有历史记录保留，可随时恢复在读
+    const STUDENT_STATUS = { out: '转出', leave: '休学' };
+
     function normalize(raw) {
         const data = migrate(raw || {});
         const out = emptyState();
@@ -211,6 +226,8 @@
             s.name = String(s.name || '').trim();
             s.studentNo = s.studentNo == null ? '' : String(s.studentNo).trim();
             s.note = s.note || '';
+            if (!isDateStr(s.joinedOn)) delete s.joinedOn;
+            if (!STUDENT_STATUS[s.status]) { delete s.status; delete s.statusOn; }
         });
         out.homework.forEach((h) => { if (!h.records || typeof h.records !== 'object') h.records = {}; });
         out.sideGroups = out.sideGroups.filter((g) => g.kind === 'hw' || g.kind === 'rec' || g.kind === 'note');
@@ -273,9 +290,11 @@
     }
 
     // 业务模型修改数据的唯一入口：mutator 直接修改 state，之后统一持久化 + 广播
-    async function commit(mutator) {
+    // opts.uiOnly：只是界面状态（如切换当前班级），不算"数据有改动"，不触发备份提醒
+    async function commit(mutator, opts) {
         const result = mutator(state);
         await persist();
+        if (!(opts && opts.uiOnly)) emitChange('edit');
         notify();
         gcPhotos().catch((e) => console.warn('[AppState] 清理照片失败', e));
         return result;
@@ -311,6 +330,7 @@
         const keys = await photoTx('readonly', (store, set) => reqValue(store.getAllKeys(), set));
         const stale = keys.filter((k) => !keep.has(k));
         if (stale.length) await photoTx('readwrite', (store) => { stale.forEach((k) => store.delete(k)); });
+        emitChange('replace');
         notify();
     }
 
@@ -358,14 +378,40 @@
     function switchClass(id) {
         return commit((s) => {
             if (s.classes.some((c) => c.id === id)) s.activeClassId = id;
-        });
+        }, { uiOnly: true });
     }
 
     // ---------- 学生（均指当前激活班级） ----------
 
-    function getStudents() {
+    // 当前班级的在读学生（登记、统计、导出都用它）。opts.all = true 时连已转出 / 休学的也返回（名单页、查重、编学号用）
+    function getStudents(opts) {
         const classId = getActiveClassId();
-        return state.students.filter((x) => x.classId === classId).sort(Utils.compareStudentNo);
+        const all = !!(opts && opts.all);
+        return state.students.filter((x) => x.classId === classId && (all || !x.status)).sort(Utils.compareStudentNo);
+    }
+
+    // 当前班级已转出 / 休学的学生
+    function getInactiveStudents() {
+        const classId = getActiveClassId();
+        return state.students.filter((x) => x.classId === classId && x.status).sort(Utils.compareStudentNo);
+    }
+
+    // 转出 / 休学 / 恢复在读（status = 'out' | 'leave' | null）。只改状态，不删任何记录
+    function setStudentStatus(id, status) {
+        if (status && !STUDENT_STATUS[status]) return Promise.reject(new Error('未知的学生状态'));
+        return commit(() => {
+            const stu = getStudent(id);
+            if (!stu) return;
+            if (status) { stu.status = status; stu.statusOn = Utils.today(); }
+            else { delete stu.status; delete stu.statusOn; }
+        });
+    }
+
+    function cleanJoinedOn(v) {
+        const t = String(v || '').trim();
+        if (!t) return '';
+        if (!isDateStr(t)) throw new Error('入班日期格式应为 YYYY-MM-DD');
+        return t;
     }
 
     function getStudent(id) { return state.students.find((x) => x.id === id) || null; }
@@ -381,9 +427,11 @@
         if (dup && dup.id !== exceptId) throw new Error(`本班已有同名学生「${name}」，姓名需唯一（可加后缀区分，如 张三B）`);
     }
 
+    // data.joinedOn（可选）：入班日期，空 = 从一开始就在班里
     function addStudent(data) {
         const name = String(data.name || '').trim();
         assertUniqueName(name);
+        const joinedOn = cleanJoinedOn(data.joinedOn);
         return commit((s) => {
             const stu = {
                 id: Utils.uid('stu'),
@@ -392,24 +440,33 @@
                 studentNo: String(data.studentNo || '').trim(),
                 note: data.note || ''
             };
+            if (joinedOn) stu.joinedOn = joinedOn;
             s.students.push(stu);
             return stu;
         });
     }
 
+    // patch.joinedOn：传空串 = 清除入班日期
     function updateStudent(id, patch) {
         if (patch.name != null) {
             patch.name = String(patch.name).trim();
             assertUniqueName(patch.name, id);
         }
         if (patch.studentNo != null) patch.studentNo = String(patch.studentNo).trim();
+        const hasJoined = Object.prototype.hasOwnProperty.call(patch, 'joinedOn');
+        const joinedOn = hasJoined ? cleanJoinedOn(patch.joinedOn) : '';
+        delete patch.joinedOn;
+        delete patch.status;      // 状态只能走 setStudentStatus
+        delete patch.statusOn;
         return commit(() => {
             const stu = getStudent(id);
-            if (stu) Object.assign(stu, patch);
+            if (!stu) return;
+            Object.assign(stu, patch);
+            if (hasJoined) { if (joinedOn) stu.joinedOn = joinedOn; else delete stu.joinedOn; }
         });
     }
 
-    // 删除学生：连带清除其所有作业/背诵/考试记录
+    // 删除学生：连带清除其所有作业/背诵/考试记录（只想不再出现在名单里、但保留记录的，用 setStudentStatus 转出 / 休学）
     function removeStudent(id) {
         return commit((s) => {
             s.students = s.students.filter((x) => x.id !== id);
@@ -429,7 +486,7 @@
     // 返回 { added, skipped: [{line, reason}] }，同名学生跳过不覆盖
     function bulkAddStudents(text) {
         const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-        const existing = new Set(getStudents().map((x) => x.name));
+        const existing = new Set(getStudents({ all: true }).map((x) => x.name));
         const parsed = lines.map((line) => {
             const parts = line.split(/[\s,，\t\u3000]+/).filter(Boolean);
             if (parts.length >= 2 && /^\d+$/.test(parts[0])) return { line, no: parts[0], name: parts.slice(1).join('') };
@@ -437,7 +494,7 @@
             return { line, no: null, name: parts.join('') };
         });
         // 自动编号要接在"现有学生 + 本次粘贴里显式写了学号的行"的最大值之后，避免和同批次后面的学号撞号
-        const numeric = getStudents().map((x) => x.studentNo).concat(parsed.map((p) => p.no)).filter((n) => /^\d+$/.test(n || ''));
+        const numeric = getStudents({ all: true }).map((x) => x.studentNo).concat(parsed.map((p) => p.no)).filter((n) => /^\d+$/.test(n || ''));
         let nextNo = numeric.reduce((m, n) => Math.max(m, Number(n)), 0) + 1;
         const toAdd = [];
         const skipped = [];
@@ -498,11 +555,12 @@
 
     window.AppState = {
         SCHEMA_VERSION,
-        load, subscribe, getState, exportSnapshot, replaceState, validateSnapshot,
-        _commit: commit,
+        load, subscribe, onDataChange, getState, exportSnapshot, replaceState, validateSnapshot,
+        _commit: commit, _emitChange: emitChange,
         photoPut, photoGet, photoList, gcPhotos,
         getClasses, getActiveClass, getActiveClassId, addClass, renameClass, removeClass, switchClass,
-        getStudents, getStudent, findStudentByName, addStudent, updateStudent, removeStudent, bulkAddStudents,
+        STUDENT_STATUS,
+        getStudents, getInactiveStudents, getStudent, findStudentByName, addStudent, updateStudent, setStudentStatus, removeStudent, bulkAddStudents,
         updateSettings, getQuickPhrases, addQuickPhrase, updateQuickPhrase, removeQuickPhrase, moveQuickPhrase
     };
 })();

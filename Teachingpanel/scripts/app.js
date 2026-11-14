@@ -65,7 +65,8 @@
         Persistence.requestPersistence().then(() => {
             if (Navigation.getCurrent() === 'home') SettingsPage.render();
         });
-        UpdateChecker.check();
+        // 先查更新，再查备份提醒：更新弹窗开着时备份提醒会让路（见 backupReminder.js）
+        UpdateChecker.check().finally(() => BackupReminder.init());
     }
 
     document.addEventListener('DOMContentLoaded', init);

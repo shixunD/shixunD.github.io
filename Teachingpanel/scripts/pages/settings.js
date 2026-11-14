@@ -50,7 +50,8 @@
 
                     <div class="card">
                         <h2>💾 数据</h2>
-                        <p class="hint">所有数据只保存在本浏览器。导出得到一个 .db 数据库文件（包含全部班级和数据，可用 DB Browser for SQLite 打开查看）；换电脑/换浏览器时在新设备上导入即可，也可以上传到 OneDrive。</p>
+                        <p class="hint">所有数据只保存在本浏览器。导出得到一个 .db 数据库文件（包含全部班级和数据，可用 DB Browser for SQLite 打开查看）；换电脑/换浏览器时在新设备上导入即可，也可以上传到 OneDrive。每天第一次打开时，如果上次备份之后数据有改动，会提醒你备份。</p>
+                        ${BackupReminder.cardLineHtml()}
                         <div class="btn-col">
                             <button type="button" class="btn-primary" data-export>📤 导出数据库（.db）</button>
                             <button type="button" class="btn-secondary" data-import>📥 导入数据库（覆盖当前）</button>

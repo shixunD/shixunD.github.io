@@ -68,7 +68,7 @@
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
                     <button type="button" class="btn-primary" data-save disabled>保存</button>
                 </div>
-                <div data-lists>${plansHtml(roundId, studentId)}${historyHtml(roundId, studentId)}</div>
+                <div data-lists>${recordsHtml(roundId, studentId)}</div>
             `,
             onMount(body, close) {
                 StudentTrend.linkDialogTitle(body, stu, round.title, close);
@@ -183,12 +183,12 @@
                         Toast.error(err.message);
                     }
                 });
-                // 删除计划 / 检查记录：不关弹窗，原地刷新「当前状态」和下面两个列表；没保存的选择、备注、照片都保留
+                // 删除计划 / 检查记录：不关弹窗，原地刷新「当前状态」和下面的记录时间线；没保存的选择、备注、照片都保留
                 function refreshLists() {
                     // 删掉提前完成的记录后解除锁定
                     if (locked && !RecitationModel.isLocked(roundId, studentId)) { locked = false; setResult(null); loaded = null; }
                     body.querySelector('[data-cur-status]').innerHTML = `当前：${statusPill(RecitationModel.progressOf(roundId, studentId).status)}`;
-                    body.querySelector('[data-lists]').innerHTML = plansHtml(roundId, studentId) + historyHtml(roundId, studentId);
+                    body.querySelector('[data-lists]').innerHTML = recordsHtml(roundId, studentId);
                     bindLists();
                     render();
                 }
@@ -309,37 +309,43 @@
         return `<span class="status-pill" style="background:${P.color};color:${P.text}">${esc(P.label)}</span>`;
     }
 
-    // 本轮的全部计划：未完成的可"取消计划"；已完成的（计划日当天或之后有检查记录）保留显示，也可删除
-    function plansHtml(roundId, studentId) {
-        const plans = RecitationModel.plansFor(roundId, studentId);
-        if (!plans.length) return '';
+    // 本轮记录（1.33.0 起计划和检查合在一条时间线里，样式同学生趋势的检查历史）：按日期新→旧；
+    // 同一天检查排在计划上面（先排计划、后来检查，越晚发生越靠上），再按录入先后新→旧。
+    // 计划：未完成的可"取消计划"，已完成的（之后有检查记录，见 RecitationModel.isPlanDone）变淡、可删除；检查：可编辑 / 删除
+    function recordsHtml(roundId, studentId) {
+        const items = RecitationModel.checksFor(roundId, studentId).map((c) => ({ check: c, at: c }))
+            .concat(RecitationModel.plansFor(roundId, studentId).map((p) => ({ plan: p, at: p })));
+        if (!items.length) return '';
+        items.sort((a, b) => b.at.date.localeCompare(a.at.date) || (!!a.plan - !!b.plan) || (b.at.createdAt || 0) - (a.at.createdAt || 0));
+        const R = RecitationModel.RESULT_MAP;
+        const today = Utils.today();
         return `
-            <h3 class="section-title">背诵计划</h3>
-            <ul class="record-list">
-                ${plans.map((p) => {
-                    const done = RecitationModel.isPlanDone(p);
-                    return `<li class="${done ? 'plan-done' : ''}">${planPill()} <span class="record-date">${Utils.formatDate(p.date)} · ${Utils.relativeDay(p.date)}</span>
-                        ${done ? '<span class="hint">✓ 已检查</span>' : (p.date < Utils.today() ? '<span class="hint text-danger">已逾期</span>' : '')}
-                        <button type="button" class="link-btn" data-rm-plan="${p.id}">${done ? '删除' : '取消计划'}</button>
-                        ${p.note ? `<div class="record-comment">💬 ${esc(p.note)}</div>` : ''}</li>`;
-                }).join('')}
-            </ul>`;
-    }
-
-    function historyHtml(roundId, studentId) {
-        const checks = RecitationModel.checksFor(roundId, studentId).slice().reverse();
-        if (!checks.length) return '';
-        return `
-            <h3 class="section-title">本轮检查记录</h3>
-            <ul class="record-list">
-                ${checks.map((c) => `
-                    <li>
-                        ${statusPill(c.result)} <span class="record-date">${Utils.formatDate(c.date)}</span>
-                        <button type="button" class="link-btn" data-edit-check="${c.id}">编辑</button>
-                        <button type="button" class="link-btn danger" data-rm-check="${c.id}">删除</button>
-                        ${c.note ? `<div class="record-comment">💬 ${esc(c.note)}</div>` : ''}
+            <h3 class="section-title">本轮记录（新 → 旧）</h3>
+            <ul class="check-timeline dialog-timeline">
+                ${items.map(({ check: c, plan: p }) => {
+                    if (p) {
+                        const done = RecitationModel.isPlanDone(p);
+                        return `<li class="check-item${done ? ' plan-done' : ''}" style="--dot-color:${RecitationModel.PLAN.accent}">
+                            <div class="check-item-head">
+                                ${planPill()}
+                                <span class="check-item-meta"><span class="record-date">${Utils.formatDate(p.date)} · ${Utils.relativeDay(p.date)}</span>
+                                ${done ? '<span class="hint">✓ 已检查</span>' : (p.date < today ? '<span class="hint text-danger">已逾期</span>' : '')}
+                                <button type="button" class="link-btn" data-rm-plan="${p.id}">${done ? '删除' : '取消计划'}</button></span>
+                            </div>
+                            ${p.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(p.note)}</div>` : ''}
+                        </li>`;
+                    }
+                    return `<li class="check-item" style="--dot-color:${(R[c.result] || {}).color || '#9aa0a6'}">
+                        <div class="check-item-head">
+                            ${statusPill(c.result)}
+                            <span class="check-item-meta"><span class="record-date">${Utils.formatDate(c.date)}</span>
+                            <button type="button" class="link-btn" data-edit-check="${c.id}">编辑</button>
+                            <button type="button" class="link-btn danger" data-rm-check="${c.id}">删除</button></span>
+                        </div>
+                        ${c.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(c.note)}</div>` : ''}
                         ${Photos.viewHtml(c.photoIds)}
-                    </li>`).join('')}
+                    </li>`;
+                }).join('')}
             </ul>`;
     }
 

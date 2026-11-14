@@ -216,13 +216,13 @@
                     ${numRow('p_poor_fixed', `${sq('poor_fixed')} ${S.poor_fixed.label}`, r.penalty.poor_fixed, '填 0 = 不扣分')}
                     ${numRow('p_missing_fixed', `${sq('missing_fixed')} ${S.missing_fixed.label}`, r.penalty.missing_fixed, '填 0 = 不扣分')}
                     <div class="qp-group-title">📖 背诵加减分（每个任务）</div>
-                    ${numRow('recEarly', '提前完成', r.recEarly, '检查里有「提前完成」且最终过关')}
-                    ${numRow('recOnPlan', '计划当日完成', r.recOnPlan, '没有计划，或只有一次计划且计划当日过关（完成过关 / 条件过关）')}
-                    ${numRow('recLate', '拖到之后才完成', r.recLate, '有多个计划日期，或计划当日没过关，但最终过关')}
+                    ${numRow('recEarly', '提前完成', r.recEarly, '检查里有「提前完成」（直接加，不看计划）')}
+                    ${numRow('recOnPlan', '计划当日完成', r.recOnPlan, '没有计划，或只有一次计划且计划当日过关（完成过关 / 条件过关）；过关之后才排的计划不算')}
+                    ${numRow('recLate', '拖到之后才完成', r.recLate, '过关前有多个计划日期，或计划当日没过关 / 之后又重新过关，但最终过关')}
                     ${numRow('recFail', '最终没过关（扣分）', r.recFail, '最终仍是计划中（蓝）/ 重新过关（黄）/ 未过关（红）/ 未检查')}
                     <div class="qp-group-title">📖 背诵过关判定</div>
                     <label class="setting-row ex-check"><div><div>「条件过关」算过关</div><div class="hint">关掉后只有提前完成、完成过关算 ✓</div></div><input type="checkbox" name="condPass" ${r.condPass ? 'checked' : ''}></label>
-                    <label class="setting-row ex-check"><div><div>过关后还有未完成的背诵计划 → 判不过关</div><div class="hint">即按检查页学生卡片的底色判（卡片是天蓝色就不算过关）。关掉后只看最新一次检查结果</div></div><input type="checkbox" name="planBlocks" ${r.planBlocks ? 'checked' : ''}></label>
+                    <label class="setting-row ex-check"><div><div>过关后还有未完成的背诵计划 → 判不过关</div><div class="hint">打开 = 按检查页学生卡片的底色判（卡片是天蓝色就不算过关）。默认关：只看最新一次检查结果，过关后多出来的计划多半是误操作</div></div><input type="checkbox" name="planBlocks" ${r.planBlocks ? 'checked' : ''}></label>
                     <div class="modal-actions">
                         <button type="button" class="btn-secondary" data-reset>恢复默认</button>
                         <button type="button" class="btn-secondary" data-dialog-close>取消</button>

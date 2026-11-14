@@ -27,3 +27,15 @@
 
 .roster-table td.roster-note { color: var(--text-secondary); font-size: 0.84rem; }
 .row-actions { white-space: nowrap; text-align: right !important; }
+
+/* 备份状态（主页「💾 数据」卡片，见 backupReminder.js） */
+.backup-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.2rem 0.6rem; margin: 0 0 0.7rem; padding: 0.45rem 0.65rem; border-radius: 8px; font-size: 0.85rem; }
+.backup-line.backup-ok { background: #e8f5e9; color: #1e6b34; }
+.backup-line.backup-warn { background: #fff4e0; color: #8a5200; }
+.backup-state { font-weight: 600; }
+
+/* 学生名单：入班日期标签、已转出 / 休学折叠区 */
+.roster-tag { display: inline-block; margin-right: 0.35rem; padding: 0 0.4rem; border-radius: 6px; background: #eef3fb; color: #1a4fa3; font-size: 0.76rem; white-space: nowrap; }
+.roster-inactive { margin-top: 0.8rem; }
+.roster-inactive summary { cursor: pointer; color: var(--text-secondary); font-size: 0.86rem; padding: 0.3rem 0; }
+.roster-inactive .roster-table { opacity: 0.85; }

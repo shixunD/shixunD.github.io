@@ -13,9 +13,10 @@
     const ORDER = ScoreReport.STATUS_ORDER;
 
     // Markdown 里的状态符号（没有粉红色圆形 emoji，粉色用 🩷）
-    const EMOJI = { done: '✅', poor_fixed: '🩵', missing_fixed: '💙', poor: '🩷', missing: '🔴' };
+    const EMOJI = { done: '✅', poor_fixed: '🩵', missing_fixed: '💙', poor: '🩷', missing: '🔴', na: '⬜' };
 
-    const hwStatus = (k) => HomeworkModel.STATUS_MAP[k] || HomeworkModel.STATUS_MAP.done;
+    // 'na' = 中途入班的学生入班前的作业（灰格，不计分）
+    const hwStatus = (k) => (k === 'na' ? HomeworkModel.NA : (HomeworkModel.STATUS_MAP[k] || HomeworkModel.STATUS_MAP.done));
     const recLook = (k) => (k === 'plan' ? RecitationModel.PLAN : (RecitationModel.RESULT_MAP[k] || RecitationModel.NONE));
     const hex = (c) => c.replace('#', '').toUpperCase();
     const hwLabel = (hw) => `${Utils.formatDate(hw.date)} ${hw.title}`;
@@ -32,19 +33,20 @@
             else free.push(k);
         });
         if (free.length) items.push({ keys: free, text: `${free.map((k) => hwStatus(k).label).join('、')} 不扣分` });
+        if (rp.summary.lateJoin) items.push({ keys: ['na'], text: `中途入班的 ${rp.summary.lateJoin} 人：入班前的作业不计入，按入班后的作业数算加分` });
         return items;
     }
 
     function recRuleText(rp) {
         const r = rp.rules;
-        return `背诵过关 = 学生卡片底色为绿色：最新一次检查是 提前完成 / 完成过关${r.condPass ? ' / 条件过关' : ''}` +
-            (r.planBlocks ? '，且之后没有还未完成的背诵计划' : '') + '；其余判不过关';
+        return `背诵过关 = 最新一次检查是 提前完成 / 完成过关${r.condPass ? ' / 条件过关' : ''}` +
+            (r.planBlocks ? '，且之后没有还未完成的背诵计划' : '（过关之后多出来的计划不影响）') + '；其余判不过关';
     }
 
     function recScoreText(rp) {
         const r = rp.rules;
         return `背诵加减分：提前完成 ${signed(r.recEarly)}；无计划或只有一次计划且计划当日过关 ${signed(r.recOnPlan)}；` +
-            `多个计划日期、或计划当日没过关但最终过关 ${signed(r.recLate)}；最终没过关（计划中 / 重新过关 / 未过关 / 未检查）${signed(-r.recFail)}`;
+            `多个计划日期、或计划当日没过关但最终过关 ${signed(r.recLate)}（过关之后才排的计划不算）；最终没过关（计划中 / 重新过关 / 未过关 / 未检查）${signed(-r.recFail)}`;
     }
 
     function metaLine(rp) {

@@ -4,6 +4,9 @@
 // 记录规则：homework.records 里"没有某个学生的记录" = 默认完全完成（done）。
 // 这样新开一项作业不需要给全班每个人写一条记录，只登记少数没完成的人；
 // 把学生改回"完全完成"且没有 comment 时，记录会被删除，保持数据精简。
+//
+// 中途入班（1.33.0）：学生有 joinedOn（入班日期）时，日期早于它的作业"不算他的"——不出现在该作业的登记卡片里，
+// 不计入完成率、欠交清单、学生趋势和导出统计（否则"没有记录 = 完成"会让他白白算全绿）。判断统一用 appliesTo()。
 
 (function () {
     'use strict';
@@ -18,6 +21,17 @@
     ];
     const STATUS_MAP = {};
     STATUSES.forEach((s) => { STATUS_MAP[s.key] = s; });
+    // 「入班前」：不是真正的状态，只在矩阵 / 导出明细里占位（灰色，不计分）
+    const NA = { key: 'na', label: '入班前（不计入）', short: '—', color: '#e4dfda', text: '#8a817a' };
+
+    // 这项作业算不算这个学生的：入班日期之前布置的不算
+    function appliesTo(hw, stu) {
+        return !stu || !stu.joinedOn || hw.date >= stu.joinedOn;
+    }
+    // 某项作业要算的学生（从给定名单里筛）
+    function studentsFor(hw, students) {
+        return students.filter((stu) => appliesTo(hw, stu));
+    }
 
     // 未补上的问题状态 -> 补上后的状态
     const FIX_MAP = { missing: 'missing_fixed', poor: 'poor_fixed' };
@@ -131,11 +145,13 @@
     function isProblem(status) { return status !== 'done'; }
     function isOutstanding(status) { return status === 'missing' || status === 'poor'; }
 
-    // 单项作业的各状态人数
+    // 单项作业的各状态人数；total = 这项作业要算的人数（去掉入班前的学生），算比例用它
     function summarize(hw, students) {
         const counts = {};
         STATUSES.forEach((s) => { counts[s.key] = 0; });
-        students.forEach((stu) => { counts[getRecord(hw, stu.id).status]++; });
+        const list = studentsFor(hw, students);
+        list.forEach((stu) => { counts[getRecord(hw, stu.id).status]++; });
+        counts.total = list.length;
         return counts;
     }
 
@@ -146,7 +162,7 @@
         const groups = [];
         list(filter).forEach((hw) => {
             const items = [];
-            students.forEach((stu) => {
+            studentsFor(hw, students).forEach((stu) => {
                 const rec = getRecord(hw, stu.id);
                 if (isOutstanding(rec.status)) items.push({ student: stu, rec });
             });
@@ -183,7 +199,8 @@
 
     // 某学生的统计：各状态次数、按时完成率、最终完成率、按时间顺序的记录（旧 -> 新）
     function studentStats(studentId, filter) {
-        const hws = list(filter).slice().reverse();
+        const stu = AppState.getStudent(studentId);
+        const hws = list(filter).filter((hw) => appliesTo(hw, stu)).slice().reverse();
         const counts = {};
         STATUSES.forEach((s) => { counts[s.key] = 0; });
         const timeline = hws.map((hw) => {
@@ -205,7 +222,8 @@
     // 按周聚合的按时完成率（用于趋势折线），返回 [{label, rate}]
     function weeklyRates(studentId, filter) {
         const weeks = {};
-        list(filter).forEach((hw) => {
+        const stu = AppState.getStudent(studentId);
+        list(filter).filter((hw) => appliesTo(hw, stu)).forEach((hw) => {
             const d = Utils.parseDate(hw.date);
             const monday = Utils.addDays(hw.date, -((d.getDay() + 6) % 7));
             if (!weeks[monday]) weeks[monday] = { total: 0, done: 0 };
@@ -216,7 +234,7 @@
     }
 
     window.HomeworkModel = {
-        STATUSES, STATUS_MAP, FIX_MAP,
+        STATUSES, STATUS_MAP, FIX_MAP, NA, appliesTo, studentsFor,
         list, sideList, sideLayout, moveSide, removeGroup, get, create, update, remove,
         getRecord, setRecord, markFixed, snapshotRecord, restoreRecord, isProblem, isOutstanding,
         summarize, outstanding, countOutstanding, countOutstandingBetween, studentStats, weeklyRates

@@ -116,7 +116,7 @@
                 if (grade === undefined) { result.invalid.push(line); return; }
             }
             if (cls === undefined) { result.invalid.push(line); return; }
-            const stu = AppState.findStudentByName(name);
+            const stu = AppState.getStudents().find((x) => x.name === name) || null;   // 只匹配在读学生（转出 / 休学的不导入）
             if (!stu) { result.unknown.push({ name, line }); return; }
             const item = { student: stu, score, cls, grade, line };
             if (seen[stu.id] != null) {

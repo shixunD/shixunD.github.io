@@ -50,6 +50,11 @@
 .stu-card-plan { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
 .stu-card-plan.overdue { color: #c5221f; opacity: 1; }
 .record-list li.plan-done { opacity: 0.65; }
+/* 检查弹窗里的本轮记录时间线（计划 + 检查合在一起，1.33.0） */
+.dialog-timeline { margin-top: 0.3rem; }
+.dialog-timeline::before { top: 0.6rem; }
+.dialog-timeline .check-item.plan-done { opacity: 0.65; }
+.check-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; }
 
 /* 计划背诵子标签 */
 .plan-day-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; }

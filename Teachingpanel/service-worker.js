@@ -36,6 +36,7 @@ const URLS_TO_CACHE = [
     './scripts/app.js',
     './scripts/dbFile.js',
     './scripts/importExport.js',
+    './scripts/backupReminder.js',
     './scripts/vendor/sql-wasm.js',
     './scripts/vendor/sql-wasm.wasm',
     './scripts/navigation.js',

@@ -11,6 +11,7 @@
         const bytes = await DbFile.exportBytes(AppState.exportSnapshot());
         const filename = `${Utils.timestampName()}.db`;
         Utils.downloadText(filename, bytes, DB_MIME);
+        BackupReminder.markBackedUp('local');
         return filename;
     }
 

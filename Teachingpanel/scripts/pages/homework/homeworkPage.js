@@ -135,9 +135,12 @@
             </button>`;
     }
 
-    function registerDetail(hw, students) {
+    function registerDetail(hw, allStudents) {
+        // 入班日期在这项作业之后的学生不算这项作业：不显示卡片、不计入比例
+        const students = HomeworkModel.studentsFor(hw, allStudents);
+        const later = allStudents.length - students.length;
         const c = HomeworkModel.summarize(hw, students);
-        const total = students.length || 1;
+        const total = c.total || 1;
         return `
             <div class="card">
                 <div class="detail-head">
@@ -157,7 +160,8 @@
                     <div class="seg-items">${HomeworkModel.STATUSES.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)} <b>${c[s.key]}</b></span>`).join('')}</div>
                     <span class="seg-rate">按时完成 ${Utils.percent(c.done, total)} | 补改完成 ${Utils.percent(c.done + c.missing_fixed + c.poor_fixed, total)}</span>
                 </div>
-                ${students.length ? `<div class="stu-grid">${students.map((stu) => studentCard(hw, stu)).join('')}</div>` : UI.emptyStudentsHint()}
+                ${students.length ? `<div class="stu-grid">${students.map((stu) => studentCard(hw, stu)).join('')}</div>` : (later ? '' : UI.emptyStudentsHint())}
+                ${later ? `<div class="hint hw-later-hint">另有 ${later} 名学生在这项作业之后才入班，不计入这项作业</div>` : ''}
             </div>
         `;
     }

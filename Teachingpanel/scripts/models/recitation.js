@@ -206,13 +206,18 @@
             .sort((a, b) => a.date.localeCompare(b.date));
     }
 
-    // 计划是否已完成：安排计划之后登记了一次检查，且检查日期在计划日期当天或之后
-    // （"安排之后"用 createdAt 判断：今天已经查过、又给今天加计划时，之前那次检查不算完成这条新计划）
-    // 例外：计划日期已经过去时，那天本身有检查就算完成，不看先后（补录历史计划时，那天早就检查过的也应该打勾）
+    // 计划是否已完成（1.33.0 起每次都按这个学生本轮的全部检查记录现算，不看保存的先后顺序）：
+    //   计划日期之后有任何检查记录 → 完成（已经背过了）
+    //   计划当天或之后有过关的检查（提前完成 / 完成过关 / 条件过关）→ 完成
+    //     （以前要求"检查是在加计划之后登记的"：同一次保存里先存检查、再存计划，当天过关的计划就一直不打勾，要等到第二天）
+    //   只有计划当天的 重新过关 / 未过关：计划日期已过去 → 完成；是今天 → 这条检查是加计划之后登记的才算完成
+    //     （今天已经判了重新过关、又给今天加计划 = 今天还要再背一次，之前那次不算）
     function isPlanDone(plan) {
-        const past = plan.date < Utils.today();
-        return state().recChecks.some((c) => c.roundId === plan.roundId && c.studentId === plan.studentId
-            && c.date >= plan.date && ((c.createdAt || 0) >= (plan.createdAt || 0) || (past && c.date === plan.date)));
+        const checks = state().recChecks.filter((c) => c.roundId === plan.roundId && c.studentId === plan.studentId && c.date >= plan.date);
+        if (!checks.length) return false;
+        if (checks.some((c) => c.date > plan.date || isPassed(c.result))) return true;
+        if (plan.date < Utils.today()) return true;
+        return checks.some((c) => (c.createdAt || 0) >= (plan.createdAt || 0));
     }
 
     // 还没完成的计划（待办），按日期正序

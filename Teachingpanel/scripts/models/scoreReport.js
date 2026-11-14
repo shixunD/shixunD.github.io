@@ -8,6 +8,8 @@
 //   全部 N 项绿色 → 加 bonusAll；N ≥ 2 且恰好 N-1 项绿色 → 加 bonusOneOff；其余不加分。N = 1 时只有「全绿加分 / 不加分」两档
 //   每项按最终状态扣 penalty[status]（默认 粉 0.5、红 1、两种蓝 0）；蓝色不算绿色，会影响加分
 //   最终得分 = 加分 - 扣分
+//   中途入班（1.33.0）：入班日期之前的作业不算这个学生的——明细里显示「入班前」灰格（status 'na'），
+//   他自己的 N = 入班后的作业数（row.n），加分档按 row.n 算，不再按「没有记录 = 完成」白给全绿
 // 背诵（每个任务单独判 ✓ / ✗）：按检查页学生卡片的底色判——
 //   卡片底色 = 最新检查结果的颜色；但「最后一天只有未完成的计划」时卡片是天蓝（与 recitationPage.studentCard 同一规则）
 //   （1.32.0 起另有背诵加减分，见 recScore；✓/✗ 仍用于「过关人数」统计）
@@ -21,11 +23,11 @@
         bonusOneOff: 1,
         penalty: { poor: 0.5, missing: 1, poor_fixed: 0, missing_fixed: 0 },
         recEarly: 3,         // 背诵：提前完成加分
-        recOnPlan: 2,        // 背诵：无计划，或只有一次计划且计划当日过关
-        recLate: 1,          // 背诵：多个计划日期 / 计划当日没过关，但最终过关
+        recOnPlan: 2,        // 背诵：无计划，或过关前只有一次计划且计划当日过关
+        recLate: 1,          // 背诵：过关前有多个计划日期 / 计划当日没过关，但最终过关
         recFail: 2,          // 背诵：一周最终没过关（蓝 / 黄 / 红 / 未检查）扣分
         condPass: true,      // 条件过关算不算过关
-        planBlocks: true     // 过关后又排了还没完成的计划（卡片天蓝）是否判不过关
+        planBlocks: false    // 过关后又排了还没完成的计划（卡片天蓝）是否判不过关（1.33.0 起默认关：过关后的计划多半是误操作，仍算过关）
     };
     const PENALTY_KEYS = ['poor', 'missing', 'poor_fixed', 'missing_fixed'];
     // 作业完成情况里各状态的显示顺序
@@ -86,18 +88,20 @@
         return { pass, look: planIsLast ? 'plan' : pg.status, status: pg.status, score: recScore(round, studentId, pass, rules) };
     }
 
-    // 背诵加减分（每个任务一项）：
+    // 背诵加减分（每个任务一项），1.33.0 起：
+    //   检查里有「提前完成」→ +recEarly（直接加，不看计划）
     //   最终没过关（卡片是蓝 / 黄 / 红 / 灰）→ -recFail
-    //   过关：检查里有「提前完成」→ +recEarly；
-    //         否则没有计划，或只有一次计划且计划当日有过关的检查 → +recOnPlan；
-    //         否则（多个计划日期，或计划当日没过关，最终才过关）→ +recLate
+    //   过关（完成过关 / 条件过关）：只看「过关那天及之前」的计划——过关之后才排的计划多半是误操作，不算
+    //     没有计划，或只有一次计划、且最后这段连续过关就是从计划那天开始的 → +recOnPlan
+    //     否则（过关前有多个计划日期；或计划当日没过关 / 过关后又被判重新过关，最后才过关）→ +recLate
     function recScore(round, studentId, pass, rules) {
-        if (!pass) return -rules.recFail;
         const checks = RecitationModel.checksFor(round.id, studentId);
         if (checks.some((c) => c.result === 'excel')) return rules.recEarly;
-        const plans = RecitationModel.plansFor(round.id, studentId);
+        if (!pass) return -rules.recFail;
+        const passedOn = RecitationModel.progressOf(round.id, studentId).passedOn;
+        const plans = RecitationModel.plansFor(round.id, studentId).filter((p) => !passedOn || p.date <= passedOn);
         if (!plans.length) return rules.recOnPlan;
-        if (plans.length === 1 && checks.some((c) => c.date === plans[0].date && RecitationModel.isPassed(c.result))) return rules.recOnPlan;
+        if (plans.length === 1 && plans[0].date === passedOn) return rules.recOnPlan;
         return rules.recLate;
     }
 
@@ -116,18 +120,21 @@
         const rows = students.map((stu) => {
             const counts = {};
             STATUS_ORDER.forEach((k) => { counts[k] = 0; });
+            let rowN = 0;
             const statuses = hws.map((hw) => {
+                if (!HomeworkModel.appliesTo(hw, stu)) return 'na';
+                rowN++;
                 const st = HomeworkModel.getRecord(hw, stu.id).status;
                 counts[st] = (counts[st] || 0) + 1;
                 return st;
             });
-            const bonus = bonusOf(counts.done, n, rules);
+            const bonus = bonusOf(counts.done, rowN, rules);
             const penalty = round2(PENALTY_KEYS.reduce((sum, k) => sum + counts[k] * rules.penalty[k], 0));
             const rec = rounds.map((r) => recOf(r, stu.id, rules));
             const recScoreSum = round2(rec.reduce((sum, x) => sum + x.score, 0));
             const final = round2(bonus - penalty);
             return {
-                student: stu, counts, statuses, bonus, penalty, final,
+                student: stu, n: rowN, counts, statuses, bonus, penalty, final,
                 rec, recScore: recScoreSum, total: round2(final + recScoreSum)
             };
         });
@@ -139,8 +146,9 @@
             total,
             avg: rows.length ? round2(total / rows.length) : 0,
             recTotal: round2(rows.reduce((sum, r) => sum + r.recScore, 0)),
-            full: rows.filter((r) => n && r.counts.done === n).length,           // 全部按时完成
-            oneOff: rows.filter((r) => n >= 2 && r.counts.done === n - 1).length,   // 只差一项（N ≥ 2 才有这一档）
+            full: rows.filter((r) => r.n && r.counts.done === r.n).length,           // 全部按时完成（中途入班的按入班后的作业数算）
+            oneOff: rows.filter((r) => r.n >= 2 && r.counts.done === r.n - 1).length,   // 只差一项（N ≥ 2 才有这一档）
+            lateJoin: rows.filter((r) => r.n < n).length,                           // 有入班前作业（不计入）的学生数
             pos: rows.filter((r) => r.final > 0).length,
             zero: rows.filter((r) => r.final === 0).length,
             neg: rows.filter((r) => r.final < 0).length,

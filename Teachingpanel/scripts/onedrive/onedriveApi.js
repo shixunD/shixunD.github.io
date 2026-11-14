@@ -37,6 +37,7 @@
             body
         });
         if (!res.ok) throw new Error(`上传失败: ${res.status}`);
+        BackupReminder.markBackedUp('onedrive');
         return res.json();
     }
 

@@ -481,6 +481,7 @@
         if (!old) return null;
         const blob = await rotateBlob(old, dir > 0 ? 1 : 3);
         await AppState.photoPut(id, blob);
+        AppState._emitChange('edit');   // 旋转已保存的照片不经过 _commit，但也是数据改动（备份提醒要知道）
         const url = URL.createObjectURL(blob);
         const prev = urlCache.get(id);
         urlCache.set(id, url);

@@ -28,10 +28,14 @@
         return KINDS.some((x) => x.key === k) ? k : 'homework';
     }
 
-    // 当前选中的学生；不在当前班级（切换班级、被删除）时回退到第一个
+    // 当前选中的学生；不在当前班级（切换班级、被删除）时回退到第一个在读学生。
+    // 已转出 / 休学的学生也能看（从学生名单点姓名进来），只是不出现在小块选择器的常规列表里
     function currentId() {
-        const students = AppState.getStudents();
-        if (!students.some((s) => s.id === studentId)) studentId = students.length ? students[0].id : null;
+        const all = AppState.getStudents({ all: true });
+        if (!all.some((s) => s.id === studentId)) {
+            const students = AppState.getStudents();
+            studentId = students.length ? students[0].id : null;
+        }
         return studentId;
     }
 
@@ -52,10 +56,12 @@
     function pickerHtml(active) {
         const students = AppState.getStudents();
         const sel = currentId();
+        const selStu = sel ? AppState.getStudent(sel) : null;
+        const inactive = selStu && selStu.status ? selStu : null;   // 正在看的是已转出 / 休学的学生：单独补一块
         return `
             <div class="card trend-picker">
                 <div class="trend-kinds">${KINDS.map((k) => `<button type="button" class="trend-kind ${k.key === active ? 'active' : ''}" data-trend-kind="${k.key}">${k.label}</button>`).join('')}</div>
-                <div class="trend-chips">${students.map((s) => `<button type="button" class="trend-chip ${s.id === sel ? 'active' : ''}" data-trend-stu="${s.id}">${esc(s.studentNo ? s.studentNo + ' ' : '')}${esc(s.name)}</button>`).join('')}</div>
+                <div class="trend-chips">${students.map((s) => `<button type="button" class="trend-chip ${s.id === sel ? 'active' : ''}" data-trend-stu="${s.id}">${esc(s.studentNo ? s.studentNo + ' ' : '')}${esc(s.name)}</button>`).join('')}${inactive ? `<button type="button" class="trend-chip active" data-trend-stu="${inactive.id}">${esc(inactive.name)}（已${esc(AppState.STUDENT_STATUS[inactive.status])}）</button>` : ''}</div>
             </div>`;
     }
 

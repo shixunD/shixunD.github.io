@@ -95,6 +95,10 @@
     font-size: 0.72rem; font-weight: 700; font-family: inherit;
 }
 .cell:hover { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+/* 入班前的作业（中途入班的学生）：灰色占位，不可点 */
+.cell.cell-na { cursor: default; background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,0.6) 4px 6px); }
+.cell.cell-na:hover { outline: none; }
+.hw-later-hint { margin-top: 0.6rem; }
 .cell.has-comment::after {
     content: ''; position: absolute; top: 0; right: 0;
     border-style: solid; border-width: 0 8px 8px 0; border-color: transparent #fff transparent transparent;
