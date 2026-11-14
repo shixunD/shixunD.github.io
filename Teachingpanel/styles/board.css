@@ -44,6 +44,7 @@
     box-shadow: inset 6px 0 0 var(--st-color);
 }
 .status-option:hover { background: color-mix(in srgb, var(--st-color) 12%, white); }
+.status-option:disabled, .status-option:disabled:hover { opacity: 0.4; background: #f1f1f1; color: #999; cursor: not-allowed; }
 .status-option.selected { background: var(--st-color); color: var(--st-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-color) 30%, transparent); }
 
 /* 矩阵表 */

@@ -2,8 +2,8 @@
 // 全局命名空间：window.RecitationModel
 //
 // 轮次（round）= 一项背诵任务，不绑定日期；老师每天抽查一部分人，每次检查新增一条 recCheck。
-// 学生在某轮次的"当前状态" = 最新一条检查记录的结果（超额完成 / 过关 / 重新过关 / 未过关），没有记录 = 未检查。
-// "超额完成"= 过关里做得特别好的（深绿），所有"算不算过关"的统计都把它算作过关，用 isPassed() 判断。
+// 学生在某轮次的"当前状态" = 最新一条检查记录的结果（提前完成 / 过关 / 重新过关 / 未过关），没有记录 = 未检查。
+// "提前完成"= 过关里做得特别好的（深绿），所有"算不算过关"的统计都把它算作过关，用 isPassed() 判断。
 // "重新过关 / 未过关"只是状态，不带日期（1.9.0 起）；"哪天再背"统一用背诵计划（recPlan）表示。
 // 背诵计划（recPlan）= "计划某天让这个学生背"，与检查状态互不影响、可以同时存在（一个学生可有多个计划日期）。
 //   登记检查不会删除计划；安排之后登记的、日期在计划日当天或之后的检查，会让这条计划算"已完成"
@@ -13,7 +13,7 @@
     'use strict';
 
     const RESULTS = [
-        { key: 'excel', label: '超额完成', color: '#0b5c2a', text: '#fff' },
+        { key: 'excel', label: '提前完成', color: '#0b5c2a', text: '#fff' },
         { key: 'pass', label: '完成过关', color: '#1e8e3e', text: '#fff' },
         { key: 'cond', label: '条件过关', color: '#b9e8b0', text: '#1f5214' },
         { key: 'retry', label: '重新过关', color: '#f2b705', text: '#4a3500' },
@@ -27,7 +27,7 @@
 
     function state() { return AppState.getState(); }
 
-    // 超额完成、条件过关（勉强过）也算过关
+    // 提前完成、条件过关（勉强过）也算过关
     function isPassed(key) { return key === 'pass' || key === 'excel' || key === 'cond'; }
 
     // ---------- 轮次 ----------
@@ -114,10 +114,35 @@
         return progressOf(roundId, studentId).status;
     }
 
+    // ---------- 「提前完成」的限制（1.32.1） ----------
+    // 锁定：最新一条检查是 excel —— 这一轮已经过关，不能再加别的检查状态、不能再加计划，只能编辑这条记录的备注 / 照片
+    // 不能选 excel：之前登记过 重新过关 / 未过关（ignoreDate 那天的记录会被这次保存替换，不算）
+    const sortChecks = (list) => list.slice().sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    function lockedIn(checks) {
+        const l = sortChecks(checks);
+        return l.length ? l[l.length - 1].result === 'excel' : false;
+    }
+    function excelBlockedIn(checks, ignoreDate) {
+        return checks.some((c) => (c.result === 'retry' || c.result === 'fail') && c.date !== ignoreDate);
+    }
+    // exceptCheckId（可选）：算锁定时不看这一条（编辑那条记录自己时用）
+    function isLocked(roundId, studentId, exceptCheckId) { return lockedIn(checksFor(roundId, studentId).filter((c) => c.id !== exceptCheckId)); }
+    function canExcel(roundId, studentId, ignoreDate) { return !excelBlockedIn(checksFor(roundId, studentId), ignoreDate); }
+    function guardCheck(mine, result, date, selfId) {
+        const others = selfId ? mine.filter((c) => c.id !== selfId) : mine;
+        if (lockedIn(others)) {
+            const ex = sortChecks(others).pop();
+            if (!(result === 'excel' && date === ex.date)) throw new Error('已经「提前完成」，只能修改那条记录的备注和照片，不能再登记其他状态');
+        } else if (result === 'excel' && excelBlockedIn(others, date)) {
+            throw new Error('已有「重新过关 / 未过关」记录，不能再选「提前完成」');
+        }
+    }
+
     // 同一个学生、同一轮次、同一天只保留一个检查状态：这天已有记录时，把它改成新的结果（不新增）。计划（recPlan）不受这条限制
     function addCheck(data) {
         return AppState._commit((s) => {
             const date = data.date || Utils.today();
+            guardCheck(s.recChecks.filter((c) => c.roundId === data.roundId && c.studentId === data.studentId), data.result, date, null);
             const same = s.recChecks.find((c) => c.roundId === data.roundId && c.studentId === data.studentId && c.date === date);
             if (same) {
                 same.result = data.result;
@@ -146,6 +171,10 @@
         return AppState._commit((s) => {
             const c = s.recChecks.find((x) => x.id === id);
             if (!c) return;
+            // 结果和日期都没变（只改备注 / 照片）不受限制
+            if (!(patch.result === c.result && (patch.date || c.date) === c.date)) {
+                guardCheck(s.recChecks.filter((x) => x.roundId === c.roundId && x.studentId === c.studentId), patch.result, patch.date || c.date, c.id);
+            }
             c.result = patch.result;
             c.date = patch.date || c.date;
             c.note = patch.note || '';
@@ -160,7 +189,7 @@
         return AppState._commit((s) => { s.recChecks = s.recChecks.filter((c) => c.id !== id); });
     }
 
-    // 单轮次的状态统计；passed = 超额完成 + 过关 + 条件过关
+    // 单轮次的状态统计；passed = 提前完成 + 过关 + 条件过关
     function roundSummary(roundId, students) {
         const counts = { excel: 0, pass: 0, cond: 0, retry: 0, fail: 0, none: 0 };
         (students || AppState.getStudents()).forEach((stu) => { counts[statusOf(roundId, stu.id)]++; });
@@ -198,6 +227,8 @@
         return AppState._commit((s) => {
             let added = 0;
             studentIds.forEach((studentId) => {
+                // 已「提前完成」的学生不能再加计划
+                if (lockedIn(s.recChecks.filter((c) => c.roundId === roundId && c.studentId === studentId))) return;
                 list.forEach((date) => {
                     if (s.recPlans.some((p) => p.roundId === roundId && p.studentId === studentId && p.date === date)) return;
                     const plan = { id: Utils.uid('plan'), roundId, studentId, date, createdAt: Date.now() };
@@ -276,7 +307,7 @@
     }
 
     // 今日背诵剩余人数：今天还有未完成计划的学生（跨轮次去重）
-    // 本周背诵剩余人数：本周轮次里，状态不是 超额完成 / 过关 / 条件过关 的学生人次
+    // 本周背诵剩余人数：本周轮次里，状态不是 提前完成 / 过关 / 条件过关 的学生人次
     function remainingCounts() {
         const today = Utils.today();
         const thisWeek = weekStartOf(today);
@@ -320,7 +351,7 @@
     window.RecitationModel = {
         RESULTS, RESULT_MAP, NONE, PLAN, isPassed, moveSide, removeGroup,
         rounds, roundLayout, getRound, createRound, updateRound, removeRound,
-        checksFor, latestCheck, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
+        checksFor, latestCheck, isLocked, canExcel, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
         plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
         schedule, nextArrangement, dueToday, reminderCounts, remainingCounts, weekStartOf, roundWeek, roundDay, studentOverview
     };

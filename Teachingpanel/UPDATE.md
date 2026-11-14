@@ -3,6 +3,16 @@
 **每次发版本必须在这里加一条新记录**（最新的在最上面），格式：`## {semver} — {日期}`。
 `version.json` 的 `semver` 必须始终等于本文件最新一条记录的版本号，并在其 `changelog` 数组最前面插入同版本条目。
 
+## 1.32.1 — 2026-11-14
+
+- 新增：「提前完成」(`excel`) 的限制。`RecitationModel.isLocked(roundId, studentId, exceptCheckId?)`（最新一条检查是 excel = 锁定）、`canExcel(roundId, studentId, ignoreDate?)`（有 retry / fail 记录则不能选 excel）；`addCheck` / `updateCheck` 内 `guardCheck` 校验并抛中文错误（只改备注 / 照片不受限）；`addPlans` 跳过已锁定的学生
+- 界面：检查弹窗锁定时只留提前完成（其余按钮灰、隐藏日期与计划区、提示文字），选提前完成时隐藏计划区；编辑检查记录、计划背诵页学生块同样置灰；删除提前完成记录后解除锁定。不改数据结构，不升 schema
+
+## 1.32.0 — 2026-11-14
+
+- 调整：背诵结果 `excel` 的显示名「超额完成」→「提前完成」（key 不变，无需迁移；历史更新记录保持原文）
+- 新增：导出统计的背诵加减分（`ScoreReport.recScore`）：最终没过关 −`recFail`(2)；过关且有 `excel` 检查 +`recEarly`(3)；无计划或仅一次计划且计划当日有过关检查 +`recOnPlan`(2)；其余过关 +`recLate`(1)。`settings.scoreRules` 新增四个字段（读取时与默认值合并，**不升 schema**）；每行新增 `recScore` / `total`；报表单元格显示分数，新增「背诵得分」「总分」列（预览 / PDF / Excel / Markdown）；规则弹窗可改分值；Handbook、PROJECT.md 同步
+
 ## 1.31.0 — 2026-11-12
 
 - 新增：考试成绩带「班级排名 / 年级排名」。`ExamModel.parseTxt` 改为每行 `姓名 成绩 班级排名 [年级排名]`（班级排名必填，年级排名可省略 / NA / - / 无）；`setScores(examId, scores, ranks)` 新增第三参数写入 `exam.classRanks` / `exam.gradeRanks`（可选字段，**不升 schema**，.db 落在 `exams.extra`）；`stats()` 的 `ranks` 优先用导入值、缺失才按分数算，新增 `gradeRanks`；`studentHistory` 新增 `gradeRank`；`exportTxt` 输出四列（年级无则 NA）；删除学生 / 清除成绩级联清排名

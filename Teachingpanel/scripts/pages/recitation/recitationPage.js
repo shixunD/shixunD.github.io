@@ -19,7 +19,7 @@
         { key: 'retry', label: '重新过关' },
         { key: 'fail', label: '未过关' },
         { key: 'pass', label: '完成过关' },
-        { key: 'excel', label: '超额完成' },
+        { key: 'excel', label: '提前完成' },
         { key: 'cond', label: '条件过关' }
     ];
 

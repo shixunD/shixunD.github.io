@@ -106,8 +106,9 @@ state = {
 
 - **轮次（round）不绑定日期**，每天抽查一部分人，每次检查新增一条 `recCheck`（历史全保留，可删单条）。
 - 学生在某轮次的**当前状态 = 最新一条检查记录的 result**（`progressOf()/statusOf()`；按 date，再按 createdAt 排序）；没记录 = 未检查。
-  result：`excel` 深绿（超额完成，1.10.0 新增）/ `pass` 绿 / `cond` 浅绿（有条件过关=勉强过，1.12.0 新增，同样算过关）/ `retry` 黄（需重新过关）/ `fail` 红（未过关）。
-  超额完成 = 过关里做得好的，凡是"算不算过关"的地方（过关率、过关数、连续过关、把未过关的加入计划）都用 `RecitationModel.isPassed()` 判断，
+  result：`excel` 深绿（提前完成，1.10.0 新增）/ `pass` 绿 / `cond` 浅绿（有条件过关=勉强过，1.12.0 新增，同样算过关）/ `retry` 黄（需重新过关）/ `fail` 红（未过关）。
+  提前完成 = 过关里做得好的，凡是"算不算过关"的地方（过关率、过关数、连续过关、把未过关的加入计划）都用 `RecitationModel.isPassed()` 判断，
+  **提前完成限制（1.32.1）**：最新一条检查是 excel = 锁定（`isLocked`）：不能再登记别的状态、不加计划（`addPlans` 跳过），只能改那条的备注 / 照片；有 retry / fail 记录则不能选 excel（`canExcel`）；校验在 `addCheck` / `updateCheck` 的 `guardCheck`，UI 置灰在 checkDialog / planView。
   `roundSummary()` 另给 `passed = excel + pass + cond`。计划背诵标识色 1.12.0 起改为浅天蓝（`PLAN`）。
   作业侧栏同理：`HomeworkModel.sideLayout()` / `sideList()` / `moveSide()`，可选字段 `order`；`list()` 保持按日期（趋势统计依赖时间顺序）。
   **分组夹**（1.27.0，`models/sideGroups.js`，作业 / 背诵共用）：最外层 = 没进分组的条目 + 分组夹，共用一套 `order`；分组夹内条目有自己一套 `order` 和 `groupId`；分组夹只有一层。`SideGroups.move(kind, items, cmpItem, drag, drop)` 每次都对整个布局重新编号；删除分组夹时里面的条目留在原位置。拖动 / 折叠 UI 在 `UI.sideTreeHtml` + `UI.bindSideTree`（取代旧的 `bindSideDrag`）：条目落在条目上半 / 下半 = 插到前 / 后（进入或留在它的分组夹），落在分组夹标题（上 30% = 插到前面，其余 = 放进去），落在列表底部 `.side-end` = 移到最外层最后（脱离分组夹）；分组夹拖到别的分组夹里面的条目上 = 落到那个分组夹前 / 后。折叠状态存 `collapsed`（进数据 / 备份）。
@@ -136,7 +137,7 @@ state = {
   卡片上的日期用 `nextArrangement()`（只算这一对，避免整班渲染时 O(n²)）。
 - 时间看板 = `schedule()`：所有未完成的背诵计划（每条附该生当前状态和最近一次检查备注）。已逾期置顶，之后按日期分组。
   **默认显示全部未来安排**，可切 7/14/30 天。提醒角标/首页概览统计的也是计划。
-- 总览矩阵（`overview.js`）：每格是一条按数量分段的色块——该生在该轮所有检查记录中 超额完成 / 过关 / 需重新过关 / 未过关 的次数，
+- 总览矩阵（`overview.js`）：每格是一条按数量分段的色块——该生在该轮所有检查记录中 提前完成 / 过关 / 需重新过关 / 未过关 的次数，
   按深绿、绿、黄、红从左到右、宽度按数量比例（`flex: n`）；中间数字 = 检查次数；没检查过 = 灰色空格；最右"过关"列按当前状态统计。
 
 ### 3.4 其他情况：学情记录（`models/remarks.js`）
@@ -175,7 +176,7 @@ state = {
 
 - 只读统计，不改业务数据。`ScoreReport.build({hwIds, roundIds, sort, title})` → 报表对象（rows / summary / unfixed / recFails），三种输出都吃这一个对象。
 - **作业**：一次导出 = 一个统计周期，N = 勾选的作业总数（跨分组夹也合在一起算，用户明确要求）。全部绿 +`bonusAll`(2)；N ≥ 2 且恰好 N−1 项绿 +`bonusOneOff`(1)；N = 1 时只有「全绿加分 / 0」两档。扣分 = Σ 各状态数量 × `penalty[status]`（默认粉 0.5、红 1、两种蓝 0）；蓝色不算绿。
-- **背诵**：每个任务一列，判定 = 检查页卡片底色（`recOf` 与 `recitationPage.studentCard` 的 `planIsLast` 规则必须保持一致）：最新结果是 excel / pass /（`condPass` 时）cond，且（`planBlocks` 时）最后一天不是「只有未完成的计划」→ ✓。
+- **背诵**（1.32.0 起为加减分，`recScore`：最终没过关 −`recFail`(2)；有提前完成检查 +`recEarly`(3)；无计划或仅一次计划且计划当日过关 +`recOnPlan`(2)；其余过关 +`recLate`(1)；行上有 `recScore` / `total`）：每个任务一列，过关判定 = 检查页卡片底色（`recOf` 与 `recitationPage.studentCard` 的 `planIsLast` 规则必须保持一致）：最新结果是 excel / pass /（`condPass` 时）cond，且（`planBlocks` 时）最后一天不是「只有未完成的计划」→ ✓。
 - **规则**存 `settings.scoreRules = { bonusAll, bonusOneOff, penalty: {poor, missing, poor_fixed, missing_fixed}, condPass, planBlocks }`，`ScoreReport.getRules()` 读取时与 `DEFAULT_RULES` 合并，所以**不需要升 schema**；在「⚙️ 设置」里的弹窗（`ExportReport.openRules`）修改。
 - **PDF** = `ReportOutput.print()`：把报表渲染进 `body > #tp-print-root`，`@media print` 只显示它，`document.title` 临时改成文件名，`afterprint` 清理。不用 PDF 库：内嵌中文字体要几 MB。**Excel** = `XlsxLite.build()`（手写 stored ZIP，零依赖；数字用 `+General;-General;0` 格式显示正负号）。**Markdown** 符号：✅ 🩵 💙 🩷 🔴（Unicode 没有粉色圆形 emoji）。
 - 中途转入的学生在转入前的作业上默认算绿色（records 里没有记录 = done），目前不处理。

@@ -71,7 +71,7 @@
                         const planned = mine.some((p) => !RecitationModel.isPlanDone(p)) && !RecitationModel.isPassed(RecitationModel.statusOf(ui.roundId, stu.id));
                         const stripColor = planned ? RecitationModel.PLAN.accent : st.color;
                         const stripTitle = planned ? `${st.label}（已计划）` : st.label;
-                        return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''}" data-plan-sid="${stu.id}" ${done ? 'title="这天的计划已检查完成；点击会取消这条历史计划"' : ''}>
+                        return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''}" data-plan-sid="${stu.id}" ${!plan && RecitationModel.isLocked(ui.roundId, stu.id) ? 'disabled title="已提前完成，不能再加计划"' : ''} ${done ? 'title="这天的计划已检查完成；点击会取消这条历史计划"' : ''}>
                             <i style="background:${stripColor}" title="${esc(stripTitle)}"></i><span class="row-no">${esc(stu.studentNo)}</span>${esc(stu.name)}
                             <small>${plan ? (done ? '✓ 这天已检查' : '✓ 这天已计划') : esc(st.label)}</small>
                             <small class="plan-stu-dates">${mine.length ? `🗓️ ${dateList}` : '暂无计划'}</small>
