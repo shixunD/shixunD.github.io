@@ -108,7 +108,7 @@
             title: `导入成绩 · ${exam.name}`,
             wide: true,
             html: `
-                <div class="hint">每行「姓名 成绩 班级排名 年级排名」，用空格分隔，例如：<code>杨迪 101 3 25</code>。<b>姓名、成绩、班级排名必填</b>；年级排名可不写（或写 <code>NA</code>），就显示 NA。可直接粘贴，或选择 .txt 文件。</div>
+                <div class="hint">每行「姓名 成绩 班级排名 年级排名」，用空格分隔，例如：<code>杨迪 101 3 25</code>。<b>姓名、成绩、班级排名必填</b>；年级排名可不写（或写 <code>NA</code>），就显示 NA。可直接粘贴，或选择 .txt 文件；第一行是「姓名 得分 班级排名 年级排名」这样的表头也没关系，会自动跳过。</div>
                 <input type="file" accept=".txt,text/plain" data-file>
                 <textarea rows="8" data-text placeholder="杨迪 101 3 25&#10;罗门 103 1 NA"></textarea>
                 <div data-preview></div>

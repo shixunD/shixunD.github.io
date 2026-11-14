@@ -87,8 +87,8 @@
         const align = ['---:', '---'];
         if (rp.n) { head.push('作业完成情况', '加分', '扣分', '作业得分'); align.push('---', '---:', '---:', '---:'); }
         rp.rounds.forEach((r) => { head.push(`背诵：${mdCell(r.title)}`); align.push(':---:'); });
-        if (rp.rounds.length) { head.push('背诵得分'); align.push('---:'); }
-        if (rp.rounds.length && rp.n) { head.push('总分'); align.push('---:'); }
+        // 1.33.1 起不再单列「背诵得分」（各任务的分已经逐列显示）；有背诵就显示总分 = 作业得分 + 各背诵任务得分
+        if (rp.rounds.length) { head.push('总分'); align.push('---:'); }
         L.push(`| ${head.join(' | ')} |`, `|${align.join('|')}|`);
         rp.rows.forEach((row) => {
             const c = [mdCell(row.student.studentNo), mdCell(row.student.name)];
@@ -97,8 +97,7 @@
                     signed(row.bonus), signed(-row.penalty), `**${signed(row.final)}**`);
             }
             row.rec.forEach((x) => c.push(signed(x.score)));
-            if (rp.rounds.length) c.push(`**${signed(row.recScore)}**`);
-            if (rp.rounds.length && rp.n) c.push(`**${signed(row.total)}**`);
+            if (rp.rounds.length) c.push(`**${signed(row.total)}**`);
             L.push(`| ${c.join(' | ')} |`);
         });
         L.push('');
@@ -126,7 +125,7 @@
     function summaryTable(rp) {
         const sep = (i) => (rp.n && i === 0 ? ' rp-sep' : '');   // 作业得分与背诵之间的细分隔线（只加在表身；表头靠背诵列的深一号绿色区分）
         const recHead = rp.rounds.map((r, i) => `<th class="rp-c rp-rec-h${rp.n ? ' rp-rec-th' : ''}">背诵<small>${esc(r.title)}</small></th>`).join('');
-        const recSum = rp.rounds.length ? `<th class="rp-c rp-rec-th">背诵得分</th>${rp.n ? '<th class="rp-c">总分</th>' : ''}` : '';
+        const recSum = rp.rounds.length ? '<th class="rp-c">总分</th>' : '';
         const body = rp.rows.map((row) => {
             const cls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
             const hw = rp.n ? `
@@ -135,7 +134,7 @@
                 <td class="rp-c">${signed(-row.penalty)}</td>
                 <td class="rp-c rp-final ${row.final > 0 ? 'pos' : row.final < 0 ? 'neg' : ''}">${signed(row.final)}</td>` : '';
             const rec = row.rec.map((x, i) => `<td class="rp-c rp-mark ${cls(x.score)}${sep(i)}">${signed(x.score)}</td>`).join('') +
-                (rp.rounds.length ? `<td class="rp-c rp-final ${cls(row.recScore)}">${signed(row.recScore)}</td>${rp.n ? `<td class="rp-c rp-final ${cls(row.total)}">${signed(row.total)}</td>` : ''}` : '');
+                (rp.rounds.length ? `<td class="rp-c rp-final ${cls(row.total)}">${signed(row.total)}</td>` : '');
             return `<tr><td class="rp-no">${esc(row.student.studentNo)}</td><td class="rp-name">${esc(row.student.name)}</td>${hw}${rec}</tr>`;
         }).join('');
         return `
@@ -262,7 +261,7 @@
         const th = (v, extra) => ({ v, s: Object.assign({ bold: true, color: 'FFFFFF', fill: GREEN, align: 'center', border: true, wrap: true }, extra || {}) });
         const td = (v, s) => ({ v, s: Object.assign({ border: true }, s || {}) });
         const s = rp.summary;
-        const width = 2 + (rp.n ? 4 : 0) + rp.rounds.length + (rp.rounds.length ? (rp.n ? 2 : 1) : 0);
+        const width = 2 + (rp.n ? 4 : 0) + rp.rounds.length + (rp.rounds.length ? 1 : 0);
 
         // 表 1：汇总
         const rows1 = [
@@ -274,8 +273,7 @@
         const head = [th('学号'), th('学生', { align: 'left' })];
         if (rp.n) head.push(th('作业完成情况', { align: 'left' }), th('加分'), th('扣分'), th('作业得分'));
         rp.rounds.forEach((r) => head.push(th(`背诵：${r.title}`)));
-        if (rp.rounds.length) head.push(th('背诵得分'));
-        if (rp.rounds.length && rp.n) head.push(th('总分'));
+        if (rp.rounds.length) head.push(th('总分'));
         rows1.push(head);
         rp.rows.forEach((row) => {
             const no = row.student.studentNo;
@@ -290,11 +288,10 @@
             }
             const colorOf = (v) => (v > 0 ? GREEN : v < 0 ? RED : '333333');
             row.rec.forEach((x) => line.push(td(x.score, { align: 'center', signed: true, bold: true, color: colorOf(x.score) })));
-            if (rp.rounds.length) line.push(td(row.recScore, { align: 'center', signed: true, bold: true, color: colorOf(row.recScore) }));
-            if (rp.rounds.length && rp.n) line.push(td(row.total, { align: 'center', signed: true, bold: true, color: colorOf(row.total) }));
+            if (rp.rounds.length) line.push(td(row.total, { align: 'center', signed: true, bold: true, color: colorOf(row.total) }));
             rows1.push(line);
         });
-        const cols1 = [7, 12].concat(rp.n ? [30, 8, 8, 14] : [], rp.rounds.map((r) => Math.max(12, Math.min(40, r.title.length * 2 + 8))), rp.rounds.length ? (rp.n ? [10, 10] : [10]) : []);
+        const cols1 = [7, 12].concat(rp.n ? [30, 8, 8, 14] : [], rp.rounds.map((r) => Math.max(12, Math.min(40, r.title.length * 2 + 8))), rp.rounds.length ? [10] : []);
         const lastCol = String.fromCharCode(64 + Math.min(width, 26));
 
         // 表 2：逐项明细（单元格底色 = 状态色）

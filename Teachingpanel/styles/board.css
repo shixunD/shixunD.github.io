@@ -144,3 +144,4 @@
 .import-preview .bad { color: var(--danger-color); }
 .import-preview .warn { color: #a36d00; }
 .rank-table td:first-child { font-weight: 700; width: 56px; }
+.rank-table td.rank-no { color: var(--text-secondary); }   /* 学号放最右边、颜色淡一点（1.33.1） */

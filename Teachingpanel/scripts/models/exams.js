@@ -5,6 +5,7 @@
 //   杨迪 101 3 25
 //   罗门 103 1 NA
 // 姓名、成绩、班级排名必填；年级排名可省略，也可写 NA / - ，都表示没有年级排名。
+// 导出的文件第一行是表头「姓名 得分 班级排名 年级排名」（1.33.1 起）；导入时以「姓名」开头的表头行自动跳过。
 // 分隔符兼容半角/全角空格、Tab、逗号；按姓名匹配当前班级学生（姓名在班级内唯一）。
 // 排名存在考试的可选字段 classRanks / gradeRanks（{ [studentId]: 正整数 }），无需升 schema。
 
@@ -102,6 +103,7 @@
         String(text || '').replace(/^﻿/, '').split(/\r?\n/).forEach((raw) => {
             const line = raw.trim();
             if (!line) return;
+            if (/^姓名[\s,，\t　]/.test(line) && !/\d/.test(line)) return;   // 表头行（导出的 TXT 第一行）
             const parts = line.split(/[\s,，\t　]+/).filter(Boolean);
             // 姓名 = 第一个纯数字片段之前的部分；其后依次是 成绩、班级排名、[年级排名]
             const first = parts.findIndex((p) => parseScore(p) != null);
@@ -135,12 +137,13 @@
         return v == null ? '' : String(Math.round(v * 100) / 100);
     }
 
-    // 导出为 TXT：「姓名 成绩 班级排名 年级排名(没有写 NA)」，按学号顺序，缺考（无成绩）的学生不输出
+    // 导出为 TXT：第一行表头「姓名 得分 班级排名 年级排名」（1.33.1 起，方便别的程序识别字段），
+    // 之后每行「姓名 成绩 班级排名 年级排名(没有写 NA)」，空格分隔，按学号顺序，缺考（无成绩）的学生不输出
     function exportTxt(examId) {
         const exam = get(examId);
         if (!exam) return '';
         const st = stats(exam);
-        return AppState.getStudents()
+        return '姓名 得分 班级排名 年级排名\n' + AppState.getStudents()
             .filter((stu) => exam.scores[stu.id] != null)
             .map((stu) => `${stu.name} ${formatScore(exam.scores[stu.id])} ${st.ranks[stu.id]} ${st.gradeRanks[stu.id] || 'NA'}`)
             .join('\n') + '\n';

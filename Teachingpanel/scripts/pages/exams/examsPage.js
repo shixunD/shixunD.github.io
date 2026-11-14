@@ -125,10 +125,10 @@
                     ${SvgChart.bars({ labels: dist.map((d) => d.label), values: dist.map((d) => d.count), color: 'var(--primary-color)' })}
                     <h3 class="section-title">成绩排名</h3>
                     <table class="simple-table rank-table">
-                        <thead><tr><th>班级排名</th><th>年级排名</th><th>学号</th><th>姓名</th><th>成绩</th><th>得分率</th></tr></thead>
+                        <thead><tr><th>班级排名</th><th>年级排名</th><th>姓名</th><th>成绩</th><th>得分率</th><th>学号</th></tr></thead>
                         <tbody>${st.entries.map((x) => `<tr data-sid="${x.student.id}">
-                            <td>${st.ranks[x.student.id]}</td><td>${st.gradeRanks[x.student.id] || 'NA'}</td><td>${esc(x.student.studentNo)}</td><td>${UI.studentLink(x.student)}</td>
-                            <td><b>${ExamModel.formatScore(x.score)}</b></td><td>${Utils.percent(x.score, exam.fullScore)}</td></tr>`).join('')}
+                            <td>${st.ranks[x.student.id]}</td><td>${st.gradeRanks[x.student.id] || 'NA'}</td><td>${UI.studentLink(x.student)}</td>
+                            <td><b>${ExamModel.formatScore(x.score)}</b></td><td>${Utils.percent(x.score, exam.fullScore)}</td><td class="rank-no">${esc(x.student.studentNo)}</td></tr>`).join('')}
                         </tbody>
                     </table>
                     ${st.total > st.count ? `<div class="hint">未录入：${AppState.getStudents().filter((s) => exam.scores[s.id] == null).map((s) => esc(s.name)).join('、')}</div>` : ''}
