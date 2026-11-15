@@ -134,7 +134,7 @@
                 <td class="rp-c">${signed(-row.penalty)}</td>
                 <td class="rp-c rp-final ${row.final > 0 ? 'pos' : row.final < 0 ? 'neg' : ''}">${signed(row.final)}</td>` : '';
             const rec = row.rec.map((x, i) => `<td class="rp-c rp-mark ${cls(x.score)}${sep(i)}">${signed(x.score)}</td>`).join('') +
-                (rp.rounds.length ? `<td class="rp-c rp-final ${cls(row.total)}">${signed(row.total)}</td>` : '');
+                (rp.rounds.length ? `<td class="rp-c rp-final rp-sep ${cls(row.total)}">${signed(row.total)}</td>` : '');   // 背诵与总分之间同样一根细分隔线
             return `<tr><td class="rp-no">${esc(row.student.studentNo)}</td><td class="rp-name">${esc(row.student.name)}</td>${hw}${rec}</tr>`;
         }).join('');
         return `

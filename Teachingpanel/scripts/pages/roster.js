@@ -16,7 +16,7 @@
         if (!list.length) return '';
         return `
             <details class="roster-inactive">
-                <summary>已转出 / 休学 ${list.length} 人（记录都保留，不出现在登记和统计里）</summary>
+                <summary>已转出 ${list.length} 人（记录都保留，不出现在登记和统计里）</summary>
                 <div class="table-scroll">
                     <table class="simple-table roster-table">
                         <tbody>${list.map((s) => `
@@ -57,7 +57,7 @@
                                     <td class="roster-note">${joinedHtml(s)}${esc(s.note)}</td>
                                     <td class="row-actions">
                                         <button type="button" class="link-btn" data-edit-student="${s.id}">编辑</button>
-                                        <button type="button" class="link-btn" data-leave-student="${s.id}" title="不再出现在登记和统计里，记录全部保留，可随时恢复">转出/休学</button>
+                                        <button type="button" class="link-btn" data-leave-student="${s.id}" title="不再出现在登记和统计里，记录全部保留，可随时恢复">转出</button>
                                         <button type="button" class="link-btn danger" data-del-student="${s.id}">删除</button>
                                     </td>
                                 </tr>`).join('')}
@@ -161,7 +161,7 @@
             const stu = AppState.getStudent(b.dataset.delStudent);
             const ok = await Modal.confirm({
                 title: '删除学生',
-                text: `确定删除「${stu.name}」吗？\n该生的所有作业、背诵、考试记录也会一起删除，此操作不可撤销。\n只是不在这个班了的话，用「转出/休学」，记录会保留。`,
+                text: `确定删除「${stu.name}」吗？\n该生的所有作业、背诵、考试记录也会一起删除，此操作不可撤销。\n只是不在这个班了的话，用「转出」，记录会保留。`,
                 confirmText: '删除',
                 danger: true
             });
@@ -169,15 +169,14 @@
         }));
     }
 
-    // 转出 / 休学：选一种，记录全部保留
+    // 转出：记录全部保留（1.33.2 起界面上只有「转出」一种，不再单独选休学；以前设为休学的学生数据不变，名单里仍显示「休学」）
     function openLeave(stu) {
         Modal.open({
-            title: `${stu.name} · 转出 / 休学`,
+            title: `${stu.name} · 转出`,
             html: `
-                <p>设为转出或休学后，该生不再出现在作业、背诵、考试的登记和统计里，也不计入导出统计；以前的所有记录都保留，在学生名单底部「已转出 / 休学」里可以随时恢复在读。</p>
+                <p>转出后，该生不再出现在作业、背诵、考试的登记和统计里，也不计入导出统计；以前的所有记录都保留，在学生名单底部「已转出」里可以随时恢复在读。</p>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
-                    <button type="button" class="btn-secondary" data-set="leave">休学</button>
                     <button type="button" class="btn-primary" data-set="out">转出</button>
                 </div>`,
             onMount(body, close) {
