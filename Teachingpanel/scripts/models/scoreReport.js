@@ -182,6 +182,6 @@
 
     window.ScoreReport = {
         DEFAULT_RULES, PENALTY_KEYS, STATUS_ORDER,
-        getRules, saveRules, defaultRules, normalizeRules, signed, bonusOf, build
+        getRules, saveRules, defaultRules, normalizeRules, signed, bonusOf, recOf, build
     };
 })();

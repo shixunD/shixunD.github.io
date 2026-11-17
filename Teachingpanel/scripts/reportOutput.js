@@ -235,16 +235,94 @@
             </div>`;
     }
 
+    // ---------- 个人学情（PersonalReport.build 的结果；没有加减分，只写完成情况） ----------
+
+    const sq = (c) => `<i class="rp-sq" style="background:${c}"></i>`;
+    const personalMeta = (p) => [p.className, `${p.student.name}${p.student.studentNo ? '（学号 ' + p.student.studentNo + '）' : ''}`, `导出于 ${p.exportedAt}`].filter(Boolean).join(' · ');
+    const plansText = (p) => p.plans.map((d) => Utils.formatDate(d)).join('、');
+
+    function personalSummary(p) {
+        const bits = [];
+        if (p.hws.length) {
+            const S = HomeworkModel.STATUS_MAP;
+            bits.push(`作业 ${p.hws.length} 项：` + ORDER.filter((k) => p.counts[k]).map((k) => `${S[k].label} ${p.counts[k]} 项`).join('，'));
+        }
+        if (p.rounds.length) bits.push(`背诵 ${p.rounds.length} 项：过关 ${p.recPass} 项，未过关 ${p.rounds.length - p.recPass} 项`);
+        return bits.join('；');
+    }
+
+    function personalMarkdown(p) {
+        const L = [`# ${p.title}`, '', personalMeta(p), '', `**概况：** ${personalSummary(p)}`, ''];
+        if (p.hws.length) {
+            L.push('## 作业', '', '| # | 日期 | 作业 | 完成情况 | 备注 |', '|---:|---|---|---|---|');
+            p.hws.forEach((x) => L.push(`| ${x.no} | ${mdCell(Utils.formatDate(x.hw.date))} | ${mdCell(x.hw.title)} | ${EMOJI[x.status]} ${x.label} | ${mdCell(x.comment)} |`));
+            L.push('');
+        }
+        if (p.rounds.length) {
+            L.push('## 背诵', '', '| # | 任务 | 当前情况 | 是否过关 | 最近检查 | 检查次数 | 待完成计划 | 备注 |', '|---:|---|---|:---:|---|---:|---|---|');
+            p.rounds.forEach((x) => L.push(`| ${x.no} | ${mdCell(x.round.title)} | ${x.label} | ${x.pass ? '✓' : '✗'} | ${x.lastDate ? mdCell(Utils.formatDate(x.lastDate)) : '—'} | ${x.attempts} | ${mdCell(plansText(x)) || '—'} | ${mdCell(x.comment)} |`));
+            L.push('');
+        }
+        return L.join('\n');
+    }
+
+    function personalHtml(p) {
+        const hwRows = p.hws.map((x) => {
+            const s = hwStatus(x.status);
+            return `<tr><td class="rp-c">${x.no}</td><td>${esc(Utils.formatDate(x.hw.date))}</td><td>${esc(x.hw.title)}</td><td class="rp-pstatus">${sq(s.color)}${esc(x.label)}</td><td>${esc(x.comment)}</td></tr>`;
+        }).join('');
+        const recRows = p.rounds.map((x) => {
+            const s = recLook(x.look);
+            const label = x.look === 'plan' ? `${x.label}（有计划）` : x.label;
+            return `<tr><td class="rp-c">${x.no}</td><td>${esc(x.round.title)}</td><td class="rp-pstatus">${sq(s.color)}${esc(label)}</td><td class="rp-c rp-mark ${x.pass ? 'pos' : 'neg'}">${x.pass ? '✓ 过关' : '✗ 未过关'}</td><td>${x.lastDate ? esc(Utils.formatDate(x.lastDate)) : '—'}</td><td class="rp-c">${x.attempts}</td><td>${esc(plansText(x)) || '—'}</td><td>${esc(x.comment)}</td></tr>`;
+        }).join('');
+        const hwLegend = p.hws.length ? HomeworkModel.STATUSES.map((st) => `<span class="rp-rule">${sq(st.color)}${esc(st.label)}</span>`).join('') : '';
+        const recLegend = p.rounds.length ? RecitationModel.RESULTS.concat([RecitationModel.PLAN, RecitationModel.NONE]).map((st) => `<span class="rp-rule">${sq(st.color)}${esc(st.label)}</span>`).join('') : '';
+        let sec = 0;
+        const h = (t) => `<h2 class="rp-h2">${['一', '二'][sec++]}、${t}</h2>`;
+        return `
+            <div class="rp rp-personal">
+                <div class="rp-head"><h1>${esc(p.title)}</h1></div>
+                <div class="rp-meta">${esc(personalMeta(p))}</div>
+                <div class="rp-line"></div>
+                <p class="rp-names">${esc(personalSummary(p))}</p>
+                ${p.hws.length ? `<div class="rp-section">${h('作业完成情况')}
+                    <table class="rp-table"><thead><tr><th class="rp-c">#</th><th>日期</th><th>作业</th><th>完成情况</th><th>备注</th></tr></thead><tbody>${hwRows}</tbody></table>
+                    <div class="rp-rules rp-legend"><b>作业颜色：</b>${hwLegend}</div></div>` : ''}
+                ${p.rounds.length ? `<div class="rp-section">${h('背诵情况')}
+                    <table class="rp-table"><thead><tr><th class="rp-c">#</th><th>任务</th><th>当前情况</th><th class="rp-c">是否过关</th><th>最近检查</th><th class="rp-c">检查次数</th><th>待完成计划</th><th>备注</th></tr></thead><tbody>${recRows}</tbody></table>
+                    <div class="rp-rules rp-legend"><b>背诵颜色：</b>${recLegend}</div></div>` : ''}
+            </div>`;
+    }
+
+    function personalXlsx(p) {
+        const GREEN = '1E8E3E', RED = 'D93025';
+        const th = (v) => ({ v, s: { bold: true, color: 'FFFFFF', fill: GREEN, align: 'center', border: true, wrap: true } });
+        const td = (v, s) => ({ v, s: Object.assign({ border: true }, s || {}) });
+        const rows = [[{ v: p.title, s: { bold: true, size: 16 } }], [{ v: personalMeta(p), s: { color: '7A6F68' } }], [personalSummary(p)], []];
+        if (p.hws.length) {
+            rows.push([{ v: '作业完成情况', s: { bold: true } }], [th('#'), th('日期'), th('作业'), th('完成情况'), th('备注')]);
+            p.hws.forEach((x) => { const s = hwStatus(x.status); rows.push([td(x.no, { align: 'center' }), td(Utils.formatDate(x.hw.date)), td(x.hw.title), td(x.label, { align: 'center', fill: hex(s.color), color: hex(s.text) }), td(x.comment)]); });
+            rows.push([]);
+        }
+        if (p.rounds.length) {
+            rows.push([{ v: '背诵情况', s: { bold: true } }], [th('#'), th('任务'), th('当前情况'), th('是否过关'), th('最近检查'), th('检查次数'), th('待完成计划'), th('备注')]);
+            p.rounds.forEach((x) => { const s = recLook(x.look); rows.push([td(x.no, { align: 'center' }), td(x.round.title), td(x.label, { align: 'center', fill: hex(s.color), color: hex(s.text) }), td(x.pass ? '✓ 过关' : '✗ 未过关', { align: 'center', bold: true, color: x.pass ? GREEN : RED }), td(x.lastDate ? Utils.formatDate(x.lastDate) : '—'), td(x.attempts, { align: 'center' }), td(plansText(x) || '—'), td(x.comment)]); });
+        }
+        return XlsxLite.build([{ name: '个人学情', cols: [6, 20, 34, 16, 14, 10, 22, 30], rows }]);
+    }
+
     // 打印（另存为 PDF）：打印框里的默认文件名取自 document.title
-    function print(rp) {
+    function print(rp) { printHtml(html(rp), fileBase(rp)); }
+    function printHtml(content, base) {
         const old = document.getElementById('tp-print-root');
         if (old) old.remove();
         const root = document.createElement('div');
         root.id = 'tp-print-root';
-        root.innerHTML = html(rp);
+        root.innerHTML = content;
         document.body.appendChild(root);
         const title = document.title;
-        document.title = fileBase(rp);
+        document.title = base;
         const cleanup = () => {
             document.title = title;
             root.remove();
@@ -346,5 +424,8 @@
         return `${rp.title}_${rp.exportedAt.slice(0, 10)}`.replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim();
     }
 
-    window.ReportOutput = { markdown, html, print, xlsx, fileBase };
+    window.ReportOutput = {
+        markdown, html, print, xlsx, fileBase,
+        personal: { markdown: personalMarkdown, html: personalHtml, xlsx: personalXlsx, print: (p) => printHtml(personalHtml(p), fileBase(p)) }
+    };
 })();

@@ -76,6 +76,7 @@ const URLS_TO_CACHE = [
     './scripts/vendor/msal-browser.min.js',
     './scripts/onedrive/onedriveApi.js',
     './scripts/models/scoreReport.js',
+    './scripts/models/personalReport.js',
     './scripts/xlsxLite.js',
     './scripts/reportOutput.js',
     './scripts/pages/exportReport.js',
