@@ -6,6 +6,13 @@
 .exam-trend-split .chart-wrap { margin: 0; }
 .exam-trend-split .simple-table th, .exam-trend-split .simple-table td { padding: 0.3rem 0.4rem; font-size: 0.8rem; }
 @media (max-width: 720px) { .exam-trend-split { grid-template-columns: 1fr; } }
+/* 考试趋势表的小眼睛（1.35.0）：控制该场考试是否画进折线图 */
+.exam-trend-split .simple-table th.eye-col, .exam-trend-split .simple-table td.eye-col { width: 1.8rem; padding-left: 0.2rem; padding-right: 0.2rem; text-align: center; }
+.eye-btn { border: 0; background: none; padding: 2px; line-height: 0; cursor: pointer; color: var(--text-secondary, #6b7280); border-radius: 4px; }
+.eye-btn:hover:not(:disabled) { color: var(--primary-color); background: rgba(0, 0, 0, 0.05); }
+.eye-btn:disabled { opacity: 0.35; cursor: default; }
+.eye-btn.eye-off { color: #b8b2ac; }
+.exam-trend-table tr.exam-row-off td:not(.eye-col) { opacity: 0.45; }
 .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart-grid { stroke: #eee5dc; stroke-width: 1; }
 .chart-axis { font-size: 11px; fill: #8a7f78; }
