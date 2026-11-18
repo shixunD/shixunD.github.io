@@ -1,9 +1,9 @@
 // models/homework.js —— 作业业务逻辑：状态定义、作业增删改、单人状态登记、补交、统计
 // 全局命名空间：window.HomeworkModel
 //
-// 记录规则：homework.records 里"没有某个学生的记录" = 默认完全完成（done）。
+// 记录规则：homework.records 里"没有某个学生的记录" = 默认按时完成（done）。
 // 这样新开一项作业不需要给全班每个人写一条记录，只登记少数没完成的人；
-// 把学生改回"完全完成"且没有 comment 时，记录会被删除，保持数据精简。
+// 把学生改回"按时完成"且没有 comment 时，记录会被删除，保持数据精简。
 //
 // 中途入班（1.33.0）：学生有 joinedOn（入班日期）时，日期早于它的作业"不算他的"——不出现在该作业的登记卡片里，
 // 不计入完成率、欠交清单、学生趋势和导出统计（否则"没有记录 = 完成"会让他白白算全绿）。判断统一用 appliesTo()。
@@ -13,7 +13,7 @@
 
     // 顺序即状态选择器里按钮的顺序。颜色是固定语义色，与主题主色无关
     const STATUSES = [
-        { key: 'done', label: '完全完成', short: '完成', color: '#1e8e3e', text: '#fff' },
+        { key: 'done', label: '按时完成', short: '完成', color: '#1e8e3e', text: '#fff' },
         { key: 'missing', label: '未完成', short: '未交', color: '#d93025', text: '#fff' },
         { key: 'poor', label: '未按要求完成', short: '不达标', color: '#f48fb1', text: '#5a1030' },
         { key: 'missing_fixed', label: '已补交', short: '已补交', color: '#1a4fa3', text: '#fff' },

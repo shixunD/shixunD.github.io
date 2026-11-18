@@ -118,7 +118,7 @@
                         <button type="button" class="btn-primary" data-ex-out="md">📝 Markdown</button>
                         <button type="button" class="btn-secondary" data-ex-out="copy">📋 复制 Markdown</button>
                     </div>
-                    <p class="hint">PDF：会打开浏览器的打印窗口，「打印机」选「另存为 PDF」即可保存。加减分规则在「主页 → ⚙️ 设置」里调整。</p>
+                    <p class="hint">PDF：会打开浏览器的打印窗口，「打印机」选「另存为 PDF」即可保存；在「更多设置」里取消勾选「页眉和页脚」，否则会多印网址和时间（页码报表自带）。加减分规则在「主页 → ⚙️ 设置」里调整。</p>
                     <div class="ex-preview" data-ex-preview></div>
                 </div>`,
             onMount(body) {
@@ -238,7 +238,7 @@
                         <button type="button" class="btn-primary" data-ex-out="md">📝 Markdown</button>
                         <button type="button" class="btn-secondary" data-ex-out="copy">📋 复制 Markdown</button>
                     </div>
-                    <p class="hint">只写出该生每项作业 / 背诵的完成情况，不计加减分。PDF：打印窗口里「打印机」选「另存为 PDF」。</p>
+                    <p class="hint">只写出该生每项作业 / 背诵的完成情况，不计加减分。PDF：打印窗口里「打印机」选「另存为 PDF」，并在「更多设置」里取消勾选「页眉和页脚」（页码报表自带）。</p>
                     <div class="ex-preview" data-ex-preview></div>
                 </div>`,
             onMount(body) {

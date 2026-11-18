@@ -69,7 +69,7 @@
                     <input type="text" name="title" value="${esc(isEdit ? hw.title : '')}" placeholder="如：练习册 P23-25" autocomplete="off">
                     <label>备注（可选）</label>
                     <textarea name="note" rows="2" placeholder="作业要求、截止时间等">${esc(isEdit ? hw.note : '')}</textarea>
-                    ${isEdit ? '' : '<div class="hint">新建后全班默认"完全完成"，只需登记没完成的同学。</div>'}
+                    ${isEdit ? '' : '<div class="hint">新建后全班默认"按时完成"，只需登记没完成的同学。</div>'}
                     <div class="modal-actions">
                         <button type="button" class="btn-secondary" data-dialog-close>取消</button>
                         <button type="submit" class="btn-primary">${isEdit ? '保存' : '创建'}</button>

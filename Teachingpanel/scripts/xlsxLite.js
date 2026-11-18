@@ -2,7 +2,9 @@
 // 全局命名空间：window.XlsxLite
 //
 // XlsxLite.build(sheets) -> Uint8Array
-//   sheets: [{ name, cols: [列宽（字符数）], freeze: 冻结的行数, rows: [[cell, ...], ...], merges: ['A1:G1'] }]
+//   sheets: [{ name, cols: [列宽（字符数）], freeze: 冻结的行数, rows: [[cell, ...], ...], merges: ['A1:G1'], print }]
+//   print:  { landscape: true|false, titleRows: [起, 止]（每页重复的行，从 1 数）, footer: 页脚左侧文字 }
+//           有 print 时：A4、缩放到一页宽（高度不限）、页脚右侧「第 X 页 / 共 Y 页」
 //   cell:   null | 字符串 | 数字 | { v: 字符串或数字, runs: [{ t, color, bold }], s: 样式 }
 //   样式 s: { bold, color: 'RRGGBB', fill: 'RRGGBB', align: 'left'|'center'|'right', size, border: true, signed: true（数字显示为 +2 / -0.5 / 0）, wrap }
 // 为什么不用 SheetJS：整个库约 900 KB，而这里只需要「写几张带颜色的表」。
@@ -141,8 +143,16 @@
             ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${sheet.freeze}" topLeftCell="A${sheet.freeze + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` : '';
         const merges = (sheet.merges || []).length
             ? `<mergeCells count="${sheet.merges.length}">${sheet.merges.map((m) => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : '';
+        const pr = sheet.print;
+        // 页眉页脚里 & 是控制符（&L 左、&R 右、&P 页码、&N 总页数），文字里的 & 要写成 &&
+        const hf = (t) => String(t || '').replace(/&/g, '&&');
+        const sheetPr = pr ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '';
+        const printXml = pr
+            ? '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.2" footer="0.3"/>' +
+              `<pageSetup paperSize="9" orientation="${pr.landscape ? 'landscape' : 'portrait'}" fitToWidth="1" fitToHeight="0"/>` +
+              `<headerFooter><oddFooter>${xml(`&L&9${hf(pr.footer)}&R&9第 &P 页 / 共 &N 页`)}</oddFooter></headerFooter>` : '';
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-            `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${view}<sheetFormatPr defaultRowHeight="18"/>${cols}<sheetData>${rows}</sheetData>${merges}</worksheet>`;
+            `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${sheetPr}${view}<sheetFormatPr defaultRowHeight="18"/>${cols}<sheetData>${rows}</sheetData>${merges}${printXml}</worksheet>`;
     }
 
     // 工作表名：不能含 \ / ? * [ ] :，最长 31 个字符，不能重复
@@ -154,6 +164,17 @@
             used.add(name);
             return name;
         });
+    }
+
+    // 打印时每页重复的表头行：工作簿里的 _xlnm.Print_Titles（按工作表）
+    function definedNames(sheets, names) {
+        const items = sheets.map((s, i) => {
+            const t = s.print && s.print.titleRows;
+            if (!t) return '';
+            const ref = "'" + names[i].replace(/'/g, "''") + "'!$" + t[0] + ':$' + t[1];
+            return `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${xml(ref)}</definedName>`;
+        }).join('');
+        return items ? `<definedNames>${items}</definedNames>` : '';
     }
 
     function build(sheets) {
@@ -172,7 +193,7 @@
             { name: '_rels/.rels', text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
                 '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
             { name: 'xl/workbook.xml', text: head + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
-                names.map((n, i) => `<sheet name="${xml(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>' },
+                names.map((n, i) => `<sheet name="${xml(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets>' + definedNames(sheets, names) + '</workbook>' },
             { name: 'xl/_rels/workbook.xml.rels', text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
                 sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') +
                 `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
