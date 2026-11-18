@@ -30,7 +30,7 @@
             <div class="card">${summaryHtml(id, {}, ui.mode)}</div>
         `;
         view.querySelectorAll('[data-mode]').forEach((btn) => btn.addEventListener('click', () => { ui.mode = btn.dataset.mode; render(view); }));
-        // 小眼睛：每行切换这场考试在折线图里显示 / 隐藏；表头的 = 全部显示
+        // 小眼睛：每行切换这场考试在折线图里显示 / 隐藏
         view.querySelectorAll('[data-eye-exam]').forEach((btn) => btn.addEventListener('click', () => {
             const set = hiddenSet();
             const eid = btn.dataset.eyeExam;
@@ -38,8 +38,16 @@
             saveHidden(set);
             render(view);
         }));
+        // 表头的小眼睛：全部显示 ↔ 全部隐藏。全都在显示时点一下 = 全部隐藏；只要有隐藏的，点一下 = 全部显示
         const all = view.querySelector('[data-eye-all]');
-        if (all) all.addEventListener('click', () => { saveHidden(new Set()); render(view); });
+        if (all) all.addEventListener('click', () => {
+            const set = hiddenSet();
+            const ids = [...view.querySelectorAll('[data-eye-exam]')].map((b) => b.dataset.eyeExam);
+            if (all.dataset.eyeAll === 'hide') ids.forEach((eid) => set.add(eid));
+            else ids.forEach((eid) => set.delete(eid));
+            saveHidden(set);
+            render(view);
+        });
         // 表格里的考试名：跳到考试页该场考试，并让该学生的成绩行闪三秒
         view.querySelectorAll('[data-jump-exam]').forEach((el) => {
             el.addEventListener('click', () => { BackJump.mark(id); ExamsPage.jumpTo(el.dataset.jumpExam, id); });
@@ -83,7 +91,7 @@
                 yFormat: (v) => pct ? `${Math.round(v)}%` : Utils.formatNumber(v, 0)
             }) : '<div class="chart-empty">考试都隐藏了，点表格左上角的小眼睛全部显示</div>'}
             <table class="simple-table exam-trend-table">
-                <thead><tr><th class="eye-col"><button type="button" class="eye-btn" data-eye-all ${hiddenHere ? '' : 'disabled'} title="${hiddenHere ? `折线图里隐藏了 ${hiddenHere} 场，点击全部显示` : '全部考试都在折线图里显示'}" aria-label="全部显示">${EYE}</button></th><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>班级排名</th><th>年级排名</th></tr></thead>
+                <thead><tr><th class="eye-col"><button type="button" class="eye-btn${hiddenHere ? ' eye-off' : ''}" data-eye-all="${hiddenHere ? 'show' : 'hide'}" title="${hiddenHere ? `折线图里隐藏了 ${hiddenHere} 场，点击全部显示` : '全部考试都在折线图里显示，点击全部隐藏'}" aria-label="${hiddenHere ? '全部显示' : '全部隐藏'}">${hiddenHere ? EYE_OFF : EYE}</button></th><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>班级排名</th><th>年级排名</th></tr></thead>
                 <tbody>${hist.slice().reverse().map((h) => { const off = hidden.has(h.exam.id); return `<tr class="${off ? 'exam-row-off' : ''}">
                     <td class="eye-col"><button type="button" class="eye-btn${off ? ' eye-off' : ''}" data-eye-exam="${h.exam.id}" title="${off ? '折线图里已隐藏，点击显示' : '点击在折线图里隐藏这场考试'}" aria-label="${off ? '显示' : '隐藏'}" aria-pressed="${off ? 'false' : 'true'}">${off ? EYE_OFF : EYE}</button></td>
                     <td>${Utils.formatDate(h.exam.date)}</td>
