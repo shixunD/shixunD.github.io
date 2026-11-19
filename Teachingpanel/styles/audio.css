@@ -1,0 +1,49 @@
+/* 录音：登记弹窗里的圆形录音按钮、录音列表 / 播放条、录音窗口、压缩档位对比框（scripts/components/audioRec.js） */
+
+/* 圆形录音按钮：放在「📷 拍照 / 🖼️ 上传照片」那一行（Photos.editorHtml） */
+.audio-rec-btn {
+    width: 32px; height: 32px; flex: none; border-radius: 50%;
+    border: 1px solid var(--border-color); background: var(--card-bg, #fff);
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.audio-rec-btn:hover { border-color: #d93025; background: #fdecea; }
+.audio-rec-btn .audio-rec-icon { width: 12px; height: 12px; border-radius: 50%; background: #d93025; }
+.audio-rec-btn.busy .audio-rec-icon { animation: audio-rec-blink 1s infinite; }
+
+/* 录音列表 / 只读播放条 */
+.audio-clips { display: flex; flex-direction: column; gap: 4px; margin-top: 0.3rem; }
+.audio-clips:empty { display: none; }
+.audio-clip { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.audio-clip audio { height: 34px; width: 280px; max-width: 100%; }
+.audio-clip > span[data-audio] { display: flex; max-width: 100%; }
+.audio-clip small { color: var(--text-secondary); font-size: 0.75rem; white-space: nowrap; }
+.audio-rm { border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; padding: 2px 4px; }
+.audio-rm:hover { color: #d93025; }
+
+/* 笔记正文里的录音（<span class="note-audio" data-audio contenteditable="false">） */
+.note-audio { display: inline-flex; vertical-align: middle; margin: 2px 0; }
+.note-audio audio { height: 34px; width: 300px; max-width: 100%; }
+
+/* 录音窗口（层级同相机 8000，见 base.css 的 z-index 表） */
+.audio-rec-overlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.audio-rec-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1.2rem 1.4rem; width: min(360px, 100%); display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; }
+.audio-rec-title { font-weight: 600; }
+.audio-rec-state { display: flex; align-items: center; gap: 6px; color: #d93025; font-size: 0.9rem; }
+.audio-rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #d93025; animation: audio-rec-blink 1s infinite; }
+.audio-rec-overlay.paused .audio-rec-state { color: var(--text-secondary); }
+.audio-rec-overlay.paused .audio-rec-dot { animation: none; background: #9aa0a6; }
+.audio-rec-time { font-size: 2rem; font-variant-numeric: tabular-nums; }
+.audio-rec-meter { width: 100%; height: 8px; border-radius: 4px; background: #eee; overflow: hidden; }
+.audio-rec-meter i { display: block; height: 100%; width: 0; background: #1e8e3e; transition: width 0.08s linear; }
+.audio-rec-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+@keyframes audio-rec-blink { 50% { opacity: 0.3; } }
+
+/* 压缩档位对比框（层级同照片预览 8500）；档位按钮沿用 photos.css 的 .photo-choose-lv */
+.audio-choose-overlay { position: fixed; inset: 0; z-index: 8500; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 0.6rem; }
+.audio-choose-box { background: var(--card-bg, #fff); border-radius: 14px; padding: 1rem; width: min(720px, 100%); max-height: 92vh; display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; }
+.audio-choose-box h2 { margin: 0; font-size: 1.1rem; }
+.audio-choose-box h2 small { font-weight: normal; color: var(--text-secondary); margin-left: 0.5rem; font-size: 0.8rem; }
+.audio-choose-box audio { width: 100%; }
+.audio-choose-opts { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; font-size: 0.85rem; }
+.audio-choose-opts input[type="number"] { width: 4.5rem; }
+.audio-choose-opts .check-label { display: inline-flex; align-items: center; gap: 4px; }

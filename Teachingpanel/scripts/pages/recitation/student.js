@@ -104,7 +104,7 @@
                         ${!plan && RecitationModel.isUndated(check.result) ? '' : `<span class="record-date">${Utils.formatDate(check.date)}</span>`}
                     </div>
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
-                    ${Photos.viewHtml(check.photoIds)}
+                    ${Photos.viewHtml(check.photoIds)}${AudioRec.viewHtml(check.audioIds)}
                 </li>`).join('')}</ul>`).join('')}</div>`).join('')
                 : '<div class="hint">还没有检查记录</div>'}
         `;

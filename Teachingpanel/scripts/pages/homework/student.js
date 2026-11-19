@@ -37,7 +37,7 @@
         if (!st.total) return '<div class="empty-message">暂无作业记录</div>';
         const S = HomeworkModel.STATUS_MAP;
         const weekly = HomeworkModel.weeklyRates(studentId, filter);
-        const comments = st.timeline.filter((x) => x.rec.comment || x.rec.photoIds.length || x.rec.status !== 'done').reverse();
+        const comments = st.timeline.filter((x) => x.rec.comment || x.rec.photoIds.length || x.rec.audioIds.length || x.rec.status !== 'done').reverse();
 
         return `
             <div class="stat-row">
@@ -64,7 +64,7 @@
                 return `<li data-hist-hw="${hw.id}"><span class="status-pill" style="background:${s.color};color:${s.text}">${esc(s.short)}</span>
                     <span class="record-date">${Utils.formatDate(hw.date)}</span> <button type="button" class="record-jump" data-jump-hw="${hw.id}" title="跳到作业页该项作业">${esc(hw.title)}</button>
                     ${rec.comment ? `<div class="record-comment">💬 ${esc(rec.comment)}</div>` : ''}
-                    ${Photos.viewHtml(rec.photoIds)}</li>`;
+                    ${Photos.viewHtml(rec.photoIds)}${AudioRec.viewHtml(rec.audioIds)}</li>`;
             }).join('')}</ul>` : '<div class="hint">没有问题记录，表现很好 👍</div>'}
         `;
     }

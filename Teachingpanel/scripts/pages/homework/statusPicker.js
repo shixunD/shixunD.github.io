@@ -37,6 +37,7 @@
                 StudentTrend.linkDialogTitle(body, stu, hw.title, close);
                 QuickPhrases.bind(body, body.querySelector('[data-comment]'));
                 const photoEditor = Photos.bindEditor(body, rec.photoIds);
+                const audioEditor = AudioRec.bindEditor(body, rec.audioIds);
                 body.querySelector('.status-options').addEventListener('click', (e) => {
                     const btn = e.target.closest('[data-status]');
                     if (!btn) return;
@@ -46,8 +47,9 @@
                 body.querySelector('[data-save]').addEventListener('click', async () => {
                     const comment = body.querySelector('[data-comment]').value.trim();
                     const photoIds = await photoEditor.finalize();
+                    const audioIds = await audioEditor.finalize();
                     close();
-                    await HomeworkModel.setRecord(hwId, studentId, { status: selected, comment, photoIds });
+                    await HomeworkModel.setRecord(hwId, studentId, { status: selected, comment, photoIds, audioIds });
                 });
             }
         });

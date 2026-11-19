@@ -167,6 +167,7 @@
                 same.result = data.result;
                 same.note = data.note || '';
                 if (data.photoIds) same.photoIds = data.photoIds.slice();
+                if (data.audioIds) { if (data.audioIds.length) same.audioIds = data.audioIds.slice(); else delete same.audioIds; }
                 same.createdAt = Date.now();
                 return same;
             }
@@ -180,6 +181,7 @@
                 createdAt: Date.now()
             };
             if (data.photoIds && data.photoIds.length) check.photoIds = data.photoIds.slice();
+            if (data.audioIds && data.audioIds.length) check.audioIds = data.audioIds.slice();
             s.recChecks.push(check);
             return check;
         });
@@ -202,6 +204,7 @@
             c.date = patch.date || c.date;
             c.note = patch.note || '';
             if (patch.photoIds) c.photoIds = patch.photoIds.slice();
+            if (patch.audioIds) { if (patch.audioIds.length) c.audioIds = patch.audioIds.slice(); else delete c.audioIds; }
             // 改到的那天如果已有另一条记录，按「同一天只有一个状态」用这条替换掉它
             s.recChecks = s.recChecks.filter((x) => x.id === c.id
                 || !(x.roundId === c.roundId && x.studentId === c.studentId && x.date === c.date));

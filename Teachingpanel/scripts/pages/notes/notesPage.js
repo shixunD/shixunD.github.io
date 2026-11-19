@@ -34,7 +34,7 @@
         if (!dirty || !editor || !editingId) return;
         const id = editingId;
         const titleEl = document.querySelector('#notes-page-body .note-title');
-        const patch = { html: editor.getHtml(), photoIds: editor.getPhotoIds() };
+        const patch = { html: editor.getHtml(), photoIds: editor.getPhotoIds(), audioIds: editor.getAudioIds() };
         if (titleEl) patch.title = titleEl.value.trim();
         dirty = false;
         saving = true;

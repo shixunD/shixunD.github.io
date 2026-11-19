@@ -9,6 +9,71 @@
 
     function container() { return document.getElementById('home-page-body'); }
 
+    // ---------- 录音设置（1.39.0）：存在本机 localStorage，和照片压缩一样每台设备各自记 ----------
+    const toggleHtml = (on, attr) => `<button type="button" class="btn-toggle ${on ? 'btn-toggle-on' : ''}" ${attr}>${on ? '已开启' : '已关闭'}</button>`;
+    function audioRowsHtml() {
+        const a = AudioRec.settings();
+        return `
+                        <div class="setting-row">
+                            <div><div>录音压缩：默认档位</div><div class="hint">点登记弹窗里的红色圆按钮录音，停止后会弹出对比框，可逐档（Opus 语音编码 6–32 kbps、自定义，或不压缩）试听、看大小，点「确定」后只保留所选那一份。这里选默认选中哪一档。推荐 16 kbps：说话清楚，1 分钟约 140 KB</div></div>
+                            <select data-audio-level>${AudioRec.levelOptions().map((l) => `<option value="${l.key}" ${l.key === AudioRec.getLevel().key ? 'selected' : ''}>${esc(l.desc)}</option>`).join('')}</select>
+                        </div>
+                        <div class="setting-row">
+                            <div><div>录音压缩：自定义档位的码率</div><div class="hint">对比框里「自定义」档的码率（6–128 kbps）</div></div>
+                            <div class="inline-input"><input type="number" min="6" max="128" step="1" value="${a.custom}" data-audio-custom> kbps</div>
+                        </div>
+                        <div class="setting-row">
+                            <div><div>录音压缩：采样率（频带）</div><div class="hint">相当于照片的分辨率：越高能保留的高音越多，文件也越大。说话用 16 kHz 就够清楚；码率低时（6–10 kbps）编码器本来也只保留到这么多</div></div>
+                            <select data-audio-rate>${AudioRec.RATES.map((r) => `<option value="${r.v}" ${r.v === a.rate ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}</select>
+                        </div>
+                        <div class="setting-row">
+                            <div><div>录音压缩：声道</div><div class="hint">单声道最省，说话录音推荐。立体声要麦克风本身是双声道才有用（多数笔记本 / 手机的麦克风实际是单声道），而且同样码率下每个声道只分到一半，要把码率调高一倍</div></div>
+                            <select data-audio-stereo><option value="0" ${a.stereo ? '' : 'selected'}>单声道（推荐）</option><option value="1" ${a.stereo ? 'selected' : ''}>立体声</option></select>
+                        </div>
+                        <div class="setting-row">
+                            <div><div>录音：去掉开头结尾的静音</div><div class="hint">按下录音到开口、说完到点停止之间的空白去掉（各留 0.3 秒），中间的停顿不动</div></div>
+                            ${toggleHtml(a.trim, 'data-audio-trim')}
+                        </div>
+                        <div class="setting-row">
+                            <div><div>录音：浏览器降噪</div><div class="hint">用浏览器自带的降噪、回声消除、自动音量。教室里比较吵时建议开；想录原声（比如乐器）可以关掉</div></div>
+                            ${toggleHtml(a.clean, 'data-audio-clean')}
+                        </div>
+                        <div class="setting-row">
+                            <div><div>录音：试录 / 试听</div><div class="hint">录一段（不会保存），在对比框里改码率、采样率、声道、去静音逐档试听，满意了点「把这些设为默认」。<span data-audio-support></span></div></div>
+                            <div class="btn-col"><button type="button" class="btn-secondary" data-audio-test>🎙️ 试录一段</button><button type="button" class="btn-secondary" data-audio-replay ${AudioRec.hasTest() ? '' : 'hidden'}>再听上次试录</button></div>
+                        </div>`;
+    }
+    function bindAudioRows(q) {
+        const sync = () => {
+            const a = AudioRec.settings();
+            const lv = q('[data-audio-level]');
+            lv.innerHTML = AudioRec.levelOptions().map((l) => `<option value="${l.key}">${esc(l.desc)}</option>`).join('');
+            lv.value = AudioRec.getLevel().key;
+            q('[data-audio-custom]').value = a.custom;
+            q('[data-audio-rate]').value = String(a.rate);
+            q('[data-audio-stereo]').value = a.stereo ? '1' : '0';
+            [['[data-audio-trim]', a.trim], ['[data-audio-clean]', a.clean]].forEach(([sel, on]) => {
+                const b = q(sel);
+                b.classList.toggle('btn-toggle-on', on);
+                b.textContent = on ? '已开启' : '已关闭';
+            });
+            q('[data-audio-replay]').hidden = !AudioRec.hasTest();
+        };
+        q('[data-audio-level]').addEventListener('change', (e) => AudioRec.save({ level: e.target.value }));
+        q('[data-audio-custom]').addEventListener('change', (e) => { AudioRec.save({ custom: e.target.value }); sync(); });
+        q('[data-audio-rate]').addEventListener('change', (e) => AudioRec.save({ rate: e.target.value }));
+        q('[data-audio-stereo]').addEventListener('change', (e) => AudioRec.save({ stereo: e.target.value === '1' }));
+        q('[data-audio-trim]').addEventListener('click', () => { AudioRec.save({ trim: !AudioRec.settings().trim }); sync(); });
+        q('[data-audio-clean]').addEventListener('click', () => { AudioRec.save({ clean: !AudioRec.settings().clean }); sync(); });
+        q('[data-audio-test]').addEventListener('click', async () => { await AudioRec.testRecord(sync); sync(); });
+        q('[data-audio-replay]').addEventListener('click', () => AudioRec.replayTest(sync));
+        const support = q('[data-audio-support]');
+        if (!AudioRec.hasMic()) support.textContent = '（这里打不开麦克风：需要 https，且浏览器支持录音）';
+        else AudioRec.canReencode().then((ok) => {
+            support.textContent = ok ? '' : '（这个浏览器不支持在页面里重新压缩：录音会按默认档的码率直接录，采样率 / 去静音不起作用，对比框里只能试听）';
+        });
+    }
+
     function render() {
         const el = container();
         if (!el) return;
@@ -75,6 +140,7 @@
                             <div><div>照片压缩：自定义档位的质量</div><div class="hint">预览框里「自定义」档的默认质量（0.001–1）。预览框里可临时改，但下次打开仍恢复这里的值</div></div>
                             <div class="inline-input"><input type="number" min="0.001" max="1" step="0.001" value="${Photos.getCustomQuality()}" data-photo-custom></div>
                         </div>
+                        ${audioRowsHtml()}
                         <div class="setting-row">
                             <div><div>手机拍：关窗后保持连接</div><div class="hint">手机已连上时，关掉「📱 手机拍」窗口后连接再保持这么多分钟，期间在别的块再点「手机拍」会直接复用，不用重新连接；到时间自动断开。填 0 = 关窗即断开（0–60，默认 2）</div></div>
                             <div class="inline-input"><input type="number" min="0" max="60" step="0.5" value="${PhoneLink.getKeepMinutes()}" data-phone-keep> 分钟</div>
@@ -175,6 +241,7 @@
             await AppState.updateSettings({ reminderNotify: on });
         });
         q('[data-photo-quality]').addEventListener('change', (e) => Photos.setLevel(e.target.value));
+        bindAudioRows(q);
         q('[data-photo-custom]').addEventListener('change', (e) => {
             Photos.setCustomQuality(e.target.value);
             e.target.value = Photos.getCustomQuality();

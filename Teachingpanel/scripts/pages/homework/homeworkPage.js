@@ -174,7 +174,7 @@
             <div class="stu-card" data-sid="${stu.id}" style="--st-color:${st.color};--st-text:${st.text}" title="${esc(st.label)}${rec.comment ? '：' + esc(rec.comment) : ''}${rec.photoIds.length ? '（有 ' + rec.photoIds.length + ' 张照片）' : ''}">
                 <div class="stu-card-no">${esc(stu.studentNo)}</div>
                 <div class="stu-card-name">${esc(stu.name)}</div>
-                <div class="stu-card-status">${esc(st.short)}${rec.comment || rec.photoIds.length ? ' 💬' : ''}</div>
+                <div class="stu-card-status">${esc(st.short)}${rec.comment || rec.photoIds.length || rec.audioIds.length ? ' 💬' : ''}</div>
                 ${canFix ? `<button type="button" class="stu-card-fix" data-fix="${stu.id}" title="标记为已补上">补</button>` : ''}
             </div>`;
     }

@@ -79,8 +79,9 @@
                 const noteEl = body.querySelector('[data-note]');
                 QuickPhrases.bind(body, noteEl);
                 const photoEditor = Photos.bindEditor(body, []);
+                const audioEditor = AudioRec.bindEditor(body, []);
                 noteVal = () => noteEl.value.trim();
-                photoFp = () => photoEditor.fingerprint();
+                photoFp = () => photoEditor.fingerprint() + '/' + audioEditor.fingerprint();
                 const saveBtn = body.querySelector('[data-save]');
                 const show = (sel, on) => { body.querySelector(sel).hidden = !on; };
 
@@ -144,10 +145,12 @@
                         setResult(ex.result);
                         noteEl.value = ex.note || '';
                         photoEditor.setKept(ex.photoIds || []);
+                        audioEditor.setKept(ex.audioIds || []);
                         loaded = { note: ex.note || '' };
                     } else if (loaded) {
                         if (noteEl.value === loaded.note) noteEl.value = '';
                         photoEditor.setKept([]);
+                        audioEditor.setKept([]);
                         loaded = null;
                     }
                 }
@@ -173,7 +176,8 @@
                                 roundId, studentId, result,
                                 date: saveDate(),
                                 note: noteEl.value.trim(),
-                                photoIds: await photoEditor.finalize()
+                                photoIds: await photoEditor.finalize(),
+                                audioIds: await audioEditor.finalize()
                             });
                         }
                         const add = addedDates();
@@ -270,6 +274,7 @@
             onMount(body, close) {
                 QuickPhrases.bind(body, body.querySelector('[data-edit-note]'));
                 const photoEditor = Photos.bindEditor(body, check.photoIds || []);
+                const audioEditor = AudioRec.bindEditor(body, check.audioIds || []);
                 const saveBtn = body.querySelector('[data-edit-save]');
                 const datePicker = DayPicker.bind(body, 'editCheck', { value: date, onChange: (d) => { date = d; } });
 
@@ -299,7 +304,8 @@
                         await RecitationModel.updateCheck(checkId, {
                             result, date,
                             note: body.querySelector('[data-edit-note]').value.trim(),
-                            photoIds: await photoEditor.finalize()
+                            photoIds: await photoEditor.finalize(),
+                            audioIds: await audioEditor.finalize()
                         });
                         Toast.success('检查记录已修改');
                         back();
@@ -356,7 +362,7 @@
                             <button type="button" class="link-btn danger" data-rm-check="${c.id}">删除</button></span>
                         </div>
                         ${c.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(c.note)}</div>` : ''}
-                        ${Photos.viewHtml(c.photoIds)}
+                        ${Photos.viewHtml(c.photoIds)}${AudioRec.viewHtml(c.audioIds)}
                     </li>`;
                 }).join('')}
             </ul>`;

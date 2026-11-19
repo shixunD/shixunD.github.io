@@ -2,12 +2,13 @@
 // 全局命名空间：window.NoteEditor
 //
 //   NoteEditor.toolbarHtml()                 工具栏 HTML（放在 .ne-toolbar 里）
-//   NoteEditor.mount(card, html, hooks)      绑定工具栏和 .note-editor；返回 { getHtml(), getPhotoIds(), focus() }
+//   NoteEditor.mount(card, html, hooks)      绑定工具栏和 .note-editor；返回 { getHtml(), getPhotoIds(), getAudioIds(), focus() }
 //       hooks.onChange()                     内容有改动（输入、格式、插图）
 //       hooks.alive()                        编辑器是否还在页面上（用于放弃过期的插图）
 //   NoteEditor.sanitize(html)                把任意 HTML 清洗成白名单内的受限 HTML（保存、粘贴、载入都过一遍）
 //
-// 存储的 HTML 只含：b/strong/i/em/u/s/strike/del/span(受限 style)/div/p/br/ul/ol/li/blockquote/hr/h1-h3/img[data-photo]。
+// 存储的 HTML 只含：b/strong/i/em/u/s/strike/del/span(受限 style)/div/p/br/ul/ol/li/blockquote/hr/h1-h3/img[data-photo]/span.note-audio[data-audio]。
+// 录音（1.39.0）只存 <span class="note-audio" data-audio="录音id" contenteditable="false"></span>，里面的 <audio> 由 audioRec.js 按 id 补上，保存时清洗掉。
 // 图片只存 data-photo（照片 id），没有 src：src 是 object URL，由 photos.js 的 MutationObserver 按 id 补上。
 // 待办清单 = <ul class="todo"> + <li data-todo="0|1">，勾选框是 CSS 画的，点 li 左侧切换。
 
@@ -58,6 +59,16 @@
                 out.appendChild(img);
                 return;
             }
+            if (tag === 'SPAN' && n.hasAttribute('data-audio')) {
+                const id = n.getAttribute('data-audio');
+                if (!id) return;
+                const sp = document.createElement('span');
+                sp.className = 'note-audio';
+                sp.setAttribute('data-audio', id);
+                sp.setAttribute('contenteditable', 'false');
+                out.appendChild(sp);
+                return;
+            }
             if (!KEEP_TAGS.has(tag)) { cleanNode(n, out); return; }   // 不认识的标签：去掉标签留内容
             const el = document.createElement(tag.toLowerCase());
             const style = cleanStyle(n.getAttribute('style'));
@@ -103,6 +114,8 @@
             <button type="button" class="ne-btn ne-wide" data-ins-upload title="插入图片（会先弹出压缩框，可裁剪 / 翻转）">🖼️ 图片</button>
             <button type="button" class="ne-btn" data-ins-camera title="拍照插入">📷</button>
             ${touch ? '' : '<button type="button" class="ne-btn" data-ins-phone title="用手机拍，照片传回电脑">📱</button>'}
+            <button type="button" class="ne-btn" data-ins-audio title="录音插入（录完可以逐档试听、选压缩档位）">🎙️</button>
+            <input type="file" accept="audio/*" capture hidden data-ins-audio-input>
             <input type="file" accept="image/*" multiple hidden data-ins-input>
             <input type="file" accept="image/*" capture="environment" hidden data-ins-input-cam>
             <div class="ne-pop" data-popbox hidden></div>`;
@@ -286,7 +299,7 @@
 
         body.addEventListener('input', (e) => {
             // 清空后浏览器会留一个 <br>，占位提示靠 :empty，所以清掉
-            if (!body.querySelector('img') && !body.textContent && body.innerHTML.length < 20 && !/<(ul|ol|hr|blockquote)/.test(body.innerHTML)) body.innerHTML = '';
+            if (!body.querySelector('img, [data-audio]') && !body.textContent && body.innerHTML.length < 20 && !/<(ul|ol|hr|blockquote)/.test(body.innerHTML)) body.innerHTML = '';
             // 勾选的待办回车新建的下一项不应该继承「已完成」
             if (e.inputType === 'insertParagraph') {
                 const li = currentLi();
@@ -321,6 +334,10 @@
             alive: () => document.body.contains(card) && (hooks.alive ? hooks.alive() : true),
             onPhoto: (id) => { restore(); insertHtml(`<div><img data-photo="${Utils.escapeHtml(id)}" alt="照片"></div><div><br></div>`); }
         });
+        AudioRec.bindInserter(card, {
+            alive: () => document.body.contains(card) && (hooks.alive ? hooks.alive() : true),
+            onAudio: (id) => { restore(); insertHtml(`<div><span class="note-audio" data-audio="${Utils.escapeHtml(id)}" contenteditable="false"></span></div><div><br></div>`); }
+        });
         const imageFiles = (list) => Array.from(list || []).filter((f) => f.type && f.type.startsWith('image/'));
 
         body.addEventListener('paste', (e) => {
@@ -346,6 +363,7 @@
         return {
             getHtml() { return sanitize(body.innerHTML); },
             getPhotoIds() { return Array.from(new Set(Array.from(body.querySelectorAll('img[data-photo]')).map((im) => im.getAttribute('data-photo')))); },
+            getAudioIds() { return Array.from(new Set(Array.from(body.querySelectorAll('[data-audio]')).map((el) => el.getAttribute('data-audio')))); },
             focus() { body.focus(); }
         };
     }

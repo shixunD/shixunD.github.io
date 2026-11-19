@@ -45,7 +45,7 @@
                                 </span>
                             </div>
                             ${r.text ? `<div class="remark-text">${esc(r.text)}</div>` : ''}
-                            ${Photos.viewHtml(r.photoIds)}
+                            ${Photos.viewHtml(r.photoIds)}${AudioRec.viewHtml(r.audioIds)}
                         </div>`).join('') : '<div class="empty-message">还没有记录</div>'}
                 </div>
             </aside>
@@ -53,13 +53,15 @@
 
         const form = view.querySelector('[data-add-form]');
         const photoEditor = Photos.bindEditor(form, []);
+        const audioEditor = AudioRec.bindEditor(form, []);
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const f = form.elements;
             try {
-                if (!f.text.value.trim() && !(await hasPhotos(form))) throw new Error('请填写记录内容或添加照片');
+                if (!f.text.value.trim() && !(await hasPhotos(form))) throw new Error('请填写记录内容，或添加照片 / 录音');
                 const photoIds = await photoEditor.finalize();
-                await RemarkModel.add(student.id, { date: f.date.value || Utils.today(), text: f.text.value, photoIds });
+                const audioIds = await audioEditor.finalize();
+                await RemarkModel.add(student.id, { date: f.date.value || Utils.today(), text: f.text.value, photoIds, audioIds });
             } catch (err) {
                 Toast.error(err.message);
             }
@@ -71,9 +73,9 @@
         }));
     }
 
-    // 编辑块里当前有没有（已保留的或新选的）照片
+    // 编辑块里当前有没有（已保留的或新选的）照片或录音
     function hasPhotos(root) {
-        return Promise.resolve(root.querySelectorAll('[data-photo-list] .photo-thumb').length > 0);
+        return Promise.resolve(root.querySelectorAll('[data-photo-list] .photo-thumb, [data-audio-list] .audio-clip').length > 0);
     }
 
     function openEdit(id) {
@@ -97,13 +99,15 @@
                 const form = body.querySelector('[data-form]');
                 const f = form.elements;
                 const photoEditor = Photos.bindEditor(body, r.photoIds || []);
+                const audioEditor = AudioRec.bindEditor(body, r.audioIds || []);
                 f.text.focus();
                 form.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     try {
-                        if (!f.text.value.trim() && !(await hasPhotos(body))) throw new Error('请填写记录内容或添加照片');
+                        if (!f.text.value.trim() && !(await hasPhotos(body))) throw new Error('请填写记录内容，或添加照片 / 录音');
                         const photoIds = await photoEditor.finalize();
-                        await RemarkModel.update(id, { date: f.date.value || r.date, text: f.text.value, photoIds });
+                        const audioIds = await audioEditor.finalize();
+                        await RemarkModel.update(id, { date: f.date.value || r.date, text: f.text.value, photoIds, audioIds });
                         close();
                     } catch (err) {
                         Toast.error(err.message);

@@ -2,7 +2,7 @@
 // 全局命名空间：window.Photos
 //
 // 记录（作业登记 record / 背诵检查 recCheck / 其他记录 remark）只存 photoIds: string[]，照片本体在 IndexedDB 的 photos 存储（见 state.js）。
-//   Photos.editorHtml()                         弹窗里的照片编辑块 HTML
+//   Photos.editorHtml()                         弹窗里的照片编辑块 HTML（1.39.0 起同一行带「🎙️ 录音」圆按钮和录音列表，由 AudioRec.bindEditor 绑定）
 //   Photos.bindEditor(root, existingIds)        绑定，返回 { finalize() }：把新选的照片存起来，返回最终的 photoIds
 //   Photos.viewHtml(ids)                        只读缩略图（空数组返回空串）；<img data-photo> 由全局 MutationObserver 自动补 src
 // 拍照：手机/平板（pointer: coarse）用 <input capture> 拉起系统相机；电脑 capture 无效，改用 getUserMedia 页内相机（openCamera）。
@@ -728,8 +728,10 @@
                     <button type="button" class="btn-secondary btn-sm" data-photo-upload>🖼️ 上传照片</button>
                     <input type="file" accept="image/*" capture="environment" hidden data-photo-input="camera">
                     <input type="file" accept="image/*" multiple hidden data-photo-input="upload">
+                    ${window.AudioRec ? AudioRec.buttonHtml() : ''}
                 </div>
                 <div class="photo-thumbs" data-photo-list></div>
+                ${window.AudioRec ? AudioRec.listHtml() : ''}
             </div>`;
     }
 

@@ -25,10 +25,10 @@
     const DB_NAME = 'teaching-panel-db';
     const DB_VERSION = 2;               // v2（1.14.0）：新增 photos 存储
     const STORE_NAME = 'app-state';
-    const PHOTO_STORE = 'photos';       // 照片单独存放（key = 照片 id，value = { blob, createdAt }），不进 state 整份存储
+    const PHOTO_STORE = 'photos';       // 照片单独存放（key = 照片 id，value = { blob, createdAt }），不进 state 整份存储；1.39.0 起录音也放这里（id 以 au_ 开头）
     const STATE_KEY = 'main';
 
-    const SCHEMA_VERSION = 7;
+    const SCHEMA_VERSION = 8;
     const APP_ID = 'TeachingPanel';
 
     const DEFAULT_SETTINGS = {
@@ -112,6 +112,7 @@
 
     // ---------- 照片（IndexedDB 单独的 photos 存储） ----------
     // 记录（作业登记 / 背诵检查 / 其他记录）只存 photoIds: string[]，照片本体在这里。
+    // 1.39.0 起录音也存在这里（记录上是 audioIds: string[]，blob.type 是 audio/…）：.db 的 photos 表、导入导出、清理都和照片一起走。
     // 没有任何记录引用的照片由 gcPhotos() 清理（刚存进去不满 1 分钟的不动，避免"先存照片、后提交记录"之间被误删）。
 
     function photoTx(mode, fn) {
@@ -146,10 +147,11 @@
     function collectPhotoIds(s) {
         const ids = new Set();
         const add = (list) => (Array.isArray(list) ? list : []).forEach((id) => ids.add(id));
-        s.homework.forEach((h) => Object.keys(h.records || {}).forEach((sid) => add(h.records[sid] && h.records[sid].photoIds)));
-        s.recChecks.forEach((c) => add(c.photoIds));
-        s.remarks.forEach((r) => add(r.photoIds));
-        s.notes.forEach((n) => add(n.photoIds));
+        s.homework.forEach((h) => Object.keys(h.records || {}).forEach((sid) => {
+            const rec = h.records[sid];
+            if (rec) { add(rec.photoIds); add(rec.audioIds); }
+        }));
+        [s.recChecks, s.remarks, s.notes].forEach((list) => list.forEach((x) => { add(x.photoIds); add(x.audioIds); }));
         return ids;
     }
 
@@ -204,6 +206,7 @@
         // v4 -> v5：新增 remarks（「其他」页的学情记录）。无需转换，normalize() 会把缺失的集合补成空数组
         // v5 -> v6：新增 sideGroups（作业/背诵侧栏分组夹）。无需转换，normalize() 会把缺失的集合补成空数组
         // v6 -> v7：新增 notes（笔记页，全班级共用）及 sideGroups 的 kind:'note'。无需转换，normalize() 会把缺失的集合补成空数组
+        // v7 -> v8（1.39.0）：作业登记 / 背诵检查 / 其他记录 / 笔记新增可选字段 audioIds（录音）。无需转换，没有就是没录音
         data.schemaVersion = SCHEMA_VERSION;
         return data;
     }
@@ -235,7 +238,13 @@
             n.title = String(n.title || '');
             n.html = String(n.html || '');
             if (!Array.isArray(n.photoIds)) n.photoIds = [];
+            if (!Array.isArray(n.audioIds)) n.audioIds = [];
         });
+        // 录音 id 列表：不是数组的（损坏的数据）直接去掉
+        const fixAudio = (x) => { if (x && x.audioIds !== undefined && !Array.isArray(x.audioIds)) delete x.audioIds; };
+        out.homework.forEach((h) => Object.keys(h.records).forEach((sid) => fixAudio(h.records[sid])));
+        out.recChecks.forEach(fixAudio);
+        out.remarks.forEach(fixAudio);
         out.sideGroups.forEach((g) => { g.title = String(g.title || '分组'); g.collapsed = !!g.collapsed; });
         out.exams.forEach((e) => { if (!e.scores || typeof e.scores !== 'object') e.scores = {}; });
 
@@ -558,6 +567,7 @@
         load, subscribe, onDataChange, getState, exportSnapshot, replaceState, validateSnapshot,
         _commit: commit, _emitChange: emitChange,
         photoPut, photoGet, photoList, gcPhotos,
+        audioPut: photoPut, audioGet: photoGet,   // 录音和照片同一个存储
         getClasses, getActiveClass, getActiveClassId, addClass, renameClass, removeClass, switchClass,
         STUDENT_STATUS,
         getStudents, getInactiveStudents, getStudent, findStudentByName, addStudent, updateStudent, setStudentStatus, removeStudent, bulkAddStudents,

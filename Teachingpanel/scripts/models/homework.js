@@ -100,26 +100,29 @@
             status: rec && rec.status ? rec.status : 'done',
             comment: rec && rec.comment ? rec.comment : '',
             madeUpAt: rec && rec.madeUpAt ? rec.madeUpAt : null,
-            photoIds: rec && Array.isArray(rec.photoIds) ? rec.photoIds : []
+            photoIds: rec && Array.isArray(rec.photoIds) ? rec.photoIds : [],
+            audioIds: rec && Array.isArray(rec.audioIds) ? rec.audioIds : []
         };
     }
 
-    function writeRecord(hw, studentId, status, comment, photoIds) {
+    function writeRecord(hw, studentId, status, comment, photoIds, audioIds) {
         const prev = hw.records[studentId] || {};
         const photos = photoIds != null ? photoIds : (prev.photoIds || []);
-        if (status === 'done' && !comment && !photos.length) {
+        const audios = audioIds != null ? audioIds : (prev.audioIds || []);
+        if (status === 'done' && !comment && !photos.length && !audios.length) {
             delete hw.records[studentId];
             return;
         }
         const rec = { status, comment: comment || '' };
         if (photos.length) rec.photoIds = photos.slice();
+        if (audios.length) rec.audioIds = audios.slice();
         if (status === 'missing_fixed' || status === 'poor_fixed') {
             rec.madeUpAt = prev.madeUpAt && (prev.status === status) ? prev.madeUpAt : Utils.today();
         }
         hw.records[studentId] = rec;
     }
 
-    // patch: {status?, comment?, photoIds?}，未提供的字段保持原值
+    // patch: {status?, comment?, photoIds?, audioIds?}，未提供的字段保持原值
     function setRecord(hwId, studentId, patch) {
         return AppState._commit(() => {
             const hw = get(hwId);
@@ -128,7 +131,7 @@
             writeRecord(hw, studentId,
                 patch.status != null ? patch.status : cur.status,
                 patch.comment != null ? patch.comment : cur.comment,
-                patch.photoIds);
+                patch.photoIds, patch.audioIds);
         });
     }
 

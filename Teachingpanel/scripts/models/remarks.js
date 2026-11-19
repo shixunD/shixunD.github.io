@@ -1,6 +1,6 @@
 // models/remarks.js —— 「其他」页：对学生的学情记录（备注）增删改查
 // 全局命名空间：window.RemarkModel
-// 数据：state.remarks[] { id, studentId, date, text, photoIds?, createdAt }；随学生级联删除（AppState.removeStudent / removeClass）
+// 数据：state.remarks[] { id, studentId, date, text, photoIds?, audioIds?, createdAt }；随学生级联删除（AppState.removeStudent / removeClass）
 
 (function () {
     'use strict';
@@ -23,10 +23,12 @@
     function add(studentId, data) {
         const text = String(data.text || '').trim();
         const photoIds = Array.isArray(data.photoIds) ? data.photoIds.slice() : [];
-        if (!text && !photoIds.length) return Promise.reject(new Error('记录内容和照片至少要有一样'));
+        const audioIds = Array.isArray(data.audioIds) ? data.audioIds.slice() : [];
+        if (!text && !photoIds.length && !audioIds.length) return Promise.reject(new Error('记录内容、照片、录音至少要有一样'));
         return AppState._commit((s) => {
             const remark = { id: Utils.uid('rmk'), studentId, date: data.date || Utils.today(), text, createdAt: Date.now() };
             if (photoIds.length) remark.photoIds = photoIds;
+            if (audioIds.length) remark.audioIds = audioIds;
             s.remarks.push(remark);
             return remark;
         });
@@ -40,6 +42,7 @@
             if (!r) return;
             Object.assign(r, next);
             if (Array.isArray(r.photoIds) && !r.photoIds.length) delete r.photoIds;
+            if (Array.isArray(r.audioIds) && !r.audioIds.length) delete r.audioIds;
         });
     }
 

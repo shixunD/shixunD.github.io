@@ -1,9 +1,10 @@
 // models/notes.js —— 笔记（全班级共用，不带 classId）
 // 全局命名空间：window.NoteModel
 //
-// 数据：state.notes[] { id, title, html, photoIds, createdAt, updatedAt, groupId?, order? }
+// 数据：state.notes[] { id, title, html, photoIds, audioIds, createdAt, updatedAt, groupId?, order? }
 //   html：编辑器产出的受限 HTML（白名单标签，见 pages/notes/editor.js 的 sanitize）；图片是 <img data-photo="照片id">
 //   photoIds：html 里引用的照片 id（保存时由编辑器从 DOM 收集），AppState.gcPhotos 靠它判断照片是否还被引用
+//   audioIds：同上，html 里的录音 <span class="note-audio" data-audio="录音id">（1.39.0）
 // 文件夹复用 SideGroups（kind 'note'），布局规则同作业 / 背诵侧栏。
 
 (function () {
@@ -21,13 +22,13 @@
     function create() {
         return AppState._commit((s) => {
             const now = Date.now();
-            const note = { id: Utils.uid('note'), title: '', html: '', photoIds: [], createdAt: now, updatedAt: now };
+            const note = { id: Utils.uid('note'), title: '', html: '', photoIds: [], audioIds: [], createdAt: now, updatedAt: now };
             s.notes.push(note);
             return note;
         });
     }
 
-    // patch：{ title?, html?, photoIds? }；内容真的变了才刷新 updatedAt
+    // patch：{ title?, html?, photoIds?, audioIds? }；内容真的变了才刷新 updatedAt
     function update(id, patch) {
         return AppState._commit(() => {
             const n = get(id);
@@ -35,6 +36,7 @@
             let changed = false;
             ['title', 'html'].forEach((k) => { if (patch[k] != null && patch[k] !== n[k]) { n[k] = patch[k]; changed = true; } });
             if (Array.isArray(patch.photoIds)) n.photoIds = patch.photoIds.slice();
+            if (Array.isArray(patch.audioIds)) n.audioIds = patch.audioIds.slice();
             if (changed) n.updatedAt = Date.now();
         });
     }

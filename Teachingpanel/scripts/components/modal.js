@@ -86,6 +86,7 @@
         function snapshot() {
             const clone = bodyEl.cloneNode(true);
             clone.querySelectorAll('img[data-photo]').forEach((im) => im.removeAttribute('src'));
+            clone.querySelectorAll('[data-audio]').forEach((el) => { el.innerHTML = ''; el.removeAttribute('data-audio-loading'); });
             const vals = Array.from(bodyEl.querySelectorAll('input, textarea, select'))
                 .filter((el) => el.type !== 'file')
                 .map((el) => (el.type === 'checkbox' || el.type === 'radio') ? el.checked : el.value);
