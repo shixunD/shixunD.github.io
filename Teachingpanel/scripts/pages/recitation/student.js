@@ -101,7 +101,7 @@
                 <li class="check-item" data-hist-round="${round.id}" data-hist-kind="${plan ? 'plan' : 'check'}" style="--dot-color:${plan ? RecitationModel.PLAN.accent : (R[check.result] || {}).color || '#9aa0a6'}">
                     <div class="check-item-head">
                         ${plan ? RecitationDialogs.planPill() : RecitationDialogs.statusPill(check.result)}
-                        <span class="record-date">${Utils.formatDate(check.date)}</span>
+                        ${!plan && RecitationModel.isUndated(check.result) ? '' : `<span class="record-date">${Utils.formatDate(check.date)}</span>`}
                     </div>
                     ${check.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(check.note)}</div>` : ''}
                     ${Photos.viewHtml(check.photoIds)}

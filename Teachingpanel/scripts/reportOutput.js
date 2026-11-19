@@ -109,10 +109,10 @@
 
         const head = ['学号', '学生'];
         const align = ['---:', '---'];
-        if (rp.n) { head.push('作业完成情况', '加分', '扣分', '作业得分'); align.push('---', '---:', '---:', '---:'); }
-        rp.rounds.forEach((r) => { head.push(`背诵：${mdCell(r.title)}`); align.push('---:'); });
+        if (rp.n) { head.push('作业完成情况', '加分', '扣分', '作业得分'); align.push('---', ':---:', ':---:', ':---:'); }
+        rp.rounds.forEach((r) => { head.push(`背诵：${mdCell(r.title)}`); align.push(':---:'); });
         // 1.33.1 起不再单列「背诵得分」（各任务的分已经逐列显示）；有背诵就显示总分 = 作业得分 + 各背诵任务得分
-        if (rp.rounds.length) { head.push('总分'); align.push('---:'); }
+        if (rp.rounds.length) { head.push('总分'); align.push(':---:'); }
         L.push(`| ${head.join(' | ')} |`, `|${align.join('|')}|`);
         rp.rows.forEach((row) => {
             const c = [mdCell(row.student.studentNo), mdCell(row.student.name)];
@@ -162,7 +162,7 @@
             return `<tr><td class="rp-no">${esc(row.student.studentNo)}</td><td class="rp-name">${esc(row.student.name)}</td>${hw}${rec}</tr>`;
         }).join('');
         return `
-            <table class="rp-table">
+            <table class="rp-table rp-sum${rp.n ? '' : ' rp-auto'}">
                 <thead><tr>
                     <th class="rp-c">学号</th><th>学生</th>
                     ${rp.n ? '<th>作业完成情况</th><th class="rp-num">加分</th><th class="rp-num">扣分</th><th class="rp-num">作业得分</th>' : ''}
@@ -437,12 +437,12 @@
                 const runs = [];
                 ORDER.filter((k) => row.counts[k]).forEach((k) => runs.push({ t: '●', color: hex(hwStatus(k).color) }, { t: `×${row.counts[k]}  ` }));
                 line.push({ runs, s: { border: true } },
-                    td(row.bonus, { align: 'right', signed: true }),
-                    td(-row.penalty || 0, { align: 'right', signed: true }),
-                    td(row.final, { align: 'right', signed: true, bold: true, color: colorOf(row.final) }));
+                    td(row.bonus, { align: 'center', signed: true }),
+                    td(-row.penalty || 0, { align: 'center', signed: true }),
+                    td(row.final, { align: 'center', signed: true, bold: true, color: colorOf(row.final) }));
             }
-            row.rec.forEach((x) => line.push(td(x.score, { align: 'right', signed: true, bold: true, color: colorOf(x.score) })));
-            if (rp.rounds.length) line.push(td(row.total, { align: 'right', signed: true, bold: true, color: colorOf(row.total) }));
+            row.rec.forEach((x) => line.push(td(x.score, { align: 'center', signed: true, bold: true, color: colorOf(x.score) })));
+            if (rp.rounds.length) line.push(td(row.total, { align: 'center', signed: true, bold: true, color: colorOf(row.total) }));
             rows1.push(line);
         });
         const cols1 = [7, 12].concat(rp.n ? [30, 8, 8, 14] : [], rp.rounds.map((r) => Math.max(12, Math.min(40, r.title.length * 2 + 8))), rp.rounds.length ? [10] : []);

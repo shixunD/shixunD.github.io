@@ -20,8 +20,12 @@
         // 默认检查日期 = 今天；今天已有检查记录就载入它的结果 / 备注 / 照片，没有就结果留空（不再默认「过关」）
         let result = null;        // 'excel' | 'pass' | 'cond' | 'retry' | 'fail' | null（再点一次已选的结果可以取消）
         // 再点一次已选的检查日期可以取消；不选日期 = 这次不登记检查结果（只处理计划）
-        // 已「提前完成」= 锁定：只能改那条记录的备注 / 照片，不能再登记别的状态、不能再加计划
+        // 已归档（最新一条是 提前完成 / 完成过关 / 条件过关 / 未过关）= 锁定：只能改那条记录的备注 / 照片，不能再登记别的状态、不能再加计划
         let locked = RecitationModel.isLocked(roundId, studentId);
+        const lockLabel = () => (RecitationModel.RESULT_MAP[RecitationModel.lockedResult(roundId, studentId)] || {}).label || '';
+        // 「未过关」不选检查日期：登记成今天（只用来排序），界面上不显示日期
+        const isUndated = (r) => RecitationModel.isUndated(r);
+        const saveDate = () => (isUndated(result) && !locked ? Utils.today() : checkDate);
         const lockedCheck = () => RecitationModel.checksFor(roundId, studentId).slice().pop();
         let checkDate = locked ? lockedCheck().date : Utils.today();
         // 该生本轮已有的（未完成）计划日期：直接显示为选中，再点一次 = 取消那天的计划
@@ -85,38 +89,42 @@
                 const planChanged = () => addedDates().length > 0 || removedDates().length > 0;
 
                 function render() {
-                    // 「提前完成」的限制：锁定时只有提前完成可点；之前有重新过关 / 未过关时提前完成不可点
-                    const canEx = RecitationModel.canExcel(roundId, studentId, checkDate);
+                    // 归档的限制：锁定时只有归档的那个结果可点；之前有重新过关 / 未过关时提前完成不可点
+                    const lockedKey = locked ? RecitationModel.lockedResult(roundId, studentId) : null;
+                    const canEx = RecitationModel.canExcel(roundId, studentId, saveDate());
                     if (!locked && result === 'excel' && !canEx) setResult(null);
                     body.querySelectorAll('[data-result]').forEach((b) => {
                         const k = b.dataset.result;
-                        b.disabled = locked ? k !== 'excel' : (k === 'excel' && !canEx);
-                        b.title = b.disabled ? (locked ? '已提前完成，不能再登记其他状态' : '已有重新过关 / 未过关记录，不能再选提前完成') : '';
+                        b.disabled = locked ? k !== lockedKey : (k === 'excel' && !canEx);
+                        b.title = b.disabled ? (locked ? `已${lockLabel()}（已归档），不能再登记其他状态` : '已有重新过关 / 未过关记录，不能再选提前完成') : '';
                     });
-                    // 选了提前完成 = 不能再计划新的日期（已有的计划保留）
-                    if (!locked && result === 'excel' && addedDates().length) { planDates = existingDates.slice(); planPicker.set(planDates); }
-                    show('[data-date-row]', !locked);
-                    show('[data-plan-wrap]', !locked && result !== 'excel');
+                    // 选了会归档的结果 = 不能再计划新的日期（已有的计划保留）
+                    const archiving = RecitationModel.isArchiveResult(result);
+                    if (!locked && archiving && addedDates().length) { planDates = existingDates.slice(); planPicker.set(planDates); }
+                    show('[data-date-row]', !locked && !isUndated(result));
+                    show('[data-plan-wrap]', !locked && !archiving);
                     // 检查日期始终显示（锁定时隐藏）；备注只在选了检查结果后才出现
                     show('[data-note-wrap]', !!result);
 
                     // 同一天只能有一个检查状态：这天已有记录时提醒，保存会改成新的结果
-                    const sameDay = checkDate && RecitationModel.checksFor(roundId, studentId).find((c) => c.date === checkDate);
+                    const sameDay = saveDate() && RecitationModel.checksFor(roundId, studentId).find((c) => c.date === saveDate());
                     const R = RecitationModel.RESULT_MAP;
                     body.querySelector('[data-replace-hint]').textContent = result && sameDay
-                        ? `${Utils.formatDate(sameDay.date)} 已有检查记录「${(R[sameDay.result] || R.none).label}」，保存后会改成「${R[result].label}」（同一天只保留一个状态）`
+                        ? `${isUndated(result) ? '今天' : Utils.formatDate(sameDay.date)} 已有检查记录「${(R[sameDay.result] || R.none).label}」，保存后会改成「${R[result].label}」（同一天只保留一个状态）`
                         : '';
 
                     // 只改计划时必须有改动（新选了日期、取消了已有的日期）；登记了结果时计划可以不动
                     const withPlan = planChanged();
-                    const recordCheck = !!(result && checkDate);
+                    const recordCheck = !!(result && saveDate());
                     let problem = '';
                     if (!recordCheck && !withPlan) problem = result ? '请选择检查日期（或改计划日期 / 备注）' : '请选择检查结果，或选计划日期、改计划备注';
                     saveBtn.disabled = !!problem;
                     saveBtn.title = problem;
                     saveBtn.textContent = recordCheck && withPlan ? '保存并更新计划' : (!recordCheck && withPlan) ? '保存计划' : '保存';
                     body.querySelector('[data-mode-hint]').textContent = locked
-                        ? '已提前完成：这一轮已过关，只能修改这条记录的备注 / 照片，不能再登记其他状态或计划'
+                        ? `已${lockLabel()}（已归档）：只能修改这条记录的备注 / 照片，不能再登记其他状态或计划；要改状态请在下面删除这条记录`
+                        : archiving
+                            ? `「${R[result].label}」保存后这一轮归档：不能再登记其他状态，也不能再加计划${isUndated(result) ? '（未过关不选检查日期）' : ''}`
                         : result && !checkDate
                             ? '还没选检查日期：不选的话这次不会登记检查结果（只处理计划）'
                             : '';
@@ -160,10 +168,10 @@
                 loadCheckFor(checkDate);   // 今天已有记录就直接载入
                 saveBtn.addEventListener('click', async () => {
                     try {
-                        if (result && checkDate) {
+                        if (result && saveDate()) {
                             await RecitationModel.addCheck({
                                 roundId, studentId, result,
-                                date: checkDate,
+                                date: saveDate(),
                                 note: noteEl.value.trim(),
                                 photoIds: await photoEditor.finalize()
                             });
@@ -241,14 +249,16 @@
             title: `编辑检查记录 · ${stu.name} · ${round.title}`,
             wide: true,
             html: `
-                <div class="dialog-meta">原记录：${statusPill(check.result)} ${Utils.formatDate(check.date)}</div>
+                <div class="dialog-meta">原记录：${statusPill(check.result)} ${RecitationModel.isUndated(check.result) ? '' : Utils.formatDate(check.date)}</div>
                 <div class="status-options status-options-4">
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option ${r.key === result ? 'selected' : ''}" data-edit-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}
                 </div>
-                <label class="field-label">检查日期</label>
-                ${DayPicker.html('editCheck', { count: 7, dimFuture: true })}
+                <div data-edit-date-row>
+                    <label class="field-label">检查日期</label>
+                    ${DayPicker.html('editCheck', { count: 7, dimFuture: true })}
+                </div>
                 <label class="field-label">备注（comment）</label>
                 ${QuickPhrases.chipsHtml('recitation')}
                 <textarea rows="5" data-edit-note>${esc(check.note)}</textarea>
@@ -263,16 +273,19 @@
                 const saveBtn = body.querySelector('[data-edit-save]');
                 const datePicker = DayPicker.bind(body, 'editCheck', { value: date, onChange: (d) => { date = d; } });
 
-                // 提前完成的限制：别处已提前完成 → 只能保持这条原来的结果；有重新过关 / 未过关（别的记录）→ 不能改成提前完成
+                // 归档的限制：别的记录已归档 → 只能保持这条原来的结果；这条自己就是归档的那条 → 只能改备注 / 照片；
+                //   有重新过关 / 未过关（别的记录）→ 不能改成提前完成
                 const lockedByOthers = RecitationModel.isLocked(check.roundId, check.studentId, check.id);
+                const all = RecitationModel.checksFor(check.roundId, check.studentId);
+                const selfArchives = all[all.length - 1] === check && RecitationModel.isArchiveResult(check.result);
                 function render() {
                     const canEx = RecitationModel.canExcel(check.roundId, check.studentId, date);
                     body.querySelectorAll('[data-edit-result]').forEach((b) => {
                         const k = b.dataset.editResult;
-                        // 提前完成这条自己：只能改备注 / 照片，不能改成别的状态
-                        b.disabled = k !== check.result && (check.result === 'excel' || lockedByOthers || (k === 'excel' && !canEx));
-                        b.title = b.disabled ? '这一轮的「提前完成」限制：不能选这个状态' : '';
+                        b.disabled = k !== check.result && (selfArchives || lockedByOthers || (k === 'excel' && !canEx));
+                        b.title = b.disabled ? (selfArchives ? '这条记录已归档，只能改备注和照片；要改状态请删除这条记录' : '这一轮已归档或有重新过关 / 未过关记录：不能选这个状态') : '';
                     });
+                    body.querySelector('[data-edit-date-row]').hidden = RecitationModel.isUndated(result);
                     body.querySelectorAll('[data-edit-result]').forEach((b) => b.classList.toggle('selected', b.dataset.editResult === result));
                     // 检查日期块的颜色跟所选结果的颜色一致
                     const rs = RecitationModel.RESULT_MAP[result];
@@ -338,7 +351,7 @@
                     return `<li class="check-item" style="--dot-color:${(R[c.result] || {}).color || '#9aa0a6'}">
                         <div class="check-item-head">
                             ${statusPill(c.result)}
-                            <span class="check-item-meta"><span class="record-date">${Utils.formatDate(c.date)}</span>
+                            <span class="check-item-meta">${RecitationModel.isUndated(c.result) ? '' : `<span class="record-date">${Utils.formatDate(c.date)}</span>`}
                             <button type="button" class="link-btn" data-edit-check="${c.id}">编辑</button>
                             <button type="button" class="link-btn danger" data-rm-check="${c.id}">删除</button></span>
                         </div>

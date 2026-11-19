@@ -172,6 +172,16 @@
             ranks[id] = (exam.classRanks && exam.classRanks[id]) || computed[id];
             if (exam.gradeRanks && exam.gradeRanks[id]) gradeRanks[id] = exam.gradeRanks[id];
         });
+        // 班级百分位 = 本次分数严格低于他的同学 ÷（参考人数 − 1）× 100，即「超过了班里百分之几的同学」：
+        //   第一名 100%，最后一名 0%；同分不算超过（同分的人百分位相同）；只算这次有成绩的在班学生
+        //   （缺考的不进分母，转出的学生 getStudents 本来就不含）；只有 1 人参考时没有百分位
+        const percentiles = {};
+        if (n >= 2) {
+            entries.forEach((x) => {
+                const lower = values.filter((v) => v < x.score).length;
+                percentiles[x.student.id] = (lower / (n - 1)) * 100;
+            });
+        }
         return {
             count: n,
             total: students.length,
@@ -182,7 +192,8 @@
             passLine,
             entries,
             ranks,
-            gradeRanks
+            gradeRanks,
+            percentiles
         };
     }
 
@@ -208,6 +219,7 @@
                 score: exam.scores[studentId] != null ? exam.scores[studentId] : null,
                 rank: st.ranks[studentId] || null,
                 gradeRank: st.gradeRanks[studentId] || null,
+                percentile: st.percentiles[studentId] != null ? st.percentiles[studentId] : null,
                 count: st.count,
                 avg: st.avg
             };

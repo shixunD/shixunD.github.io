@@ -148,9 +148,14 @@
         try { localStorage.setItem(key, value); } catch (e) { /* 忽略 */ }
     }
 
+    // 页面的滚动容器：导航栏下面的内容区 #app-scroll（整个窗口不滚动）。读写滚动位置、监听滚动都用它
+    function scrollBox() {
+        return document.getElementById('app-scroll') || document.scrollingElement || document.documentElement;
+    }
+
     window.Utils = {
         escapeHtml, balancedTitleHtml, uid, toDateStr, parseDate, today, addDays, diffDays,
         formatDate, weekdayName, weekdaysOf, relativeDay, timestampName, compareStudentNo, formatNumber, percent,
-        downloadText, lsGet, lsSet
+        downloadText, lsGet, lsSet, scrollBox
     };
 })();

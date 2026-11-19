@@ -20,7 +20,7 @@
         document.querySelectorAll('.nav-btn').forEach((btn) => {
             btn.classList.toggle('active', btn.dataset.page === pageName);
         });
-        window.scrollTo(0, 0);
+        Utils.scrollBox().scrollTop = 0;
 
         listeners.forEach((fn) => {
             try { fn(pageName); } catch (e) { console.error('[navigation] listener error', e); }

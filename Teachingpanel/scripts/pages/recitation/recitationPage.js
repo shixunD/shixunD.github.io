@@ -223,8 +223,9 @@
         const rows = checks.map((c) => ({ date: c.date, order: 0, c }))
             .concat(plans.map((p) => ({ date: p.date, order: 1, p })))
             .sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
+        // 未过关不带日期：这一行写「未过关」代替日期
         const dateLines = rows.map((r) => r.c
-            ? `<div class="stu-card-date"><span class="dl-mark"><i class="stu-dot" style="background:${(R[r.c.result] || RecitationModel.NONE).color}"></i></span>${esc(Utils.formatDate(r.date))}${r.c.note ? ' 💬' : ''}</div>`
+            ? `<div class="stu-card-date"><span class="dl-mark"><i class="stu-dot" style="background:${(R[r.c.result] || RecitationModel.NONE).color}"></i></span>${esc(RecitationModel.isUndated(r.c.result) ? R[r.c.result].label : Utils.formatDate(r.date))}${r.c.note ? ' 💬' : ''}</div>`
             : `<div class="stu-card-date stu-card-plan ${r.date < today ? 'overdue' : ''}"><span class="dl-mark">🗓️</span>${esc(Utils.formatDate(r.date))}</div>`).join('');
         return `
             <div class="stu-card ${due ? 'due-today' : ''}" data-sid="${stu.id}" style="--st-color:${look.color};--st-text:${look.text}"

@@ -11,7 +11,7 @@
 .sub-tab.active { background: #fff; color: var(--primary-dark); font-weight: 700; box-shadow: var(--shadow); }
 
 .split-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 1rem; align-items: start; }
-.side-panel { padding: 0.8rem; position: sticky; top: 76px; }
+.side-panel { padding: 0.8rem; position: sticky; top: 16px; }   /* 相对内容区顶边（导航栏下沿） */
 .side-panel-head { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
 .side-panel-head select { flex: 1; min-width: 0; }
 .side-panel-head > .btn-primary:only-child { flex: 1; }

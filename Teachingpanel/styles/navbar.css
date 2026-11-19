@@ -7,8 +7,8 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    position: sticky;
-    top: 0;
+    flex: none;            /* body 是上下排列的 flex：导航栏固定高度，剩下的给内容区 */
+    position: relative;    /* 不再需要 sticky（内容区自己滚动）；relative + z-index 让班级下拉面板盖在内容上面 */
     z-index: 1000;
 }
 

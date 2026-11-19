@@ -35,7 +35,7 @@
     // 跳走之前调用（这样滚动位置还是对的）：记录当前页、滚动位置，在趋势页时还有当前学生
     function mark() {
         const page = Navigation.getCurrent();
-        saved = { page, studentId: page === 'trend' ? StudentTrend.currentId() : null, y: window.scrollY };
+        saved = { page, studentId: page === 'trend' ? StudentTrend.currentId() : null, y: Utils.scrollBox().scrollTop };
         ensureButton();
         place();
     }
@@ -52,7 +52,7 @@
         dismiss();   // 用过一次就消失；下次跳转时再出现
         if (s.studentId) StudentTrend.setCurrent(s.studentId);
         Navigation.goTo(s.page);
-        window.scrollTo(0, s.y);
+        Utils.scrollBox().scrollTop = s.y;
     }
 
     window.BackJump = { mark };

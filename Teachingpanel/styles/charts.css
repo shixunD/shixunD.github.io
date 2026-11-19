@@ -16,6 +16,9 @@
 .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart-grid { stroke: #eee5dc; stroke-width: 1; }
 .chart-axis { font-size: 11px; fill: #8a7f78; }
+.chart-axis-right { fill: #b45309; }   /* 右侧副坐标轴（如班级百分位）：刻度用这条线的颜色，一眼看出属于哪条线 */
+.chart-axis-title { font-size: 10px; }
+.chart-legend small { font-size: 0.72rem; color: var(--text-secondary); }
 .chart-value { font-size: 11px; fill: #2b2420; font-weight: 700; }
 .chart-legend { display: flex; gap: 1rem; justify-content: center; font-size: 0.8rem; color: var(--text-secondary); }
 .chart-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }

@@ -62,8 +62,14 @@
 .rp-table td { padding: 4px 8px; border-bottom: 1px solid #e6ecea; }
 .rp-table tbody tr:nth-child(even) td { background: #f3f8f6; }
 .rp-table .rp-c { text-align: center; }
-/* 分数列：右对齐 + 等宽数字，+0.5 / +2 / -3 上下对齐 */
-.rp-table .rp-num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 12px; white-space: nowrap; }
+/* 分数列：居中 + 等宽数字；列宽按内容收缩 */
+.rp-table .rp-num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; padding-left: 10px; padding-right: 10px; }
+/* 汇总表：学号、姓名、分数列都按内容收窄（width: 1%），多出来的宽度全给「作业完成情况」，不再撑大背诵列 */
+.rp-sum .rp-no, .rp-sum .rp-name { width: 1%; }
+/* 只有背诵、没有作业时没有可以吸收宽度的列：表格按内容宽度，不铺满 */
+.rp-table.rp-auto { width: auto; min-width: 50%; }
+/* 个人版：序号、日期、状态按内容收窄，宽度留给作业名 / 任务名 / 备注 */
+.rp-personal .rp-table .rp-c, .rp-personal .rp-date, .rp-personal .rp-pstatus { width: 1%; white-space: nowrap; }
 .rp-date { white-space: nowrap; }
 .rp-table th:first-child { white-space: nowrap; }
 .rp-no { text-align: center; color: var(--rp-muted); font-size: var(--rp-fs-xs); width: 3em; font-variant-numeric: tabular-nums; }
@@ -74,8 +80,9 @@
 .rp-mark { font-weight: 700; }
 .rp .pos { color: #1e8e3e; }
 .rp .neg { color: #d93025; }
-.rp-rec-h { max-width: 9em; overflow-wrap: anywhere; }
-.rp-rec-h small { display: block; font-weight: normal; opacity: 0.9; font-size: var(--rp-fs-xs); }
+.rp-table th.rp-rec-h { white-space: normal; line-height: 1.3; }
+/* 背诵任务名作小字第二行：列宽至少 5 个字，名字长就在列内换行，不把整列撑宽 */
+.rp-rec-h small { display: block; min-width: 5em; max-width: 8em; margin: 0 auto; font-weight: normal; opacity: 0.9; font-size: var(--rp-fs-xs); overflow-wrap: anywhere; }
 
 .rp-section { margin-top: 18px; }
 .rp-personal .rp-pstatus { white-space: nowrap; }
@@ -114,6 +121,7 @@
     @page { size: A4; margin: 12mm 11mm; }
     body > *:not(#tp-print-root) { display: none !important; }
     html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
+    body { display: block !important; }   /* 平时 body 是一屏高的 flex（内容区自己滚动），打印时恢复成普通文档流 */
     #tp-print-root { display: block; }
     #tp-print-root * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     /* 五档字号整体缩小（约 0.85 倍），标题和正文的比例不变 */

@@ -83,12 +83,17 @@
                 labels: shown.map((h) => Utils.formatDate(h.exam.date)),
                 series: [
                     { name: '本人', color: 'var(--primary-color)', values: shown.map((h) => val(h.score, h.exam)) },
-                    { name: '班级平均', color: '#9ca3af', dashed: true, values: shown.map((h) => val(h.avg, h.exam)) }
+                    { name: '班级平均', color: '#9ca3af', dashed: true, values: shown.map((h) => val(h.avg, h.exam)) },
+                    // 班级百分位（超过了班里百分之几的同学）画在右侧 0～100% 的副坐标轴上，和分数不混用一个刻度
+                    { name: '班级百分位', color: '#d97706', axis: 'right', values: shown.map((h) => h.percentile) }
                 ],
                 yMin: pct ? 0 : undefined,
                 yMax: pct ? 100 : undefined,
                 height: 240,
-                yFormat: (v) => pct ? `${Math.round(v)}%` : Utils.formatNumber(v, 0)
+                yFormat: (v) => pct ? `${Math.round(v)}%` : Utils.formatNumber(v, 0),
+                yTitle: pct ? '得分率' : '分数',
+                y2Min: 0, y2Max: 100, y2Title: '百分位',
+                y2Format: (v) => `${Math.round(v)}%`
             }) : '<div class="chart-empty">考试都隐藏了，点表格左上角的小眼睛全部显示</div>'}
             <table class="simple-table exam-trend-table">
                 <thead><tr><th class="eye-col"><button type="button" class="eye-btn${hiddenHere ? ' eye-off' : ''}" data-eye-all="${hiddenHere ? 'show' : 'hide'}" title="${hiddenHere ? `折线图里隐藏了 ${hiddenHere} 场，点击全部显示` : '全部考试都在折线图里显示，点击全部隐藏'}" aria-label="${hiddenHere ? '全部显示' : '全部隐藏'}">${hiddenHere ? EYE_OFF : EYE}</button></th><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>班级排名</th><th>年级排名</th></tr></thead>

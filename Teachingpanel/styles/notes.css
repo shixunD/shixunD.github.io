@@ -10,7 +10,7 @@
 .note-status { flex: none; font-size: 0.78rem; color: var(--text-secondary); min-width: 3.5rem; text-align: right; }
 
 /* 工具栏：吸顶（导航栏下面），一行放不下自动换行 */
-.ne-toolbar { position: sticky; top: 64px; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 0.35rem 0.6rem; background: #fcf9f6; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+.ne-toolbar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 0.35rem 0.6rem; background: #fcf9f6; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
 .ne-btn { position: relative; min-width: 1.9rem; height: 1.9rem; padding: 0 0.4rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font-size: 0.9rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .ne-btn:hover { background: rgba(255, 138, 61, 0.14); }
 .ne-btn.on { background: var(--primary-soft); color: var(--primary-dark); }

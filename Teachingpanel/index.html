@@ -55,12 +55,15 @@
         </div>
     </nav>
 
+    <!-- 内容区：只有这里滚动，导航栏固定在上面不动，滚动条也从导航栏下面开始（见 base.css #app-scroll） -->
+    <main id="app-scroll" class="app-scroll">
     <div class="page active" id="home-page"><div class="container" id="home-page-body"></div></div>
     <div class="page" id="homework-page"><div class="container" id="homework-page-body"></div></div>
     <div class="page" id="recitation-page"><div class="container" id="recitation-page-body"></div></div>
     <div class="page" id="exams-page"><div class="container" id="exams-page-body"></div></div>
     <div class="page" id="trend-page"><div class="container" id="trend-page-body"></div></div>
     <div class="page" id="notes-page"><div class="container" id="notes-page-body"></div></div>
+    </main>
 
     <!-- 脚本顺序 = 依赖顺序：无依赖工具 → 组件 → state → 业务模型 → 依赖它们的组件/横切模块 → 页面 → app.js -->
     <script src="./scripts/utils.js"></script>

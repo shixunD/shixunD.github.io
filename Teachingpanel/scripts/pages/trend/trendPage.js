@@ -15,7 +15,8 @@
 
     function pageEl() { return document.getElementById('trend-page-body'); }
 
-    // 顶部固定区的高度写进 CSS 变量：章节滚动定位的留白、「其他情况」右栏的吸顶位置都靠它
+    // 顶部固定区的高度写进 CSS 变量：章节滚动定位的留白、「其他情况」右栏的吸顶位置和最大高度都靠它。
+    //   返回值 = 导航栏 + 选择器的高度，即选择器下沿在窗口里的位置（onScroll 用 getBoundingClientRect 比较，是窗口坐标）
     function measure() {
         const el = pageEl();
         if (!el) return 0;
@@ -38,7 +39,7 @@
     function render() {
         const el = pageEl();
         if (!el) return;
-        const y = window.scrollY;
+        const y = Utils.scrollBox().scrollTop;
         const kinds = StudentTrend.KINDS;
         if (!active || !kinds.some((k) => k.key === active)) active = StudentTrend.lastKind();
 
@@ -57,7 +58,7 @@
         SECTIONS.forEach((s) => s.render(el.querySelector(`#trend-sec-${s.key} [data-sec-body]`)));
         StudentTrend.bind(el, render, (key) => scrollTo(key, true));
         measure();
-        window.scrollTo(0, y);
+        Utils.scrollBox().scrollTop = y;
     }
 
     function scrollTo(key, smooth) {
@@ -77,10 +78,11 @@
         const line = measure() + 24;
         let key = secs[0].dataset.sec;
         secs.forEach((s) => { if (s.getBoundingClientRect().top <= line) key = s.dataset.sec; });
-        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) key = secs[secs.length - 1].dataset.sec;
+        const box = Utils.scrollBox();
+        if (box.clientHeight + box.scrollTop >= box.scrollHeight - 4) key = secs[secs.length - 1].dataset.sec;
         setActive(key);
     }
-    window.addEventListener('scroll', onScroll, { passive: true });
+    Utils.scrollBox().addEventListener('scroll', onScroll, { passive: true });   // 滚动的是内容区，不是窗口
     window.addEventListener('resize', () => { if (Navigation.getCurrent() === 'trend') measure(); });
 
     window.TrendPage = { render, scrollTo };

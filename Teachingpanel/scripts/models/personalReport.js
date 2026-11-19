@@ -33,7 +33,7 @@
                 look: r.look,                       // 'plan' | 状态 key（用于配色）
                 status: pg.status,
                 label: (RecitationModel.RESULT_MAP[pg.status] || RecitationModel.NONE).label,
-                lastDate: pg.check ? pg.check.date : '',
+                lastDate: pg.check && !RecitationModel.isUndated(pg.check.result) ? pg.check.date : '',   // 未过关不带日期
                 attempts: checks.length,
                 pass: r.pass,
                 plans: plans.map((p) => p.date),

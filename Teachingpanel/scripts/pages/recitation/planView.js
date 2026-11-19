@@ -50,7 +50,7 @@
                 <div class="plan-day-head">
                     <h3 class="section-title">${Utils.formatDate(ui.day)} · ${Utils.relativeDay(ui.day)}：已计划 <b>${dayPlans.length}</b> 人</h3>
                     <div class="plan-quick">
-                        <button type="button" class="btn-secondary btn-sm" data-add-unpassed ${ui.day < today ? 'disabled' : ''}>把未过关的都加进来</button>
+                        <button type="button" class="btn-secondary btn-sm" data-add-unpassed ${ui.day < today ? 'disabled' : ''} title="已归档（提前完成 / 完成过关 / 条件过关 / 未过关）的学生不加">把未检查 / 重新过关的都加进来</button>
                         <button type="button" class="btn-secondary btn-sm" data-clear-day ${dayPlans.some((p) => !RecitationModel.isPlanDone(p)) ? '' : 'disabled'}>清空这天的计划</button>
                     </div>
                 </div>
@@ -68,12 +68,14 @@
                             return cls ? `<span class="${cls}">${esc(txt)}</span>` : esc(txt);
                         }).join('、');
                         // 左侧色条：有未完成的计划且还没过关 -> 天蓝；否则是状态色。卡片底色不填充。selected = 当前选中的那天有他的计划
-                        const planned = mine.some((p) => !RecitationModel.isPlanDone(p)) && !RecitationModel.isPassed(RecitationModel.statusOf(ui.roundId, stu.id));
+                        // 已归档（提前完成 / 完成过关 / 条件过关 / 未过关）：整块变灰、不能再加计划（这天已有的计划仍可点掉）
+                        const archived = RecitationModel.isLocked(ui.roundId, stu.id);
+                        const planned = mine.some((p) => !RecitationModel.isPlanDone(p)) && !archived;
                         const stripColor = planned ? RecitationModel.PLAN.accent : st.color;
                         const stripTitle = planned ? `${st.label}（已计划）` : st.label;
-                        return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''}" data-plan-sid="${stu.id}" ${!plan && RecitationModel.isLocked(ui.roundId, stu.id) ? 'disabled title="已提前完成，不能再加计划"' : ''} ${done ? 'title="这天的计划已检查完成；点击会取消这条历史计划"' : ''}>
+                        return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''} ${archived ? 'archived' : ''}" data-plan-sid="${stu.id}" ${!plan && archived ? `disabled title="已${esc(st.label)}（已归档），不能再加计划"` : ''} ${done ? 'title="这天的计划已检查完成；点击会取消这条历史计划"' : ''}>
                             <i style="background:${stripColor}" title="${esc(stripTitle)}"></i><span class="row-no">${esc(stu.studentNo)}</span>${esc(stu.name)}
-                            <small>${plan ? (done ? '✓ 这天已检查' : '✓ 这天已计划') : esc(st.label)}</small>
+                            <small>${plan ? (done ? '✓ 这天已检查' : '✓ 这天已计划') : archived ? `${esc(st.label)} · 已归档` : esc(st.label)}</small>
                             <small class="plan-stu-dates">${mine.length ? `🗓️ ${dateList}` : '暂无计划'}</small>
                         </button>`;
                     }).join('')}
@@ -94,7 +96,7 @@
             else await RecitationModel.addPlans(ui.roundId, [sid], ui.day);
         }));
         view.querySelector('[data-add-unpassed]').addEventListener('click', async () => {
-            const ids = students.filter((s) => !RecitationModel.isPassed(RecitationModel.statusOf(ui.roundId, s.id))).map((s) => s.id);
+            const ids = students.filter((s) => !RecitationModel.isLocked(ui.roundId, s.id)).map((s) => s.id);
             const added = await RecitationModel.addPlans(ui.roundId, ids, ui.day);
             Toast.success(`已加入 ${added} 人`);
         });
