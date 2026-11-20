@@ -223,6 +223,13 @@
         return counts;
     }
 
+    // 每个学生全部轮次里「提前完成 + 完成过关 + 条件过关」的检查记录条数（含已归档的）：studentId -> 次数（1.44.0，背诵页名字旁显示）
+    function passedTotals() {
+        const map = new Map();
+        state().recChecks.forEach((c) => { if (isPassed(c.result)) map.set(c.studentId, (map.get(c.studentId) || 0) + 1); });
+        return map;
+    }
+
     // ---------- 背诵计划 ----------
 
     // 某生某轮次的计划，按日期正序
@@ -382,7 +389,7 @@
     window.RecitationModel = {
         RESULTS, RESULT_MAP, NONE, PLAN, isPassed, isArchiveResult, isUndated, moveSide, removeGroup,
         rounds, roundLayout, getRound, createRound, updateRound, removeRound,
-        checksFor, latestCheck, isLocked, lockedResult, canExcel, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary,
+        checksFor, latestCheck, isLocked, lockedResult, canExcel, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary, passedTotals,
         plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
         schedule, nextArrangement, dueToday, reminderCounts, remainingCounts, weekStartOf, roundWeek, roundDay, studentOverview
     };

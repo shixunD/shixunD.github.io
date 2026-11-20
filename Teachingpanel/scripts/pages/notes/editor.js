@@ -332,7 +332,17 @@
         // 图片：选择 / 拍照 / 手机拍 / 粘贴 / 拖入 都走照片压缩预览框
         const inserter = Photos.bindInserter(card, {
             alive: () => document.body.contains(card) && (hooks.alive ? hooks.alive() : true),
-            onPhoto: (id) => { restore(); insertHtml(`<div><img data-photo="${Utils.escapeHtml(id)}" alt="照片"></div><div><br></div>`); }
+            onPhoto: (id) => { restore(); insertHtml(`<div><img data-photo="${Utils.escapeHtml(id)}" alt="照片"></div><div><br></div>`); },
+            // 「📱 手机拍」面板里点 ✕：删掉这张（只剩它的那一行也一起删）
+            onRemove: (id) => {
+                body.querySelectorAll('img[data-photo]').forEach((im) => {
+                    if (im.dataset.photo !== id) return;
+                    const line = im.parentNode;
+                    im.remove();
+                    if (line && line !== body && !line.textContent && !line.querySelector('img, [data-audio]')) line.remove();
+                });
+                onChange();
+            }
         });
         AudioRec.bindInserter(card, {
             alive: () => document.body.contains(card) && (hooks.alive ? hooks.alive() : true),

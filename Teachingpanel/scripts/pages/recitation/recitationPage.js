@@ -169,6 +169,7 @@
         const c = RecitationModel.roundSummary(round.id, students);
         const R = RecitationModel.RESULT_MAP;
         const shown = students.filter((stu) => !ui.filter || RecitationModel.statusOf(round.id, stu.id) === ui.filter);
+        const totals = RecitationModel.passedTotals();
 
         return `
             <div class="card">
@@ -193,7 +194,7 @@
                 <div class="brush-bar">
                     ${FILTERS.map((f) => `<button type="button" class="btn-toggle ${ui.filter === f.key ? 'btn-toggle-on' : ''}" data-filter="${f.key}">${esc(f.label)}</button>`).join('')}
                 </div>
-                ${students.length ? (shown.length ? `<div class="stu-grid">${shown.map((stu) => studentCard(round, stu)).join('')}</div>` : '<div class="empty-message">没有符合筛选条件的学生</div>') : UI.emptyStudentsHint()}
+                ${students.length ? (shown.length ? `<div class="stu-grid">${shown.map((stu) => studentCard(round, stu, totals)).join('')}</div>` : '<div class="empty-message">没有符合筛选条件的学生</div>') : UI.emptyStudentsHint()}
             </div>
         `;
     }
@@ -205,7 +206,8 @@
     //   不再显示状态文字行
     //   日期：每行一个，按日期升序。检查记录：日期前加该结果色的小圆点；计划：日期前用 🗓️（逾期未检查的整行标红）
     //   今天需要检查（今天有计划）-> 粉色边框
-    function studentCard(round, stu) {
+    // totals：RecitationModel.passedTotals()，名字旁的「(x次)」= 这个学生所有轮次里过关（提前完成 / 完成过关 / 条件过关）的总次数
+    function studentCard(round, stu, totals) {
         const R = RecitationModel.RESULT_MAP;
         const today = Utils.today();
         const pg = RecitationModel.progressOf(round.id, stu.id);
@@ -231,7 +233,7 @@
             <div class="stu-card ${due ? 'due-today' : ''}" data-sid="${stu.id}" style="--st-color:${look.color};--st-text:${look.text}"
                 title="${esc(st.label)}${plans.length ? ` · 计划：${plans.map((p) => Utils.formatDate(p.date)).join('、')}` : ''}${due ? ' · 今天需要检查' : ''}">
                 <div class="stu-card-no">${esc(stu.studentNo)}${attempts > 1 ? ` · 第${attempts}次` : ''}</div>
-                <div class="stu-card-name">${esc(stu.name)}</div>
+                <div class="stu-card-name">${esc(stu.name)}<span class="stu-card-tally" title="所有背诵任务里提前完成 + 完成过关 + 条件过关的总次数">(${(totals && totals.get(stu.id)) || 0}次)</span></div>
                 ${dateLines}
             </div>`;
     }

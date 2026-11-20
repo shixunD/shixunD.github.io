@@ -45,6 +45,7 @@
         .cam-flash.on { opacity: 0.7; transition: none; }
         .cam-top { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; justify-content: space-between; color: #fff; font-size: 0.85rem; pointer-events: none; }
         .cam-top span:not(:empty) { background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.15rem 0.7rem; }
+        .cam-orient { position: absolute; left: 50%; top: -4px; transform: translateX(-50%); pointer-events: auto; border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 999px; background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 0.9rem; padding: 0.25rem 0.9rem; }
         .cam-zoom { position: absolute; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 0.4rem; color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.3rem 0.9rem; font-size: 0.85rem; }
         .cam-zoom input { width: 160px; }
         .cam-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px calc(14px + env(safe-area-inset-bottom)); background: rgba(0, 0, 0, 0.75); }
@@ -73,7 +74,7 @@
         </label>
         <div class="pending" id="pending" hidden></div>
         <div class="list" id="list"></div>
-        <p class="hint">「📷 拍照」在本页里直接打开摄像头，可以连拍，每拍一张马上传到电脑（不离开本页，最稳定）。「📱 用系统相机拍」会跳到手机自带的相机 App，有夜景、HDR 等效果，但部分手机拍完不会回到本页。没连上时拍的照片会先存在手机上，刷新或关掉本页也不会丢，连上后自动发送；电脑收到后手机上的才删除，也可以点照片右上角的 ✕ 手动删除。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
+        <p class="hint">「📷 拍照」在本页里直接打开摄像头，可以连拍，每拍一张马上传到电脑（不离开本页，最稳定）。拍照界面顶部的「▯ 竖拍 / ▭ 横拍」点一下切换方向：手机锁了竖屏也能直接拍出横的照片（横拍时手机顶端朝左拿），电脑上不用再旋转。「📱 用系统相机拍」会跳到手机自带的相机 App，有夜景、HDR 等效果，但部分手机拍完不会回到本页。没连上时拍的照片会先存在手机上，刷新或关掉本页也不会丢，连上后自动发送；电脑收到后手机上的才删除，也可以点照片右上角的 ✕ 手动删除。电脑上要保持「📱 手机拍」窗口打开。第一次扫码后手机会记住电脑，下次直接打开本页就能连上（可以把本页加到书签或主屏幕）。</p>
         <details>
             <summary>连接诊断</summary>
             <div class="diag" id="diag"></div>
@@ -88,7 +89,7 @@
     <div class="cam" id="camview" hidden>
         <video id="camvideo" playsinline muted autoplay></video>
         <div class="cam-flash" id="camflash"></div>
-        <div class="cam-top"><span id="camres"></span><span id="camcount"></span></div>
+        <div class="cam-top"><span id="camres"></span><button type="button" class="cam-orient" id="camorient" title="点一下切换横拍 / 竖拍"></button><span id="camcount"></span></div>
         <div class="cam-zoom" id="camzoombox" hidden>🔍 <input type="range" id="camzoom"> <span id="camzoomval"></span></div>
         <div class="cam-bar">
             <button type="button" class="cam-btn" id="camdone">完成</button>

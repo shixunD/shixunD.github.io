@@ -561,9 +561,12 @@
     async function rotateSaved(id, dir) {
         const old = await AppState.photoGet(id);
         if (!old) return null;
-        const blob = await rotateBlob(old, dir > 0 ? 1 : 3);
+        return replaceSaved(id, await rotateBlob(old, dir > 0 ? 1 : 3));
+    }
+    // 已存进照片库的照片换成新图（旋转、笔记里手机拍的照片重新压缩），页面上显示它的地方一起换
+    async function replaceSaved(id, blob) {
         await AppState.photoPut(id, blob);
-        AppState._emitChange('edit');   // 旋转已保存的照片不经过 _commit，但也是数据改动（备份提醒要知道）
+        AppState._emitChange('edit');   // 改已保存的照片不经过 _commit，但也是数据改动（备份提醒要知道）
         const url = URL.createObjectURL(blob);
         const prev = urlCache.get(id);
         urlCache.set(id, url);
@@ -833,7 +836,8 @@
         // 读得了的照片排进预览队列，由用户选档位后才加入；这里先试读一次，读不了立刻报错，不让手机白等回执
         // inboxId：手机拍传来的照片在电脑上暂存的编号（见 inboxTrack），只配合单张 files 使用
         // auto（手机拍，1.41.0）：不弹预览框，先用原图占位显示，再按默认档压缩；原图留在内存（和电脑端暂存）里，点照片可重新编辑
-        async function addFiles(files, { quiet = false, inboxId = '', auto = false } = {}) {
+        // onItem(item)：auto 时把放进列表的那一项交给调用方（手机拍面板用它在面板里删除 / 重新编辑同一张）
+        async function addFiles(files, { quiet = false, inboxId = '', auto = false, onItem = null } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
@@ -845,6 +849,7 @@
                         const item = { blob: file, url: URL.createObjectURL(file), inboxId, orig: file, edit: null, busy: true };
                         pending.push(item);
                         render();
+                        if (onItem) onItem(item);
                         work = work.then(async () => {
                             try {
                                 const res = await compressDefault(file);
@@ -860,6 +865,7 @@
                                 render();
                             }
                         });
+                        item.ready = work;   // 这张压完的时刻（点开编辑时只等它自己，不等后面排队的）
                         continue;
                     }
                     enqueueChoose(async () => {
@@ -890,9 +896,17 @@
             }
         });
         const phoneBtn = box.querySelector('[data-photo-phone]');
+        // 返回这张照片的操作句柄：「📱 手机拍」面板开着时登记弹窗被它盖住，面板里的缩略图靠它删除 / 打开编辑框（1.44.0）
         if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob, inboxId) => {
+            let item = null;
             // 读不了就抛错：PhoneLink 会把原因回给手机，手机那张照片显示失败，而不是假装「已发送」
-            if (!(await addFiles([blob], { quiet: true, inboxId, auto: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            if (!(await addFiles([blob], { quiet: true, inboxId, auto: true, onItem: (it) => { item = it; } }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            return item && {
+                alive: () => pending.includes(item),
+                blob: () => item.blob,
+                edit: () => editFrom(pending.indexOf(item)),
+                remove: () => removePending(item)
+            };
         }));
         box.querySelector('[data-photo-upload]').addEventListener('click', () => box.querySelector('[data-photo-input="upload"]').click());
         box.querySelectorAll('[data-photo-input]').forEach((input) => input.addEventListener('change', async () => {
@@ -902,43 +916,47 @@
         // 移除照片：先确认；移除后提示条里可「撤销」（放回原来的位置）。
         // 新拍的照片被移除后先不释放 object URL，撤销还要用；保存时（finalize）统一释放
         const discarded = [];
+        const confirmRemove = () => Modal.confirm({ title: '删除照片', text: '确定删除这张照片吗？', confirmText: '删除', danger: true });
+        // 移除一张新照片（登记弹窗里的 ✕，或手机拍面板里的 ✕）；返回是否删了
+        async function removePending(item) {
+            if (!pending.includes(item) || !(await confirmRemove())) return false;
+            const index = pending.indexOf(item);
+            if (index < 0) return false;
+            pending.splice(index, 1);
+            discarded.push(item);
+            render();
+            Toast.action('已删除照片', '撤销', () => {
+                const at = discarded.indexOf(item);
+                if (at < 0) return;
+                discarded.splice(at, 1);
+                pending.splice(Math.min(index, pending.length), 0, item);
+                render();
+            });
+            return true;
+        }
         list.addEventListener('click', async (e) => {
             const k = e.target.closest('[data-rm-kept]');
             const p = e.target.closest('[data-rm-pending]');
-            if (!k && !p) return;
-            const ok = await Modal.confirm({ title: '删除照片', text: '确定删除这张照片吗？', confirmText: '删除', danger: true });
-            if (!ok) return;
-            let undo;
-            if (k) {
-                const index = kept.indexOf(k.dataset.rmKept);
-                if (index < 0) return;
-                const [id] = kept.splice(index, 1);
-                undo = () => { if (!kept.includes(id)) kept.splice(Math.min(index, kept.length), 0, id); };
-            } else {
-                const index = Number(p.dataset.rmPending);
-                const [gone] = pending.splice(index, 1);
-                if (!gone) return;
-                discarded.push(gone);
-                undo = () => {
-                    const at = discarded.indexOf(gone);
-                    if (at >= 0) discarded.splice(at, 1);
-                    pending.splice(Math.min(index, pending.length), 0, gone);
-                };
-            }
+            if (p) { const item = pending[Number(p.dataset.rmPending)]; if (item) await removePending(item); return; }
+            if (!k) return;
+            if (!(await confirmRemove())) return;
+            const index = kept.indexOf(k.dataset.rmKept);
+            if (index < 0) return;
+            const [id] = kept.splice(index, 1);
             render();
-            Toast.action('已删除照片', '撤销', () => { undo(); render(); });
+            Toast.action('已删除照片', '撤销', () => { if (!kept.includes(id)) kept.splice(Math.min(index, kept.length), 0, id); render(); });
         });
         render();
 
         // 点还没保存的照片：打开编辑框，从原图重新选档位 / 裁剪 / 旋转；「‹ 上一张 / 下一张 ›」在这次新加的照片之间切换
         let editingNow = false;
-        pendingEditors.set(list, async (start) => {
-            if (editingNow) return;
+        async function editFrom(start) {
+            if (editingNow || start < 0) return;
             editingNow = true;
             try {
                 let p = pending[start];
                 while (p) {
-                    if (p.busy) await work;
+                    if (p.busy) { Toast.info('这张还在压缩，压完马上打开', 2000); await p.ready; }
                     const i = pending.indexOf(p);
                     if (i < 0) break;
                     const res = await chooseLevel(p.orig || p.blob, { editing: true, init: p.edit, nav: { pos: i + 1, total: pending.length } });
@@ -958,7 +976,8 @@
             } finally {
                 editingNow = false;
             }
-        });
+        }
+        pendingEditors.set(list, editFrom);
 
         return {
             // 换一批已保存的照片（切换日期时载入那天已有记录的照片）；新选还没保存的照片不动
@@ -989,31 +1008,49 @@
     // root 里需有 [data-ins-camera] / [data-ins-phone](仅电脑) / [data-ins-upload] 按钮，上传用 root 里的 <input type=file data-ins-input> 与 camera 用的 data-ins-input-cam。
     // opts.onPhoto(id)：照片已存好（photoPut），调用方把 <img data-photo=id> 插进内容；opts.alive()：返回 false（页面已切走）就放弃这张。
     // 返回 { addFiles }，粘贴 / 拖入的图片文件也走它，所以同样会弹出压缩预览框（可裁剪、翻转、选档位）。
+    // opts.onRemove(id)：可选，把这张从内容里删掉（「📱 手机拍」面板里的 ✕ 用）
     function bindInserter(root, opts) {
         const alive = opts.alive || (() => true);
         let autoWork = Promise.resolve();
-        // auto（手机拍，1.41.0）：不弹预览框，按默认档压缩后直接插进笔记；插进去之后点图片是大图（可旋转），不能再从原图裁剪
-        async function addFiles(files, { quiet = false, inboxId = '', auto = false } = {}) {
+        // 手机拍插进笔记的照片（1.44.0）：留着原图，面板里点开可从原图重新压缩 / 裁剪 / 旋转。{ orig, edit, blob, id, gone, ready }
+        let phoneItems = [];
+        const inNote = (it) => !!it.id && Array.from(root.querySelectorAll('img[data-photo]')).some((im) => im.dataset.photo === it.id);
+        const isLive = (it) => !it.gone && (!it.id || inNote(it));
+        // auto（手机拍，1.41.0）：不弹预览框，按默认档压缩后直接插进笔记
+        async function addFiles(files, { quiet = false, inboxId = '', auto = false, onItem = null } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
                     const probe = await decode(file);
                     if (probe.close) probe.close();
                     added++;
+                    let item = null;
+                    if (auto && onItem) {
+                        phoneItems = phoneItems.filter(isLive);   // 已从笔记里删掉的不再留原图
+                        item = { orig: file, edit: null, blob: null, id: null, gone: false };
+                        phoneItems.push(item);
+                    }
                     // 自动压缩的不进预览框队列（队列要等「📱 手机拍」面板关掉才动），逐张按顺序插进笔记
                     const run = auto ? (job) => { autoWork = autoWork.then(job).catch((err) => Toast.error(err.message)); } : enqueueChoose;
                     run(async () => {
+                        let done = false;
                         try {
                             if (!alive()) return;
-                            const blob = auto ? (await compressDefault(file)).blob : await chooseLevel(file);
+                            const res = auto ? await compressDefault(file) : null;
+                            const blob = auto ? res.blob : await chooseLevel(file);
                             if (!blob) return;
                             const id = Utils.uid('ph');
                             await AppState.photoPut(id, blob);
-                            if (alive()) opts.onPhoto(id);
+                            if (!alive()) return;
+                            if (item) Object.assign(item, { id, blob, edit: res.edit });
+                            opts.onPhoto(id);
+                            done = true;
                         } finally {
+                            if (item && !done) item.gone = true;
                             inboxDone(inboxId);   // 插进笔记（笔记自己会保存）或放弃，都算处理完
                         }
                     });
+                    if (item) { item.ready = autoWork; onItem(item); }
                 } catch (err) {
                     if (!quiet) Toast.error(err.message);
                 }
@@ -1032,9 +1069,51 @@
                 camInput.click();
             }
         });
+        // 面板里点开：编辑框从原图重新来，「‹ 上一张 / 下一张 ›」在这次手机拍插进来的照片之间切换；改完写回照片库，笔记里的图跟着换
+        let editingNow = false;
+        async function editFrom(item) {
+            if (editingNow) return;
+            editingNow = true;
+            try {
+                let p = item;
+                while (p) {
+                    if (!p.id) { Toast.info('这张还在压缩，压完马上打开', 2000); await p.ready; }
+                    const live = phoneItems.filter(isLive);
+                    const i = live.indexOf(p);
+                    if (i < 0) break;
+                    const res = await chooseLevel(p.orig, { editing: true, init: p.edit, nav: { pos: i + 1, total: live.length } });
+                    if (res.blob && isLive(p)) {
+                        p.blob = res.blob;
+                        p.edit = res.edit;
+                        await replaceSaved(p.id, res.blob);
+                    }
+                    if (res.action !== 'nav') break;
+                    const now = phoneItems.filter(isLive);
+                    const at = now.indexOf(p);
+                    p = now[Math.min(now.length - 1, Math.max(0, (at < 0 ? i : at) + res.step))];
+                }
+            } catch (err) {
+                Toast.error(err.message);
+            } finally {
+                editingNow = false;
+            }
+        }
         const phoneBtn = root.querySelector('[data-ins-phone]');
         if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob, inboxId) => {
-            if (!(await addFiles([blob], { quiet: true, inboxId, auto: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            let item = null;
+            if (!(await addFiles([blob], { quiet: true, inboxId, auto: true, onItem: (it) => { item = it; } }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            return item && {
+                alive: () => isLive(item),
+                blob: () => item.blob,
+                edit: () => editFrom(item),
+                remove: opts.onRemove ? async () => {
+                    if (item.ready) await item.ready;
+                    if (!isLive(item) || !(await Modal.confirm({ title: '删除照片', text: '从笔记里删掉这张照片吗？', confirmText: '删除', danger: true }))) return false;
+                    opts.onRemove(item.id);
+                    item.gone = true;
+                    return true;
+                } : null
+            };
         }));
         const upBtn = root.querySelector('[data-ins-upload]');
         if (upBtn) upBtn.addEventListener('click', () => upInput.click());

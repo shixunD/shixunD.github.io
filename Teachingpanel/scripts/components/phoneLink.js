@@ -184,6 +184,9 @@
             let peerId = getPeerId();
             const conns = new Set();
             const urls = [];
+            // 面板里的缩略图（1.44.0）：照片交给的那一块返回了操作句柄（{ alive, blob, edit, remove }）时，
+            // 面板里就能删除、点开编辑框（和登记弹窗里那张是同一张）；没有句柄的（笔记里插图）点开是大图
+            const shown = [];   // { el, handle, blob, url }
             let received = 0;
             let state = 'starting';   // starting | waiting | pairing | connected | quiet | p2pfail | error
             const lastSeen = new WeakMap();   // 连接 -> 最近一次收到它消息的时间
@@ -316,13 +319,11 @@
                             .catch((err) => { settle(msg.id); throw err; });
                         processing.set(msg.id, job);
                         try {
-                            await job;
+                            const handle = await job;   // 那一块返回的操作句柄（可能没有）
                             seenIds.set(msg.id, Date.now());
                             rememberSeen(msg.id);
                             received++;
-                            const url = URL.createObjectURL(blob);
-                            urls.push(url);
-                            thumbs.insertAdjacentHTML('beforeend', `<span class="photo-thumb"><img src="${url}" alt="已收到"></span>`);
+                            addThumb(blob, handle);
                             refreshStatus();
                             conn.send({ type: 'ack', id: msg.id });
                         } catch (err) {
@@ -367,7 +368,7 @@
                     // 其余错误属于某一条手机连接（如 negotiation-failed），由上面的连接监听处理
                 });
             }
-            quietTimer = setInterval(checkQuiet, 1000);
+            quietTimer = setInterval(() => { checkQuiet(); syncThumbs(); }, 1000);
 
             // 上次留下的照片：显示提示条，「加到这里」逐张交给当前块（和刚收到的一样走预览框），「不要了」删掉
             const orphansEl = overlay.querySelector('[data-pl-orphans]');
@@ -385,13 +386,14 @@
                     if (!onPhotoCur) break;
                     handled.add(r.id);
                     try {
-                        await onPhotoCur(new Blob([r.buf], { type: r.type || 'image/jpeg' }), r.id);
+                        const blob = new Blob([r.buf], { type: r.type || 'image/jpeg' });
+                        addThumb(blob, await onPhotoCur(blob, r.id));
                         ok++;
                         received++;
                     } catch (err) { settle(r.id); }
                 }
                 refreshStatus();
-                if (ok) Toast.success(`已找回 ${ok} 张，关掉本窗口后逐张选档位`);
+                if (ok) Toast.success(`已找回 ${ok} 张`);
             });
             overlay.querySelector('[data-pl-orphans-drop]').addEventListener('click', async () => {
                 const left = await leftovers();
@@ -401,6 +403,48 @@
                 orphansEl.hidden = true;
             });
             showOrphans();
+
+            function addThumb(blob, handle) {
+                const h = handle && typeof handle.edit === 'function' ? handle : null;
+                const url = URL.createObjectURL(blob);
+                urls.push(url);
+                const el = document.createElement('span');
+                el.className = 'photo-thumb';
+                el.innerHTML = `<img src="${url}" alt="已收到"${h ? ' title="点开可重新压缩 / 裁剪 / 旋转"' : ''}>` + (h && h.remove ? '<button type="button" class="photo-rm" title="删除">✕</button>' : '');
+                thumbs.appendChild(el);
+                shown.push({ el, handle: h, blob, url });
+                syncThumbs();
+            }
+            // 和那一块里的照片对齐：在别处删掉（或撤销删除）的跟着隐藏 / 显示，重新压缩过的换成新图
+            function syncThumbs() {
+                shown.forEach((t) => {
+                    if (!t.handle) return;
+                    const alive = t.handle.alive();
+                    t.el.hidden = !alive;
+                    const b = alive && t.handle.blob();
+                    if (b && b !== t.blob) {
+                        t.blob = b;
+                        t.url = URL.createObjectURL(b);
+                        urls.push(t.url);
+                        t.el.querySelector('img').src = t.url;
+                    }
+                });
+            }
+            thumbs.addEventListener('click', async (e) => {
+                const t = shown.find((x) => x.el.contains(e.target));
+                if (!t || !t.handle) return;   // 没有句柄：交给照片组件的通用点击（打开大图）
+                e.stopPropagation();
+                try {
+                    if (!t.handle.alive()) return;
+                    if (e.target.closest('.photo-rm')) { if (t.handle.remove) await t.handle.remove(); }
+                    else if (e.target.closest('img')) await t.handle.edit();
+                } catch (err) {
+                    Toast.error(err.message);
+                } finally {
+                    syncThumbs();
+                }
+            });
+
             function restart() {
                 if (closed) return;
                 if (peer) { try { peer.destroy(); } catch (e) { /* 忽略 */ } }
@@ -449,6 +493,7 @@
                 received = 0;
                 urls.forEach((u) => URL.revokeObjectURL(u));
                 urls.length = 0;
+                shown.length = 0;
                 thumbs.innerHTML = '';
                 active = true;
                 document.addEventListener('keydown', onKey, true);
@@ -461,7 +506,12 @@
             }
             const api = { attach, destroy };
             showOrphansRef = showOrphans;
-            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(); } };
+            // 面板上面还开着编辑框 / 确认框 / 大图时，Esc 只关上面那个（它们自己处理），不关面板
+            const onKey = (e) => {
+                if (e.key !== 'Escape' || document.querySelector('.photo-choose-overlay, .modal-overlay, .photo-lightbox')) return;
+                e.stopPropagation();
+                finish();
+            };
 
             overlay.querySelector('[data-pl-done]').addEventListener('click', finish);
             overlay.querySelector('[data-pl-reset]').addEventListener('click', async () => {

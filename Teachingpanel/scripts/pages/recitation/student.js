@@ -85,9 +85,9 @@
             <div class="count-chips">
                 ${[...RecitationModel.RESULTS, RecitationModel.NONE].map((s) => `<span class="status-pill" style="background:${s.color};color:${s.text}">${esc(s.label)} ${rows.filter((r) => r.status === s.key).length}</span>`).join('')}
             </div>
-            <h3 class="section-title">时间轴（旧 → 新）</h3>
+            <h3 class="section-title">时间轴（新 → 旧）</h3>
             <div class="strip">
-                ${rows.map((r) => {
+                ${rows.slice().reverse().map((r) => {
                     const s = R[r.status] || RecitationModel.NONE;
                     const next = RecitationModel.nextArrangement(r.round.id, studentId);
                     const tip = `${r.round.title} · ${s.label} · 检查 ${r.attempts || 0} 次` + (r.firstPassDate ? ` · 首次过关 ${Utils.formatDate(r.firstPassDate)}` : '') + (r.daysToPass == null ? '' : r.daysToPass === 0 ? ' · 当天过关' : ` · 用时 ${r.daysToPass} 天`) + (next ? ` · 下一次 ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}` : '');

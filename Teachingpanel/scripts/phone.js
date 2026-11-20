@@ -38,6 +38,7 @@
     const MAX_AUTO_TRIES = 3;        // 一张照片自动重发几次后改为「点我重发」
     const BROKER_TIMEOUT = 8000;     // 牵线服务器这么久没连上就放弃这个连接，换一个新的（正常 1 秒内连上）
     const SS_CAMERA = 'teachingPanel.phone.cameraAt';
+    const LS_ORIENT = 'teachingPanel.phone.orient';   // 网页相机的拍摄方向：v 竖拍（默认）/ h 横拍
     const OUTBOX_DB = 'teaching-panel-phone-outbox';   // 手机上暂存还没送到电脑的照片（库名带本应用前缀）
     const DEPLOY_TAG_URL = '/deploy-tag.json';         // 部署指纹，和 updateChecker.js 一样用绝对路径
     const UPDATE_EVERY = 10 * 60 * 1000;               // 开着的拍照页隔多久看一次有没有新版本
@@ -752,6 +753,36 @@
         return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.95));
     }
 
+    // 拍摄方向（1.44.0）：手机锁了竖屏时横着拿，网页相机拍出来仍是竖的。选了「横拍」就把竖的照片转成横的（逆时针 90°，
+    // 对应手机顶端朝左拿），选了「竖拍」就把横的转成竖的（顺时针 90°）；方向已经对的不动
+    let orient = lsGet(LS_ORIENT) === 'h' ? 'h' : 'v';
+    function renderOrient() {
+        $('camorient').textContent = orient === 'h' ? '▭ 横拍' : '▯ 竖拍';
+    }
+    async function orientFix(blob) {
+        let bmp = null;
+        try {
+            bmp = await createImageBitmap(blob);
+            const tall = bmp.height > bmp.width;
+            if (bmp.width === bmp.height || tall === (orient === 'v')) return blob;
+            const c = document.createElement('canvas');
+            c.width = bmp.height;
+            c.height = bmp.width;
+            const ctx = c.getContext('2d');
+            if (tall) { ctx.translate(0, bmp.width); ctx.rotate(-Math.PI / 2); }      // 竖 → 横：逆时针
+            else { ctx.translate(bmp.height, 0); ctx.rotate(Math.PI / 2); }           // 横 → 竖：顺时针
+            ctx.drawImage(bmp, 0, 0);
+            const out = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.95));
+            if (out) logEv(`按「${orient === 'h' ? '横拍' : '竖拍'}」转了 90°：${c.width}×${c.height}`);
+            return out || blob;
+        } catch (e) {
+            logEv('转方向失败（' + (e.name || e) + '），按原样发送');
+            return blob;
+        } finally {
+            if (bmp && bmp.close) bmp.close();
+        }
+    }
+
     async function shoot() {
         if (shooting || !camTrack) return;
         shooting = true;
@@ -795,6 +826,7 @@
             if (bmp && bmp.close) bmp.close();
         }
         if (!blob) { blob = await grabFrame(); how = '截取画面'; }
+        if (blob) blob = await orientFix(blob);
         $('camshot').classList.remove('busy');
         shooting = false;
         if (!blob) { logEv('没拍到画面（摄像头还没准备好）'); return; }
@@ -805,6 +837,13 @@
         updateCamCount();
     }
 
+    renderOrient();
+    $('camorient').addEventListener('click', () => {
+        orient = orient === 'h' ? 'v' : 'h';
+        lsSet(LS_ORIENT, orient);
+        renderOrient();
+        logEv('拍摄方向改为' + (orient === 'h' ? '横拍' : '竖拍'));
+    });
     $('livecam').addEventListener('click', openCam);
     $('camdone').addEventListener('click', closeCam);
     $('camshot').addEventListener('click', shoot);

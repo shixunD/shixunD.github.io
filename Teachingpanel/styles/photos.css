@@ -80,6 +80,7 @@
 .phonelink-status.connected { border-color: #1e8e3e; color: #1e8e3e; }
 .phonelink-status.error { border-color: #d93025; color: #d93025; }
 .phonelink-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; }
+.phonelink-thumbs img { cursor: pointer; }
 .phonelink-status.pairing { border-color: #f2b705; color: #8a6500; }
 .phonelink-status.p2pfail { border-color: #d93025; color: #d93025; }
 .phonelink-status.quiet { border-color: #f2b705; color: #8a6500; }
