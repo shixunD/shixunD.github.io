@@ -82,6 +82,10 @@
 .phonelink-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; }
 .phonelink-status.pairing { border-color: #f2b705; color: #8a6500; }
 .phonelink-status.p2pfail { border-color: #d93025; color: #d93025; }
+.phonelink-status.quiet { border-color: #f2b705; color: #8a6500; }
+/* 上次电脑页面刷新前收到、还没保存的手机照片（1.40.0） */
+.phonelink-orphans { padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #f2b705; background: #fff8e1; color: #6b4e00; margin: 0.6rem 0; font-size: 0.9rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.phonelink-orphans span { flex: 1 1 14rem; }
 .phonelink-tips { font-size: 0.85rem; line-height: 1.6; background: var(--bg-color); border-radius: 8px; padding: 0.4rem 0.7rem; margin-bottom: 0.6rem; }
 .phonelink-tips[hidden] { display: none; }
 .phonelink-tips ul { margin: 0.3rem 0; padding-left: 1.2rem; }

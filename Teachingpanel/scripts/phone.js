@@ -12,6 +12,14 @@
 //     每张照片发送前先确认连接还活着，不活就立刻重连；没收到回执的照片自动重发（电脑端按照片编号去重）
 //   - 内存紧张时手机在拍照期间把网页关掉重开，刚拍的照片丢了：用 sessionStorage 记下「刚去拍照」，重开后提示改用「从相册选」
 //   - HEIC 等电脑浏览器读不了的格式：发送前在手机上转成 JPEG；电脑仍然读不了时把原因回给手机，不再假装「已发送」
+//
+// 1.40.0 起：
+//   - 照片一进队列就暂存到手机的 IndexedDB（teaching-panel-phone-outbox），刷新 / 关掉页面也不丢；重新打开后自动接着发。
+//     只有电脑回执「收到了」或在手机上点 ✕ 手动删除，才从手机上删掉。电脑端把收过的照片编号记在 localStorage（7 天），
+//     回执丢了、手机刷新后重发同一张也不会重复添加
+//   - 「电脑显示已连接、手机卡在正在连接牵线服务器」：牵线服务器 8 秒没连上就换一个新连接重来（以前会一直等下去）；
+//     电脑「没有响应」时也换新的牵线连接（旧的可能是手机挂起后留下的死连接）；离开页面时告诉电脑「我走了」
+//   - 拍照页不跑主页的更新弹窗：开着的拍照页每隔一会儿看一下 /deploy-tag.json，变了就提示刷新
 
 (function () {
     'use strict';
@@ -22,12 +30,17 @@
     // 以前超过 2.5 MB 就在手机上用画布重压，相机和相册走的是两条不同的路）。更大的或 HEIC 等格式才在手机上转成 JPEG
     const SEND_LIMIT_BYTES = 8 * 1024 * 1024;
     const SEND_MAX_SIDE = 4096;
-    const CONNECT_TIMEOUT = 20000;   // 直连打通一般几秒；ICE 自己判定失败有时要 30 秒，这里提前放弃并重试
+    // 1.40.0 起各项间隔缩短，两边状态跟得更快：心跳是几十字节的小消息，2 秒一次对耗电几乎没有影响（页面在后台时浏览器本来就会放慢定时器）
+    const CONNECT_TIMEOUT = 12000;   // 直连打通一般 1–3 秒；ICE 自己判定失败有时要 30 秒，这里提前放弃并重试
     const RETRY_DELAY = 1000;
-    const HEARTBEAT = 4000;          // 连上后每 4 秒 ping 一次
-    const PONG_TIMEOUT = 12000;      // 这么久没收到电脑的任何消息（且没有照片在传）就认为连接已失效
+    const HEARTBEAT = 2000;          // 连上后每 2 秒 ping 一次
+    const PONG_TIMEOUT = 6000;       // 这么久没收到电脑的任何消息（且没有照片在传）就认为连接已失效
     const MAX_AUTO_TRIES = 3;        // 一张照片自动重发几次后改为「点我重发」
+    const BROKER_TIMEOUT = 8000;     // 牵线服务器这么久没连上就放弃这个连接，换一个新的（正常 1 秒内连上）
     const SS_CAMERA = 'teachingPanel.phone.cameraAt';
+    const OUTBOX_DB = 'teaching-panel-phone-outbox';   // 手机上暂存还没送到电脑的照片（库名带本应用前缀）
+    const DEPLOY_TAG_URL = '/deploy-tag.json';         // 部署指纹，和 updateChecker.js 一样用绝对路径
+    const UPDATE_EVERY = 10 * 60 * 1000;               // 开着的拍照页隔多久看一次有没有新版本
     const ackTimeout = (bytes) => 20000 + Math.ceil(bytes / 102400) * 1000;   // 20 秒 + 每 100 KB 1 秒（很慢的网络也够）
 
     function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
@@ -67,6 +80,16 @@
         if (box) box.textContent = events.slice().reverse().join('\n');
     }
     const mb = (n) => (n / 1048576).toFixed(2) + ' MB';
+    // 读成 ArrayBuffer：老的 iOS Safari（13 及以前）没有 Blob.arrayBuffer()，用 FileReader 兜底
+    function readBuf(blob) {
+        if (blob.arrayBuffer) return blob.arrayBuffer();
+        return new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = () => reject(fr.error);
+            fr.readAsArrayBuffer(blob);
+        });
+    }
 
     if (!target) {
         setStatus('还没有配对电脑', 'bad');
@@ -86,7 +109,7 @@
 
     // ---------- 连接诊断 ----------
 
-    const diag = { broker: '连接中…', pc: '未知', ice: null, pong: null };
+    const diag = { broker: '连接中…', pc: '未知', ice: null, pong: null, version: '' };
     function renderDiag() {
         const net = navigator.connection && navigator.connection.type;
         const rows = [
@@ -98,7 +121,8 @@
             ['电脑那边的地址', diag.ice ? cfg.candText(diag.ice.remote) : '—'],
             ['手机网络', net === 'cellular' ? '流量（移动网络）' : net === 'wifi' ? 'WiFi' : '未知'],
             ['浏览器', cfg.isWeChat() ? '微信内置浏览器' : '系统 / 其他浏览器'],
-            ['配对码', '…' + target.slice(-4) + '（应与电脑窗口里显示的一致）']
+            ['配对码', '…' + target.slice(-4) + '（应与电脑窗口里显示的一致）'],
+            ['拍照页版本', diag.version || '—']
         ];
         $('diag').innerHTML = rows.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
     }
@@ -113,6 +137,33 @@
     let heartbeat = null;
     let lastPong = 0;                // 最近一次收到电脑任何消息的时间
     const pendingAcks = new Map();   // 照片 id -> { resolve, reject }
+    let brokerSince = 0;             // 牵线服务器从什么时候起一直没连上（0 = 连着）
+    let brokerFails = 0;             // 连续几次牵线服务器超时没连上
+
+    // 丢掉当前的牵线连接，下次 connect() 新建一个（手机编号是随机的，换一个没关系）。只在没连上电脑时用：销毁会连直连一起关掉
+    function dropPeer() {
+        const old = peer;
+        peer = null;
+        brokerSince = 0;
+        if (old) { try { old.destroy(); } catch (e) { /* 忽略 */ } }
+    }
+
+    // 牵线服务器一直没连上（手机网络卡住、或从后台回来时留下的半死连接，PeerJS 既不报错也不触发 open）：
+    // 以前页面会一直停在「正在连接牵线服务器…」，现在 8 秒后换一个新连接重试
+    function brokerWatch(p) {
+        if (peer !== p || p.destroyed || p.open || connected || !brokerSince) return;
+        const left = BROKER_TIMEOUT - (Date.now() - brokerSince);
+        if (left > 0) { setTimeout(() => brokerWatch(p), left + 100); return; }
+        brokerFails++;
+        logEv(`牵线服务器 ${BROKER_TIMEOUT / 1000} 秒没连上（第 ${brokerFails} 次），换一个新连接重试`);
+        diag.broker = `没连上（已重试 ${brokerFails} 次）`;
+        renderDiag();
+        conn = null;
+        dropPeer();
+        scheduleRetry(brokerFails >= 2
+            ? `⚠ 连不上牵线服务器（已重试 ${brokerFails} 次），请检查手机网络，可以换 WiFi / 流量试试；正在继续重试…`
+            : '牵线服务器没有回应，正在换一个连接重试…', brokerFails >= 2 ? 'bad' : 'wait');
+    }
 
     function scheduleRetry(text, cls, showTips) {
         connected = false;
@@ -147,7 +198,7 @@
         }, HEARTBEAT);
     }
 
-    // 确认连接还活着：最近 5 秒内收到过电脑的消息就算活着，否则 ping 一下等 3 秒。不活就重连并返回 false
+    // 确认连接还活着：最近 3 秒内收到过电脑的消息就算活着，否则 ping 一下等 2 秒。不活就重连并返回 false
     async function ensureAlive() {
         if (!connected || !conn) return false;
         const dc = conn.dataChannel;
@@ -156,11 +207,11 @@
             reconnectNow('连接已失效（可能是刚才拍照时网页被挂起），正在重连…');
             return false;
         }
-        if (Date.now() - lastPong < 5000) return true;
+        if (Date.now() - lastPong < 3000) return true;
         logEv(`确认连接：${Math.round((Date.now() - lastPong) / 1000)} 秒没收到电脑消息，ping 一下`);
         const sentAt = Date.now();
         try { conn.send({ type: 'ping', t: sentAt }); } catch (e) { reconnectNow(); return false; }
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 20; i++) {
             await new Promise((r) => setTimeout(r, 100));
             if (lastPong >= sentAt) { logEv(`确认连接：电脑 ${Date.now() - sentAt} ms 后回应`); return true; }
             if (!connected) return false;
@@ -179,15 +230,29 @@
             setStatus('正在连接牵线服务器…', 'wait');
             peer = new window.Peer(undefined, cfg.PEER_OPTIONS);
             const myPeer = peer;
-            peer.on('open', (id) => { logEv('牵线服务器已连上（手机编号 …' + String(id).slice(-4) + '）'); diag.broker = '已连上'; renderDiag(); if (!conn && !connected) connect(); });
+            brokerSince = Date.now();
+            setTimeout(() => brokerWatch(myPeer), BROKER_TIMEOUT + 100);
+            peer.on('open', (id) => {
+                if (peer !== myPeer) return;
+                brokerSince = 0;
+                brokerFails = 0;
+                logEv('牵线服务器已连上（手机编号 …' + String(id).slice(-4) + '）');
+                diag.broker = '已连上';
+                renderDiag();
+                if (!conn && !connected) connect();
+            });
             // 牵线服务器只在建立连接时需要；已经连上的直连不依赖它，断开时只在后台重连牵线，不动直连
             peer.on('disconnected', () => {
+                if (peer !== myPeer) return;
+                if (!brokerSince) brokerSince = Date.now();
+                setTimeout(() => brokerWatch(myPeer), BROKER_TIMEOUT + 100);
                 logEv('牵线服务器断开' + (connected ? '（直连仍在，照常发送）' : ''));
                 diag.broker = '断开，重连中…';
                 renderDiag();
                 setTimeout(() => { if (peer === myPeer && !myPeer.destroyed && myPeer.disconnected) { try { myPeer.reconnect(); } catch (e) { /* 等下一次 */ } } }, connected ? 3000 : 500);
             });
             peer.on('error', (err) => {
+                if (peer !== myPeer) return;   // 已经换成新连接了，旧连接的错误不管
                 logEv('错误：' + err.type);
                 if (err.type === 'peer-unavailable') {
                     // 先把这次的连接作废，免得它随后关闭时把提示改成「电脑没有响应」
@@ -223,6 +288,8 @@
         }
         if (!peer.open) {
             // 回到前台时牵线连接可能已断开：主动重连，并保底定时再试（重连成功后的 open 事件也会调用 connect）
+            if (!brokerSince) brokerSince = Date.now();
+            if (Date.now() - brokerSince > BROKER_TIMEOUT) { brokerWatch(peer); return; }
             if (peer.disconnected) { try { peer.reconnect(); } catch (e) { /* 忽略 */ } }
             retryTimer = setTimeout(connect, RETRY_DELAY);
             return;
@@ -244,7 +311,11 @@
             logEv(reached ? '直连没打通（ICE ' + ice.ice + '）' : '电脑没有响应');
             renderDiag();
             if (reached) scheduleRetry(msgP2pFail(), 'bad', true);
-            else scheduleRetry('电脑没有响应：请确认电脑上的「📱 手机拍」窗口开着（正在重试）…', 'wait');
+            else {
+                // 电脑既没说「不在线」也没应答：手机这边的牵线连接可能已经是死的（挂起后常见），换一个新的再找
+                dropPeer();
+                scheduleRetry('电脑没有响应：请确认电脑上的「📱 手机拍」窗口开着（正在重试）…', 'wait');
+            }
         };
         const ice = cfg.watchConnection(c, (info) => {
             diag.ice = info;
@@ -272,12 +343,18 @@
         c.on('data', (msg) => {
             if (conn !== c || !msg) return;
             lastPong = diag.pong = Date.now();
-            if (msg.type === 'pong' || msg.type === 'hello') { renderDiag(); return; }
+            if (msg.type === 'pong') { renderDiag(); return; }
+            if (msg.type === 'hello') {
+                renderDiag();
+                // 电脑重新打开了「手机拍」窗口：之前因为「窗口关着」没收的照片自动重发
+                if (msg.ready) requeueClosed();
+                return;
+            }
             if (!pendingAcks.has(msg.id)) return;
             const p = pendingAcks.get(msg.id);
             pendingAcks.delete(msg.id);
             if (msg.type === 'ack') p.resolve();
-            else { const e = new Error(msg.text || '电脑处理失败'); e.fromPc = true; p.reject(e); }
+            else { const e = new Error(msg.text || '电脑处理失败'); e.fromPc = true; e.code = msg.code || ''; p.reject(e); }
         });
         const lost = () => {
             clearTimeout(timeout);
@@ -300,6 +377,7 @@
         lastCheck = Date.now();
         if (connected) ensureAlive().then((ok) => { if (ok) flush(); });
         else if (!conn) connect();
+        checkUpdate();
         // 从相机回来却没有照片（取消了拍照）：清掉「刚去拍照」的标记
         setTimeout(() => { if (ssGet(SS_CAMERA) && Date.now() - Number(ssGet(SS_CAMERA)) > 2500) ssSet(SS_CAMERA, ''); }, 3000);
     }
@@ -307,11 +385,94 @@
     window.addEventListener('pageshow', onBack);
     window.addEventListener('focus', onBack);
 
+    // 离开页面（刷新、关掉、跳走）：先告诉电脑「我走了」，电脑窗口马上改回「等待手机连接」，不会一直以为手机还连着
+    window.addEventListener('pagehide', () => {
+        if (!connected || !conn) return;
+        logEv('离开页面，通知电脑');
+        try { conn.send({ type: 'bye' }); } catch (e) { /* 忽略 */ }
+    });
+    // 有照片既没存进手机、又没送到电脑时，离开页面前让浏览器问一下（已存进手机的不用问，重新打开后会接着发）
+    window.addEventListener('beforeunload', (e) => {
+        if (!queue.some((q) => q.state !== 'sent' && !q.stored)) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    // ---------- 新版本提示 ----------
+    // 拍照页本身走网络优先（service-worker.js 的 NETWORK_FIRST），打开 / 刷新就是最新版；只有一直开着没刷新的页面会停在旧版。
+    // 打开时记下部署指纹，之后回到页面时（最多每 10 分钟一次）再看一次，变了就提示刷新（没发出去的照片存在手机上，刷新不会丢）
+    let loadedTag = null;
+    let lastUpdateCheck = 0;
+    async function fetchTag() {
+        try {
+            const res = await fetch(DEPLOY_TAG_URL, { cache: 'no-store' });
+            if (!res.ok) return null;
+            const text = (await res.text()).trim();
+            return !text || text.startsWith('<') ? null : text;   // 本地调试没有指纹文件时可能回退成 HTML
+        } catch (e) { return null; }
+    }
+    async function checkUpdate(force) {
+        if (!force && Date.now() - lastUpdateCheck < UPDATE_EVERY) return;
+        lastUpdateCheck = Date.now();
+        const tag = await fetchTag();
+        if (!tag) return;
+        if (!loadedTag) { loadedTag = tag; return; }
+        if (tag !== loadedTag && $('update').hidden) {
+            logEv('发现拍照页有新版本');
+            $('update').hidden = false;
+        }
+    }
+    checkUpdate(true);
+    setInterval(() => { if (document.visibilityState === 'visible') checkUpdate(); }, UPDATE_EVERY);
+    $('reload').addEventListener('click', () => location.reload());
+    fetch('./version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+        if (v && v.semver) { diag.version = v.semver; renderDiag(); }
+    }).catch(() => {});
+
+    // ---------- 手机上暂存（IndexedDB） ----------
+    // 存 ArrayBuffer 而不是 Blob：旧版 iOS Safari 存进去的 Blob 刷新后可能读不出来。
+    // 一条 = { id, buf, type, name, createdAt }；电脑回执或手机上手动删除才删
+    const outbox = (() => {
+        let dbp = null;
+        function open() {
+            if (!dbp) {
+                dbp = new Promise((resolve, reject) => {
+                    if (!window.indexedDB) { reject(new Error('浏览器不支持 IndexedDB')); return; }
+                    const req = indexedDB.open(OUTBOX_DB, 1);
+                    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains('photos')) req.result.createObjectStore('photos', { keyPath: 'id' }); };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error || new Error('打不开手机存储'));
+                    req.onblocked = () => reject(new Error('手机存储被占用'));
+                });
+            }
+            return dbp;
+        }
+        function run(mode, fn) {
+            return open().then((db) => new Promise((resolve, reject) => {
+                const tx = db.transaction('photos', mode);
+                const req = fn(tx.objectStore('photos'));
+                tx.oncomplete = () => resolve(req && req.result);
+                tx.onerror = tx.onabort = () => reject(tx.error || new Error('手机存储出错'));
+            }));
+        }
+        return {
+            put: (rec) => run('readwrite', (st) => st.put(rec)),
+            del: (id) => run('readwrite', (st) => st.delete(id)),
+            all: () => run('readonly', (st) => st.getAll())
+        };
+    })();
+    // 请浏览器别在空间紧张时自动清掉本站存储（安卓 Chrome 常常直接同意，iOS 一般忽略，不影响使用）
+    if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then((ok) => logEv('手机存储' + (ok ? '已设为持久保存' : '未获准持久保存（一般也不会被清）'))).catch(() => {});
+    }
+
     // ---------- 拍照 / 队列 ----------
 
-    const queue = [];   // { id, file, el, state, tries }
+    const queue = [];   // { id, file, el, state, tries, stored, saved, failCode }
     let sending = false;
     let seq = 0;
+    let storeWarned = false;
+    const newId = () => 'p' + Date.now() + '-' + (seq++) + '-' + Math.random().toString(36).slice(2, 6);
 
     // 电脑浏览器读不了 HEIC 等格式，大图传得慢：这两种都先在手机上转成 JPEG（手机浏览器一般能读自己相机的格式）。转不了就发原图
     async function prepare(file) {
@@ -331,40 +492,109 @@
         } catch (e) { logEv('手机读不了这张（' + e.name + '），发原图'); return file; }
     }
 
+    // 照片在列表里的小方块：点 ✕ 删除（会从手机上删掉）；发送失败的点一下重发
+    function makeItem(file, id, restored) {
+        const el = document.createElement('div');
+        el.className = 'item';
+        el.innerHTML = `<img alt=""><button type="button" class="rm" aria-label="删除这张">✕</button><span class="tag">${restored ? '刷新前没发出去，等待发送' : '等待发送'}</span>`;
+        el.querySelector('img').src = URL.createObjectURL(file);
+        const it = { id, file, el, state: 'wait', tries: 0, stored: !!restored, saved: Promise.resolve(), failCode: '' };
+        el.querySelector('.rm').addEventListener('click', (e) => { e.stopPropagation(); removeItem(it); });
+        el.addEventListener('click', () => {
+            if (it.state === 'fail') { it.state = 'wait'; it.tries = 0; it.failCode = ''; mark(it, '等待发送'); flush(); }
+        });
+        return it;
+    }
+
+    function removeItem(it) {
+        if (it.state === 'sending') { showNote('这张正在发送，等它显示「✓ 电脑已收到」或发送失败后再删。'); return; }
+        if (it.state !== 'sent' && !confirm('删除这张照片？电脑还没收到它，删掉后手机上也不再保留。')) return;
+        const i = queue.indexOf(it);
+        if (i >= 0) queue.splice(i, 1);
+        it.removed = true;
+        it.el.remove();
+        URL.revokeObjectURL(it.el.querySelector('img').src);
+        it.saved.then(() => outbox.del(it.id)).catch(() => {});
+        logEv(it.state === 'sent' ? '从列表移除一张已发送的' : '手动删除一张没发出去的照片');
+        updatePending();
+    }
+
+    // 先存进手机再排队发送：存好之前收到回执也没关系，删除会排在存之后
+    function store(it) {
+        it.saved = readBuf(it.file)
+            .then((buf) => outbox.put({ id: it.id, buf, type: it.file.type || 'image/jpeg', name: it.file.name || '', createdAt: Date.now() }))
+            .then(() => { it.stored = true; updatePending(); })
+            .catch((err) => {
+                logEv('照片没能存到手机上：' + (err && (err.name || err.message)));
+                if (!storeWarned) {
+                    storeWarned = true;
+                    showNote('这个浏览器没法把照片暂存在手机上（可能是无痕模式或存储空间不足）。照片显示「✓ 电脑已收到」之前，请不要刷新或关掉本页。');
+                }
+                updatePending();
+            });
+    }
+
     // 返回新加入队列的项（网页相机用它统计「已拍 / 已传」）
     function addFiles(files, from) {
         const added = [];
         Array.from(files).forEach((file) => {
             logEv(`${from}得到照片：${file.name || '(无名)'}，类型 ${file.type || '(空)'}，${mb(file.size)}`);
-            const el = document.createElement('div');
-            el.className = 'item';
-            el.innerHTML = `<img alt=""><span class="tag">等待发送</span>`;
-            el.querySelector('img').src = URL.createObjectURL(file);
-            el.addEventListener('click', () => {
-                const it = queue.find((q) => q.el === el);
-                if (it && it.state === 'fail') { it.state = 'wait'; it.tries = 0; mark(it, '等待发送'); flush(); }
-            });
-            $('list').prepend(el);
-            const it = { id: 'p' + Date.now() + '-' + (seq++), file, el, state: 'wait', tries: 0 };
+            const it = makeItem(file, newId(), false);
+            $('list').prepend(it.el);
             queue.push(it);
+            store(it);
             added.push(it);
         });
+        updatePending();
         flush();
         return added;
+    }
+
+    // 打开页面时把上次没送到电脑的照片放回队列最前面（按拍摄先后），连上后先发它们（编号不变，电脑端按编号去重）
+    const restoreDone = outbox.all().then((recs) => {
+        recs = (recs || []).filter((r) => r && r.id && r.buf).sort((a, b) => a.createdAt - b.createdAt);
+        if (!recs.length) return;
+        logEv(`找到 ${recs.length} 张刷新前没发出去的照片，连上后自动发送`);
+        const items = recs.map((r) => makeItem(new File([r.buf], r.name || (r.id + '.jpg'), { type: r.type || 'image/jpeg' }), r.id, true));
+        items.forEach((it) => $('list').prepend(it.el));
+        queue.unshift(...items);
+        updatePending();
+    }).catch((err) => { logEv('读不到手机上暂存的照片：' + (err && (err.name || err.message))); });
+    // 存储卡住时不能一直不发：最多等 3 秒
+    const restoreReady = Promise.race([restoreDone, new Promise((r) => setTimeout(r, 3000))]);
+
+    function updatePending() {
+        const left = queue.filter((q) => q.state !== 'sent');
+        const box = $('pending');
+        if (!left.length) { box.hidden = true; return; }
+        const unsaved = left.filter((q) => !q.stored).length;
+        box.hidden = false;
+        box.textContent = `还有 ${left.length} 张没送到电脑。` + (unsaved
+            ? `其中 ${unsaved} 张还没存到手机上，先别刷新或关掉本页。`
+            : '都已存在手机上，刷新或关掉本页也不会丢，连上电脑后自动发送；电脑收到后手机上的这份才删除。');
+    }
+
+    // 电脑重新打开「手机拍」窗口：之前因为窗口关着没收的照片改回等待发送
+    function requeueClosed() {
+        let n = 0;
+        queue.forEach((it) => { if (it.state === 'fail' && it.failCode === 'closed') { it.state = 'wait'; it.tries = 0; it.failCode = ''; mark(it, '等待发送'); n++; } });
+        if (n) { logEv(`电脑窗口打开了，重发 ${n} 张`); showNote(''); flush(); }
     }
 
     function mark(it, text, cls) {
         it.el.querySelector('.tag').textContent = text;
         it.el.className = 'item' + (cls ? ' ' + cls : '');
         updateCamCount();
+        updatePending();
     }
 
     async function flush() {
         if (sending || !connected) return;
         sending = true;
         try {
-            for (const it of queue) {
-                if (it.state !== 'wait') continue;
+            await restoreReady;
+            for (const it of queue.slice()) {
+                if (it.state !== 'wait' || it.removed) continue;
                 if (!(await ensureAlive())) break;   // 发之前确认连接还活着（刚从相机回来时最容易失效）
                 it.state = 'sending';
                 it.tries++;
@@ -373,7 +603,7 @@
                 const tick = setInterval(() => mark(it, `等电脑确认… ${Math.round((Date.now() - started) / 1000)}s`), 1000);
                 try {
                     const blob = await prepare(it.file);
-                    const buf = await blob.arrayBuffer();
+                    const buf = await readBuf(blob);
                     logEv(`开始发送第 ${it.tries} 次：${mb(buf.byteLength)}`);
                     conn.send({ type: 'incoming', id: it.id, size: buf.byteLength });
                     await new Promise((resolve, reject) => {
@@ -386,10 +616,17 @@
                     });
                     it.state = 'sent';
                     mark(it, '✓ 电脑已收到', 'sent');
+                    it.saved.then(() => outbox.del(it.id)).catch((e) => logEv('从手机存储删除失败：' + (e && e.name)));
                     logEv(`✓ 电脑已收到（用时 ${((Date.now() - started) / 1000).toFixed(1)} 秒）`);
                 } catch (err) {
                     logEv('发送失败：' + (err.message || err.name || err));
-                    if (err.fromPc) {
+                    if (err.fromPc && err.code === 'closed') {
+                        // 电脑上的「手机拍」窗口关着：等电脑重新打开窗口（电脑会发 hello）后自动重发，也可以点一下手动重发
+                        it.state = 'fail';
+                        it.failCode = 'closed';
+                        mark(it, '电脑窗口关着，打开后自动发', 'fail');
+                        showNote(err.message);
+                    } else if (err.fromPc) {
                         // 电脑收到了但处理不了（如读不了的格式）：重发也没用
                         it.state = 'fail';
                         mark(it, '电脑读不了', 'fail');

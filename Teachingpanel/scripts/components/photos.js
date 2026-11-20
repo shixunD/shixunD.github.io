@@ -450,6 +450,26 @@
         if (!draining) drainChooseQueue();
     }
 
+    // 手机拍收到、还没存进记录的照片（1.40.0）：PhoneLink 先把每张存在电脑的 IndexedDB 里（编号 = inboxId），电脑页面刷新后能找回。
+    // 这里跟踪每张还在哪个登记弹窗里：保存（finalize）、预览框「放弃这张」、弹窗关掉（不保存）都算处理完，通知 PhoneLink 删掉那份。
+    // 页面刷新时这些跟踪随之消失，没处理完的就留在电脑上，下次打开「📱 手机拍」可以找回
+    const inboxLive = new Map();   // inboxId -> 登记弹窗里的照片区元素
+    let inboxSweep = null;
+    function inboxTrack(id, box) {
+        if (!id) return;
+        inboxLive.set(id, box);
+        if (inboxSweep) return;
+        inboxSweep = setInterval(() => {
+            inboxLive.forEach((b, k) => { if (!document.body.contains(b)) inboxDone(k); });
+            if (!inboxLive.size) { clearInterval(inboxSweep); inboxSweep = null; }
+        }, 3000);
+    }
+    function inboxDone(id) {
+        if (!id) return;
+        inboxLive.delete(id);
+        if (window.PhoneLink && PhoneLink.settle) PhoneLink.settle(id);
+    }
+
     // ---------- 只读缩略图 ----------
 
     function viewHtml(ids) {
@@ -748,18 +768,20 @@
 
         // 返回成功接收的张数（手机回传用它判断要不要告诉手机「电脑读不了这张」）。
         // 读得了的照片排进预览队列，由用户选档位后才加入；这里先试读一次，读不了立刻报错，不让手机白等回执
-        async function addFiles(files, { quiet = false } = {}) {
+        // inboxId：手机拍传来的照片在电脑上暂存的编号（见 inboxTrack），只配合单张 files 使用
+        async function addFiles(files, { quiet = false, inboxId = '' } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
                     const probe = await decode(file);
                     if (probe.close) probe.close();
                     added++;
+                    inboxTrack(inboxId, box);
                     enqueueChoose(async () => {
-                        if (!document.body.contains(box)) return;    // 登记弹窗已经关了
+                        if (!document.body.contains(box)) { inboxDone(inboxId); return; }    // 登记弹窗已经关了
                         const blob = await chooseLevel(file);
-                        if (!blob) return;
-                        pending.push({ blob, url: URL.createObjectURL(blob) });
+                        if (!blob) { inboxDone(inboxId); return; }
+                        pending.push({ blob, url: URL.createObjectURL(blob), inboxId });
                         render();
                     });
                 } catch (err) {
@@ -782,9 +804,9 @@
             }
         });
         const phoneBtn = box.querySelector('[data-photo-phone]');
-        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob) => {
+        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob, inboxId) => {
             // 读不了就抛错：PhoneLink 会把原因回给手机，手机那张照片显示失败，而不是假装「已发送」
-            if (!(await addFiles([blob], { quiet: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            if (!(await addFiles([blob], { quiet: true, inboxId }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
         }));
         box.querySelector('[data-photo-upload]').addEventListener('click', () => box.querySelector('[data-photo-input="upload"]').click());
         box.querySelectorAll('[data-photo-input]').forEach((input) => input.addEventListener('change', async () => {
@@ -848,8 +870,10 @@
                     ids.push(id);
                     URL.revokeObjectURL(p.url);
                 }
+                // 照片已进照片库，记录随后提交：手机拍暂存在电脑上的那份可以删了
+                pending.forEach((p) => inboxDone(p.inboxId));
                 pending.length = 0;   // 连同 src（原图）一起释放
-                discarded.forEach((p) => URL.revokeObjectURL(p.url));
+                discarded.forEach((p) => { URL.revokeObjectURL(p.url); inboxDone(p.inboxId); });
                 discarded.length = 0;
                 return ids;
             }
@@ -862,7 +886,7 @@
     // 返回 { addFiles }，粘贴 / 拖入的图片文件也走它，所以同样会弹出压缩预览框（可裁剪、翻转、选档位）。
     function bindInserter(root, opts) {
         const alive = opts.alive || (() => true);
-        async function addFiles(files, { quiet = false } = {}) {
+        async function addFiles(files, { quiet = false, inboxId = '' } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
@@ -870,12 +894,16 @@
                     if (probe.close) probe.close();
                     added++;
                     enqueueChoose(async () => {
-                        if (!alive()) return;
-                        const blob = await chooseLevel(file);
-                        if (!blob) return;
-                        const id = Utils.uid('ph');
-                        await AppState.photoPut(id, blob);
-                        if (alive()) opts.onPhoto(id);
+                        try {
+                            if (!alive()) return;
+                            const blob = await chooseLevel(file);
+                            if (!blob) return;
+                            const id = Utils.uid('ph');
+                            await AppState.photoPut(id, blob);
+                            if (alive()) opts.onPhoto(id);
+                        } finally {
+                            inboxDone(inboxId);   // 插进笔记（笔记自己会保存）或放弃，都算处理完
+                        }
                     });
                 } catch (err) {
                     if (!quiet) Toast.error(err.message);
@@ -896,8 +924,8 @@
             }
         });
         const phoneBtn = root.querySelector('[data-ins-phone]');
-        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob) => {
-            if (!(await addFiles([blob], { quiet: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+        if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob, inboxId) => {
+            if (!(await addFiles([blob], { quiet: true, inboxId }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
         }));
         const upBtn = root.querySelector('[data-ins-upload]');
         if (upBtn) upBtn.addEventListener('click', () => upInput.click());
