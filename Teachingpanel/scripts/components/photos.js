@@ -119,24 +119,35 @@
 
     // 预览框：逐档对比，确定后返回所选那一档的 Blob；放弃这张返回 null。读不了图片时抛错
     // 预览区支持滚轮 / 双指缩放、左键拖动平移；四周边角直接拖动即裁剪（松手生效，可连续裁），另有左 / 右旋转
-    async function chooseLevel(file) {
+    // opts（1.41.0，点已加入的照片重新编辑时用）：
+    //   init  { rot, crop, level, customQ }：上次的编辑状态（从原图重新开始，恢复上次的旋转 / 裁剪 / 档位）
+    //   editing true：改为返回 { action: 'ok' | 'cancel' | 'nav', step, blob, edit }；「放弃这张」变成「取消」（不改这张）
+    //   nav   { pos, total }（pos 从 1 起）：显示「‹ 上一张 / 下一张 ›」，点了先把这张的改动带上（没改就 blob 为 null），再返回 action 'nav'
+    //   report(edit)：普通模式确定时回报这次的编辑状态，方便以后从原图重新编辑
+    async function chooseLevel(file, opts = {}) {
+        const editing = !!opts.editing;
+        const init = opts.init || null;
+        const nav = editing && opts.nav && opts.nav.total > 1 ? opts.nav : null;
         const bitmap = await decode(file);
         const info = `${bitmap.width}×${bitmap.height}`;
 
         const results = new Map();     // key -> { blob, url }
         const put = (key, blob) => results.set(key, { blob, url: URL.createObjectURL(blob) });
         put('raw', file);
-        let selected = getLevel().key;
+        let selected = init && levelOf(init.level, init.customQ) ? init.level : getLevel().key;
         let closed = false;
-        let customQ = getCustomQuality();   // 本次预览框里的自定义质量，可临时改；下次打开恢复主页设置里的值
+        let customQ = init && init.customQ ? clampQ(init.customQ) : getCustomQuality();   // 本次预览框里的自定义质量，可临时改；下次打开恢复主页设置里的值
         const lvOf = (key) => levelOf(key, customQ);
         const idleText = (key) => (AUTO_KEYS.includes(key) ? '计算中…' : '点击计算');
         const sizeEl = (key) => overlay.querySelector(`[data-lv="${key}"] [data-size]`);
 
         // 编辑状态：rot = 顺时针 90° 的次数；crop = 旋转后整图上保留的区域（0–1 比例）
-        let rot = 0;
-        let crop = { x: 0, y: 0, w: 1, h: 1 };
+        let rot = init ? init.rot || 0 : 0;
+        let crop = init && init.crop ? Object.assign({}, init.crop) : { x: 0, y: 0, w: 1, h: 1 };
         let edited = false;
+        const stateOf = () => ({ rot, crop: Object.assign({}, crop), level: selected, customQ });
+        const keyOf = (st) => JSON.stringify([st.rot, st.crop, st.level, st.level === 'custom' ? st.customQ : 0]);
+        const initKey = keyOf(stateOf());
         let canvas = drawToCanvas(bitmap, 0);
         let gen = 0;                   // 每次编辑 +1，让过期的后台编码作废
         const MIN_CROP = 0.05;
@@ -145,7 +156,7 @@
         overlay.className = 'photo-choose-overlay';
         overlay.innerHTML = `
             <div class="photo-choose-box" role="dialog" aria-modal="true">
-                <h2>选择压缩档位 <small>原图 ${info} · ${fmtSize(file.size)}</small></h2>
+                <h2>${editing ? '编辑照片' : '选择压缩档位'} <small>${nav ? `第 ${nav.pos} / ${nav.total} 张 · ` : ''}原图 ${info} · ${fmtSize(file.size)}</small></h2>
                 <div class="photo-choose-view" data-view>
                     <div class="photo-stage" data-stage>
                         <img alt="预览" draggable="false">
@@ -159,13 +170,14 @@
                     <button type="button" class="btn-secondary" data-rot="1" title="向右转 90°（快捷键 →）">↻ 右转</button>
                     <button type="button" class="btn-secondary" data-reset-edit disabled>还原编辑</button>
                     <span class="hint">拖动图片四周边角即可裁剪；滚轮缩放、左键拖动平移</span>
+                    ${nav ? `<span class="photo-choose-nav"><button type="button" class="btn-secondary" data-nav="-1" title="上一张（PageUp）" ${nav.pos <= 1 ? 'disabled' : ''}>‹ 上一张</button><button type="button" class="btn-secondary" data-nav="1" title="下一张（PageDown）" ${nav.pos >= nav.total ? 'disabled' : ''}>下一张 ›</button></span>` : ''}
                 </div>
                 <div class="photo-choose-info" data-info></div>
                 <div class="photo-choose-levels">${levelOptions().map((l) => `<button type="button" class="photo-choose-lv" data-lv="${l.key}"><b>${Utils.escapeHtml(l.label)}</b><span data-size>${l.key === 'raw' ? fmtSize(file.size) : idleText(l.key)}</span></button>`).join('')}</div>
                 <div class="photo-choose-custom">自定义质量 <input type="number" min="0.001" max="1" step="0.001" value="${customQ}" data-custom-q> <span class="hint">（0.001–1；只改这一次，默认值在主页「⚙️ 设置」里改）</span></div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-zoom>放大到 100%</button>
-                    <button type="button" class="btn-secondary" data-skip>放弃这张</button>
+                    <button type="button" class="btn-secondary" data-skip>${editing ? '取消' : '放弃这张'}</button>
                     <button type="button" class="btn-primary" data-ok>确定</button>
                 </div>
             </div>`;
@@ -371,21 +383,52 @@
         }
 
         return new Promise((resolve) => {
-            const finish = (value) => {
+            const finish = (value, action = value ? 'ok' : 'cancel', step = 0) => {
+                if (closed) return;
+                const edit = stateOf();
                 closed = true;
                 overlay.remove();
                 document.removeEventListener('keydown', onKey, true);
                 window.removeEventListener('resize', onResize);
                 if (bitmap.close) bitmap.close();
-                results.forEach((r) => { if (!value || r.blob !== value) URL.revokeObjectURL(r.url); });
-                resolve(value);
+                results.forEach((r) => { if (editing || !value || r.blob !== value) URL.revokeObjectURL(r.url); });
+                if (!editing) {
+                    if (value && opts.report) opts.report(edit);
+                    resolve(value);
+                } else resolve({ action, step, blob: value || null, edit });
             };
+            // 上一张 / 下一张：这张有改动就带上（所选档位还没算完就当场算），没改动只换张
+            let navBusy = false;
+            async function goNav(step) {
+                if (navBusy || closed) return;
+                navBusy = true;
+                try {
+                    let blob = null;
+                    if (keyOf(stateOf()) !== initKey) {
+                        const r = results.get(selected);
+                        if (r) blob = r.blob;
+                        else {
+                            const q = selected === 'raw' ? (edited ? ROTATE_Q : null) : lvOf(selected).quality;
+                            blob = q ? await encodeImage(canvas, q) : file;
+                        }
+                    }
+                    finish(blob, 'nav', step);
+                } catch (err) {
+                    Toast.error(err.message);
+                } finally {
+                    navBusy = false;
+                }
+            }
             // 快捷键：Esc 放弃，Enter 确定，← / → 左 / 右转；焦点在输入框里时不抢（Enter 要留给自定义质量），焦点在按钮上时 Enter 仍是点按钮
             const onKey = (e) => {
                 if (e.key === 'Escape') { e.stopPropagation(); finish(null); return; }
                 const tag = (e.target && e.target.tagName) || '';
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                if (nav && (e.key === 'PageUp' || e.key === 'PageDown')) {
+                    e.preventDefault(); e.stopPropagation();
+                    const step = e.key === 'PageDown' ? 1 : -1;
+                    if (nav.pos + step >= 1 && nav.pos + step <= nav.total) goNav(step);
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                     e.preventDefault(); e.stopPropagation();
                     rotate(e.key === 'ArrowRight' ? 1 : -1);
                 } else if (e.key === 'Enter' && tag !== 'BUTTON') {
@@ -400,6 +443,8 @@
                 if (lv) { selected = lv.dataset.lv; show(); encodeOne(selected, gen); return; }
                 const rt = e.target.closest('[data-rot]');
                 if (rt) { rotate(Number(rt.dataset.rot)); return; }
+                const nb = e.target.closest('[data-nav]');
+                if (nb) { if (!nb.disabled) goNav(Number(nb.dataset.nav)); return; }
                 if (e.target.closest('[data-reset-edit]')) {
                     rot = 0;
                     crop = { x: 0, y: 0, w: 1, h: 1 };
@@ -427,10 +472,26 @@
                 encodeOne('custom', gen);
             });
             document.body.appendChild(overlay);
-            layout();
-            show();
-            encodeAll();
+            if (rot || crop.w < 0.999 || crop.h < 0.999) applyEdit();   // 重新编辑：恢复上次的旋转 / 裁剪
+            else {
+                layout();
+                show();
+                encodeAll();
+            }
         });
+    }
+
+    // 手机拍（1.41.0）：收到后不弹预览框，直接按默认档位压缩（不裁剪、不旋转）；默认档是「不压缩」就原样保存
+    async function compressDefault(file) {
+        const lv = getLevel();
+        const edit = { rot: 0, crop: { x: 0, y: 0, w: 1, h: 1 }, level: lv.key, customQ: getCustomQuality() };
+        if (!lv.quality) return { blob: file, edit };
+        const bitmap = await decode(file);
+        try {
+            return { blob: await encodeImage(drawToCanvas(bitmap, 0), lv.quality), edit };
+        } finally {
+            if (bitmap.close) bitmap.close();
+        }
     }
 
     // 预览框排队：多张照片（连拍、多选、手机连传）一张一张预览；相机 / 手机接收面板还开着时先等着，不挡住拍照
@@ -494,7 +555,8 @@
     // ---------- 点击放大 ----------
 
     // 旋转是写回照片本身的：旋转后的图立刻存回 IndexedDB（同一个 id），所有缩略图和以后的大图都是这个方向
-    const pendingRotators = new WeakMap();   // 登记弹窗里的照片列表元素 -> (index, dir) => Promise<新 url>
+    // 登记弹窗里还没保存的照片：点开是编辑框（从原图重新压缩 / 裁剪 / 旋转，可左右切换），不是大图（1.41.0）
+    const pendingEditors = new WeakMap();   // 登记弹窗里的照片列表元素 -> (index) => void
 
     async function rotateSaved(id, dir) {
         const old = await AppState.photoGet(id);
@@ -589,10 +651,6 @@
         if (img.dataset.photo) {
             const id = img.dataset.photo;
             rotator = (dir) => rotateSaved(id, dir);
-        } else if (img.dataset.pending !== undefined) {
-            const fn = pendingRotators.get(img.closest('[data-photo-list]'));
-            const i = Number(img.dataset.pending);
-            if (fn) rotator = (dir) => fn(i, dir);
         }
         return { src: img.src, rotator };
     }
@@ -600,6 +658,10 @@
     document.addEventListener('click', (e) => {
         const img = e.target.closest('.photo-thumb img');
         if (!img || !img.src) return;
+        if (img.dataset.pending !== undefined) {
+            const fn = pendingEditors.get(img.closest('[data-photo-list]'));
+            if (fn) { fn(Number(img.dataset.pending)); return; }
+        }
         // 同一条记录（同一个缩略图容器）里已加载好的照片可左右切换
         const box = img.closest('.photo-thumbs');
         const imgs = box ? Array.from(box.querySelectorAll('.photo-thumb img')).filter((im) => im.src) : [img];
@@ -759,17 +821,19 @@
         const box = root.querySelector('[data-photo-editor]');
         const list = box.querySelector('[data-photo-list]');
         let kept = (existingIds || []).slice();
-        const pending = [];   // { blob, url }
+        const pending = [];   // { blob, url, inboxId, orig（原图，重新编辑用）, edit（上次的编辑状态）, busy（正在按默认档压缩） }
+        let work = Promise.resolve();   // 手机拍的照片逐张按默认档压缩；保存前等它做完
 
         function render() {
             list.innerHTML = kept.map((id) => `<span class="photo-thumb"><img data-photo="${Utils.escapeHtml(id)}" alt="照片"><button type="button" class="photo-rm" data-rm-kept="${Utils.escapeHtml(id)}" title="移除">✕</button></span>`).join('')
-                + pending.map((p, i) => `<span class="photo-thumb"><img src="${p.url}" alt="新照片" data-pending="${i}" title="${Math.round(p.blob.size / 1024)} KB"><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
+                + pending.map((p, i) => `<span class="photo-thumb${p.busy ? ' busy' : ''}"><img src="${p.url}" alt="新照片" data-pending="${i}" title="${p.busy ? '正在压缩…' : Math.round(p.blob.size / 1024) + ' KB · 点开可重新压缩 / 裁剪 / 旋转'}"><button type="button" class="photo-rm" data-rm-pending="${i}" title="移除">✕</button></span>`).join('');
         }
 
         // 返回成功接收的张数（手机回传用它判断要不要告诉手机「电脑读不了这张」）。
         // 读得了的照片排进预览队列，由用户选档位后才加入；这里先试读一次，读不了立刻报错，不让手机白等回执
         // inboxId：手机拍传来的照片在电脑上暂存的编号（见 inboxTrack），只配合单张 files 使用
-        async function addFiles(files, { quiet = false, inboxId = '' } = {}) {
+        // auto（手机拍，1.41.0）：不弹预览框，先用原图占位显示，再按默认档压缩；原图留在内存（和电脑端暂存）里，点照片可重新编辑
+        async function addFiles(files, { quiet = false, inboxId = '', auto = false } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
@@ -777,11 +841,33 @@
                     if (probe.close) probe.close();
                     added++;
                     inboxTrack(inboxId, box);
+                    if (auto) {
+                        const item = { blob: file, url: URL.createObjectURL(file), inboxId, orig: file, edit: null, busy: true };
+                        pending.push(item);
+                        render();
+                        work = work.then(async () => {
+                            try {
+                                const res = await compressDefault(file);
+                                if (!item.busy) return;
+                                URL.revokeObjectURL(item.url);
+                                item.blob = res.blob;
+                                item.url = URL.createObjectURL(res.blob);
+                                item.edit = res.edit;
+                            } catch (err) {
+                                Toast.warning('有一张照片压缩失败，先按原图保存：' + err.message);
+                            } finally {
+                                item.busy = false;
+                                render();
+                            }
+                        });
+                        continue;
+                    }
                     enqueueChoose(async () => {
                         if (!document.body.contains(box)) { inboxDone(inboxId); return; }    // 登记弹窗已经关了
-                        const blob = await chooseLevel(file);
+                        let edit = null;
+                        const blob = await chooseLevel(file, { report: (st) => { edit = st; } });
                         if (!blob) { inboxDone(inboxId); return; }
-                        pending.push({ blob, url: URL.createObjectURL(blob), inboxId });
+                        pending.push({ blob, url: URL.createObjectURL(blob), inboxId, orig: file, edit });
                         render();
                     });
                 } catch (err) {
@@ -806,7 +892,7 @@
         const phoneBtn = box.querySelector('[data-photo-phone]');
         if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob, inboxId) => {
             // 读不了就抛错：PhoneLink 会把原因回给手机，手机那张照片显示失败，而不是假装「已发送」
-            if (!(await addFiles([blob], { quiet: true, inboxId }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            if (!(await addFiles([blob], { quiet: true, inboxId, auto: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
         }));
         box.querySelector('[data-photo-upload]').addEventListener('click', () => box.querySelector('[data-photo-input="upload"]').click());
         box.querySelectorAll('[data-photo-input]').forEach((input) => input.addEventListener('change', async () => {
@@ -844,16 +930,34 @@
         });
         render();
 
-        // 大图里点旋转：还没保存的照片直接转当前这份，结果记在 pending 里，保存时一并存
-        pendingRotators.set(list, async (i, dir) => {
-            const p = pending[i];
-            if (!p) return null;
-            const blob = await rotateBlob(p.blob, dir > 0 ? 1 : 3);
-            URL.revokeObjectURL(p.url);
-            p.blob = blob;
-            p.url = URL.createObjectURL(blob);
-            render();
-            return p.url;
+        // 点还没保存的照片：打开编辑框，从原图重新选档位 / 裁剪 / 旋转；「‹ 上一张 / 下一张 ›」在这次新加的照片之间切换
+        let editingNow = false;
+        pendingEditors.set(list, async (start) => {
+            if (editingNow) return;
+            editingNow = true;
+            try {
+                let p = pending[start];
+                while (p) {
+                    if (p.busy) await work;
+                    const i = pending.indexOf(p);
+                    if (i < 0) break;
+                    const res = await chooseLevel(p.orig || p.blob, { editing: true, init: p.edit, nav: { pos: i + 1, total: pending.length } });
+                    if (res.blob && pending.includes(p)) {
+                        URL.revokeObjectURL(p.url);
+                        p.blob = res.blob;
+                        p.url = URL.createObjectURL(res.blob);
+                        p.edit = res.edit;
+                        render();
+                    }
+                    if (res.action !== 'nav') break;
+                    const at = pending.indexOf(p);
+                    p = pending[Math.min(pending.length - 1, Math.max(0, (at < 0 ? i : at) + res.step))];
+                }
+            } catch (err) {
+                Toast.error(err.message);
+            } finally {
+                editingNow = false;
+            }
         });
 
         return {
@@ -863,6 +967,7 @@
             fingerprint() { return kept.join(',') + '|' + pending.length; },
             // 把新选的照片写进存储，返回最终要记在记录上的 photoIds（旧的未被移除的 + 新的）
             async finalize() {
+                await work;   // 手机拍的照片还在按默认档压缩：等压完再存
                 const ids = kept.slice();
                 for (const p of pending) {
                     const id = Utils.uid('ph');
@@ -870,9 +975,9 @@
                     ids.push(id);
                     URL.revokeObjectURL(p.url);
                 }
-                // 照片已进照片库，记录随后提交：手机拍暂存在电脑上的那份可以删了
+                // 照片已进照片库，记录随后提交：手机拍暂存在电脑上的那份原图可以删了
                 pending.forEach((p) => inboxDone(p.inboxId));
-                pending.length = 0;   // 连同 src（原图）一起释放
+                pending.length = 0;   // 连同 orig（原图）一起释放
                 discarded.forEach((p) => { URL.revokeObjectURL(p.url); inboxDone(p.inboxId); });
                 discarded.length = 0;
                 return ids;
@@ -886,17 +991,21 @@
     // 返回 { addFiles }，粘贴 / 拖入的图片文件也走它，所以同样会弹出压缩预览框（可裁剪、翻转、选档位）。
     function bindInserter(root, opts) {
         const alive = opts.alive || (() => true);
-        async function addFiles(files, { quiet = false, inboxId = '' } = {}) {
+        let autoWork = Promise.resolve();
+        // auto（手机拍，1.41.0）：不弹预览框，按默认档压缩后直接插进笔记；插进去之后点图片是大图（可旋转），不能再从原图裁剪
+        async function addFiles(files, { quiet = false, inboxId = '', auto = false } = {}) {
             let added = 0;
             for (const file of Array.from(files)) {
                 try {
                     const probe = await decode(file);
                     if (probe.close) probe.close();
                     added++;
-                    enqueueChoose(async () => {
+                    // 自动压缩的不进预览框队列（队列要等「📱 手机拍」面板关掉才动），逐张按顺序插进笔记
+                    const run = auto ? (job) => { autoWork = autoWork.then(job).catch((err) => Toast.error(err.message)); } : enqueueChoose;
+                    run(async () => {
                         try {
                             if (!alive()) return;
-                            const blob = await chooseLevel(file);
+                            const blob = auto ? (await compressDefault(file)).blob : await chooseLevel(file);
                             if (!blob) return;
                             const id = Utils.uid('ph');
                             await AppState.photoPut(id, blob);
@@ -925,7 +1034,7 @@
         });
         const phoneBtn = root.querySelector('[data-ins-phone]');
         if (phoneBtn) phoneBtn.addEventListener('click', () => PhoneLink.open(async (blob, inboxId) => {
-            if (!(await addFiles([blob], { quiet: true, inboxId }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
+            if (!(await addFiles([blob], { quiet: true, inboxId, auto: true }))) throw new Error('电脑读不了这张照片（可能是 HEIC 格式）');
         }));
         const upBtn = root.querySelector('[data-ins-upload]');
         if (upBtn) upBtn.addEventListener('click', () => upInput.click());

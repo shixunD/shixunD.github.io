@@ -86,6 +86,7 @@
 /* 上次电脑页面刷新前收到、还没保存的手机照片（1.40.0） */
 .phonelink-orphans { padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #f2b705; background: #fff8e1; color: #6b4e00; margin: 0.6rem 0; font-size: 0.9rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
 .phonelink-orphans span { flex: 1 1 14rem; }
+.phonelink-orphans[hidden] { display: none; }   /* 上面的 display:flex 会盖过 hidden，没有遗留照片时必须藏起来 */
 .phonelink-tips { font-size: 0.85rem; line-height: 1.6; background: var(--bg-color); border-radius: 8px; padding: 0.4rem 0.7rem; margin-bottom: 0.6rem; }
 .phonelink-tips[hidden] { display: none; }
 .phonelink-tips ul { margin: 0.3rem 0; padding-left: 1.2rem; }
@@ -138,3 +139,8 @@
 .photo-lightbox-nav.nav-next { --nav-dir: left; }
 @media (hover: none) { .photo-lightbox-nav { opacity: 0.7; width: 56px; } }
 .photo-lightbox-count { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0, 0, 0, 0.5); border-radius: 999px; padding: 0.1rem 0.8rem; font-size: 0.85rem; }
+
+/* 1.41.0：手机拍的照片正在按默认档压缩；编辑框里的上一张 / 下一张 */
+.photo-thumb.busy img { opacity: 0.55; }
+.photo-thumb img[data-pending] { cursor: pointer; }
+.photo-choose-nav { margin-left: auto; display: inline-flex; gap: 6px; }

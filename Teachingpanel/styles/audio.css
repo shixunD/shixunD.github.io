@@ -47,3 +47,4 @@
 .audio-choose-opts { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; font-size: 0.85rem; }
 .audio-choose-opts input[type="number"] { width: 4.5rem; }
 .audio-choose-opts .check-label { display: inline-flex; align-items: center; gap: 4px; }
+.audio-choose-opts .check-label[hidden] { display: none; }   /* 单声道录音不显示「立体声」勾选 */

@@ -16,7 +16,10 @@
 
     // 'na' = 中途入班的学生入班前的作业（灰格，不计分）
     const hwStatus = (k) => (k === 'na' ? HomeworkModel.NA : (HomeworkModel.STATUS_MAP[k] || HomeworkModel.STATUS_MAP.done));
-    const recLook = (k) => (k === 'plan' ? RecitationModel.PLAN : (RecitationModel.RESULT_MAP[k] || RecitationModel.NONE));
+    // 导出里的背诵状态只分两类（1.40.1）：过关的（提前完成 / 完成过关 / 条件过关，各显示本来的颜色和名字），
+    // 其余——重新过关、未过关、计划背诵、未检查——一律显示成红色「未过关」。以「是否过关」（ScoreReport.recOf 的 pass，
+    // 和加减分同一个判定）为准，所以按规则不算过关的条件过关、过关后又排了计划的也显示未过关。应用里的原始状态和计分都不变
+    const recShown = (x) => (x.pass ? (RecitationModel.RESULT_MAP[x.status] || RecitationModel.RESULT_MAP.pass) : RecitationModel.RESULT_MAP.fail);
     const hex = (c) => c.replace('#', '').toUpperCase();
     const hwLabel = (hw) => `${cnDate(hw.date)} ${hw.title}`;
 
@@ -179,7 +182,7 @@
         const body = rows.map((row) => `
             <tr><td class="rp-no">${esc(row.student.studentNo)}</td><td class="rp-name">${esc(row.student.name)}</td>
                 ${row.statuses.map((k) => { const s = hwStatus(k); return `<td class="rp-c"><i class="rp-sq" style="background:${s.color}"></i></td>`; }).join('')}
-                ${row.rec.map((x, i) => `<td class="rp-c${sep(i)}"><i class="rp-sq" style="background:${recLook(x.look).color}"></i></td>`).join('')}
+                ${row.rec.map((x, i) => `<td class="rp-c${sep(i)}"><i class="rp-sq" style="background:${recShown(x).color}"></i></td>`).join('')}
             </tr>`).join('');
         return `<table class="rp-table rp-detail ${short ? 'rp-half' : ''}"><thead><tr><th class="rp-c">学号</th><th>学生</th>${hwHead}${recHead}</tr></thead><tbody>${body}</tbody></table>`;
     }
@@ -197,7 +200,7 @@
     // 一行最多 5 格；超过就拆成几行、每行尽量一样多
     const cardsHtml = (cards) => cards.length ? `<div class="rp-cards" style="grid-template-columns:repeat(${Math.ceil(cards.length / Math.max(1, Math.ceil(cards.length / 5)))}, minmax(0, 1fr))">${cards.map(cardHtml).join('')}</div>` : '';
     const legendHtml = (name, list) => `<div class="rp-rules rp-legend"><b>${name}：</b>${list.map((st) => `<span class="rp-rule"><i class="rp-sq" style="background:${st.color}"></i>${esc(st.label)}</span>`).join('')}</div>`;
-    const recStatuses = () => RecitationModel.RESULTS.concat([RecitationModel.PLAN, RecitationModel.NONE]);
+    const recStatuses = () => RecitationModel.RESULTS.filter((r) => RecitationModel.isPassed(r.key)).concat([RecitationModel.RESULT_MAP.fail]);
 
     function html(rp) {
         const s = rp.summary;
@@ -310,7 +313,7 @@
         }
         if (p.rounds.length) {
             L.push('## 背诵', '', '| # | 任务 | 当前情况 | 是否过关 | 最近检查 | 检查次数 | 待完成计划 | 备注 |', '|---:|---|---|:---:|---|---:|---|---|');
-            p.rounds.forEach((x) => L.push(`| ${x.no} | ${mdCell(x.round.title)} | ${x.label} | ${x.pass ? '过关' : '未过关'} | ${x.lastDate ? mdCell(cnDate(x.lastDate)) : '—'} | ${x.attempts} | ${mdCell(plansText(x)) || '—'} | ${mdCell(x.comment)} |`));
+            p.rounds.forEach((x) => L.push(`| ${x.no} | ${mdCell(x.round.title)} | ${recShown(x).label} | ${x.pass ? '过关' : '未过关'} | ${x.lastDate ? mdCell(cnDate(x.lastDate)) : '—'} | ${x.attempts} | ${mdCell(plansText(x)) || '—'} | ${mdCell(x.comment)} |`));
             L.push('');
         }
         return L.join('\n');
@@ -322,8 +325,8 @@
             return `<tr><td class="rp-c">${x.no}</td><td class="rp-date">${esc(cnDate(x.hw.date))}</td><td>${esc(x.hw.title)}</td><td class="rp-pstatus">${sq(s.color)}${esc(x.label)}</td><td>${esc(x.comment)}</td></tr>`;
         }).join('');
         const recRows = p.rounds.map((x) => {
-            const s = recLook(x.look);
-            const label = x.look === 'plan' ? `${x.label}（有计划）` : x.label;
+            const s = recShown(x);
+            const label = s.label;
             return `<tr><td class="rp-c">${x.no}</td><td>${esc(x.round.title)}</td><td class="rp-pstatus">${sq(s.color)}${esc(label)}</td><td class="rp-c rp-mark ${x.pass ? 'pos' : 'neg'}">${x.pass ? '✓ 过关' : '✗ 未过关'}</td><td class="rp-date">${x.lastDate ? esc(cnDate(x.lastDate)) : '—'}</td><td class="rp-num">${x.attempts}</td><td>${esc(plansText(x)) || '—'}</td><td>${esc(x.comment)}</td></tr>`;
         }).join('');
         let sec = 0;
@@ -368,7 +371,7 @@
         if (p.rounds.length) {
             const th = (v, extra) => xlTh(v, Object.assign({ fill: XL.REC }, extra || {}));
             const rows = top(8).concat([[th('#'), th('任务', { align: 'left' }), th('当前情况'), th('是否过关'), th('最近检查'), th('检查次数'), th('待完成计划', { align: 'left' }), th('备注', { align: 'left' })]]);
-            p.rounds.forEach((x) => { const s = recLook(x.look); rows.push([xlTd(x.no, { align: 'center' }), xlTd(x.round.title), xlTd(x.label, { align: 'center', fill: hex(s.color), color: hex(s.text) }), xlTd(x.pass ? '✓ 过关' : '✗ 未过关', { align: 'center', bold: true, color: x.pass ? XL.GREEN : XL.RED }), xlTd(x.lastDate ? cnDate(x.lastDate) : '—', { align: 'center' }), xlTd(x.attempts, { align: 'center' }), xlTd(plansText(x) || '—'), xlTd(x.comment)]); });
+            p.rounds.forEach((x) => { const s = recShown(x); rows.push([xlTd(x.no, { align: 'center' }), xlTd(x.round.title), xlTd(s.label, { align: 'center', fill: hex(s.color), color: hex(s.text) }), xlTd(x.pass ? '✓ 过关' : '✗ 未过关', { align: 'center', bold: true, color: x.pass ? XL.GREEN : XL.RED }), xlTd(x.lastDate ? cnDate(x.lastDate) : '—', { align: 'center' }), xlTd(x.attempts, { align: 'center' }), xlTd(plansText(x) || '—'), xlTd(x.comment)]); });
             sheets.push({ name: '背诵', cols: [6, 28, 14, 12, 16, 10, 24, 30], freeze: 5, rows, merges: merges(8), print: xlPrint(5, footer, true) });
         }
         if (!sheets.length) sheets.push({ name: '个人学情', cols: [40], rows: top(1) });
@@ -456,7 +459,7 @@
             const no = row.student.studentNo;
             rows2.push([td(/^\d+$/.test(no) ? Number(no) : no, { align: 'center', color: MUTED }), td(row.student.name, { bold: true })]
                 .concat(row.statuses.map((k) => { const st = hwStatus(k); return td(st.short, { align: 'center', fill: hex(st.color), color: hex(st.text) }); }),
-                    row.rec.map((x) => { const st = recLook(x.look); return td(st.label, { align: 'center', fill: hex(st.color), color: hex(st.text) }); })));
+                    row.rec.map((x) => { const st = recShown(x); return td(st.label, { align: 'center', fill: hex(st.color), color: hex(st.text) }); })));
         });
         const cols2 = [7, 12].concat(rp.hws.map(() => 16), rp.rounds.map(() => 18));
 
