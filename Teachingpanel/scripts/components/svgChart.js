@@ -57,7 +57,7 @@
 
         const lines = series.map((s) => {
             const yy = isRight(s) ? y2 : y;
-            const fmt = isRight(s) ? y2Format : yFormat;
+            const fmt = s.format || (isRight(s) ? y2Format : yFormat);   // series.format(v, i)：这条线悬停时的显示（画的值和显示的值不同时用）
             let d = '';
             let pen = false;
             s.values.forEach((v, i) => {
@@ -66,7 +66,7 @@
                 pen = true;
             });
             const dots = s.values.map((v, i) => v == null ? '' :
-                `<circle cx="${x(i)}" cy="${yy(v)}" r="3.5" style="fill:${s.color}"><title>${esc(labels[i])} ${esc(s.name)}: ${esc(fmt(v))}</title></circle>`).join('');
+                `<circle cx="${x(i)}" cy="${yy(v)}" r="3.5" style="fill:${s.color}"><title>${esc(labels[i])} ${esc(s.name)}: ${esc(fmt(v, i))}</title></circle>`).join('');
             return `<path d="${d}" style="fill:none;stroke:${s.color};stroke-width:2.2" ${s.dashed ? 'stroke-dasharray="5 4"' : ''}/>${dots}`;
         }).join('');
 

@@ -84,16 +84,17 @@
                 series: [
                     { name: '本人', color: 'var(--primary-color)', values: shown.map((h) => val(h.score, h.exam)) },
                     { name: '班级平均', color: '#9ca3af', dashed: true, values: shown.map((h) => val(h.avg, h.exam)) },
-                    // 班级百分位（超过了班里百分之几的同学）画在右侧 0～100% 的副坐标轴上，和分数不混用一个刻度
-                    { name: '班级百分位', color: '#d97706', axis: 'right', values: shown.map((h) => h.percentile) }
+                    // 班级百分位（超过了班里百分之几的同学，1.43.0 起和分数共用左轴，浅绿色）：
+                    //   得分率模式左轴本来就是 0～100%，直接画；原始分模式按该场满分折算（百分位 80% 的 150 分考试画在 120 分处），
+                    //   这样不同满分的考试也画在同一比例的高度上；鼠标悬停仍显示百分位本身
+                    { name: '班级百分位', color: '#5cc97b', values: shown.map((h) => (h.percentile == null ? null : pct ? h.percentile : h.percentile / 100 * h.exam.fullScore)),
+                        format: (v, i) => `${Math.round(shown[i].percentile)}%` }
                 ],
                 yMin: pct ? 0 : undefined,
                 yMax: pct ? 100 : undefined,
                 height: 240,
                 yFormat: (v) => pct ? `${Math.round(v)}%` : Utils.formatNumber(v, 0),
-                yTitle: pct ? '得分率' : '分数',
-                y2Min: 0, y2Max: 100, y2Title: '百分位',
-                y2Format: (v) => `${Math.round(v)}%`
+                yTitle: pct ? '得分率' : '分数'
             }) : '<div class="chart-empty">考试都隐藏了，点表格左上角的小眼睛全部显示</div>'}
             <table class="simple-table exam-trend-table">
                 <thead><tr><th class="eye-col"><button type="button" class="eye-btn${hiddenHere ? ' eye-off' : ''}" data-eye-all="${hiddenHere ? 'show' : 'hide'}" title="${hiddenHere ? `折线图里隐藏了 ${hiddenHere} 场，点击全部显示` : '全部考试都在折线图里显示，点击全部隐藏'}" aria-label="${hiddenHere ? '全部显示' : '全部隐藏'}">${hiddenHere ? EYE_OFF : EYE}</button></th><th>日期</th><th>考试</th><th>成绩</th><th>班级平均</th><th>班级排名</th><th>年级排名</th></tr></thead>
