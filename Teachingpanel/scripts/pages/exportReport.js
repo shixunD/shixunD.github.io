@@ -1,7 +1,8 @@
 // exportReport.js —— 主页「📤 导出统计」卡片 + 选择作业 / 背诵任务的导出弹窗 + 「加减分规则」设置弹窗
 // 全局命名空间：window.ExportReport
 // 计分在 models/scoreReport.js，三种输出在 reportOutput.js；这里只管界面。
-// 上次勾选记在 localStorage（teachingPanel.export.<班级 id>，仅界面偏好，不进 .db）。
+// 1.42.0 起每次打开都一项不勾、不记上次的选择（以前记在 localStorage teachingPanel.export.*，打开时顺手删掉）。
+// 勾选：最上面「全选全部内容」、每栏「全选」、每个分组夹前的复选框，部分选中时显示半选。
 
 (function () {
     'use strict';
@@ -46,34 +47,53 @@
 
     // ---------- 选择树 ----------
 
-    // layout: SideGroups 布局；返回带复选框的树。分组夹的复选框 = 全选 / 全不选里面的条目
-    function treeHtml(layout, kind, labelOf, checked) {
+    // layout: SideGroups 布局；返回带复选框的树（默认都不勾）。分组夹的复选框 = 全选 / 取消全选里面的条目
+    function treeHtml(layout, kind, labelOf) {
         const item = (it) => `
-            <label class="ex-item"><input type="checkbox" data-ex-item="${kind}" value="${it.id}" ${checked.has(it.id) ? 'checked' : ''}><span>${labelOf(it)}</span></label>`;
+            <label class="ex-item"><input type="checkbox" data-ex-item="${kind}" value="${it.id}"><span>${labelOf(it)}</span></label>`;
         const html = layout.map((e) => {
             if (e.type === 'item') return item(e.obj);
             if (!e.children.length) return '';
             return `
                 <div class="ex-group">
-                    <label class="ex-item ex-group-head"><input type="checkbox" data-ex-group><span>📁 ${esc(e.obj.title)}</span><em>${e.children.length}</em></label>
+                    <label class="ex-item ex-group-head" title="全选 / 取消全选这个分组夹"><input type="checkbox" data-ex-group><span>📁 ${esc(e.obj.title)}</span><em>${e.children.length}</em></label>
                     <div class="ex-group-body">${e.children.map((c) => item(c.obj)).join('')}</div>
                 </div>`;
         }).join('');
         return html || '<div class="hint">暂无</div>';
     }
 
-    function syncGroups(body) {
-        body.querySelectorAll('.ex-group').forEach((g) => {
-            const boxes = Array.from(g.querySelectorAll('[data-ex-item]'));
-            const on = boxes.filter((b) => b.checked).length;
-            const head = g.querySelector('[data-ex-group]');
-            head.checked = on > 0 && on === boxes.length;
-            head.indeterminate = on > 0 && on < boxes.length;
-        });
+    // 一栏的表头：标题、已选几项、「全选」复选框
+    function colHeadHtml(kind, title) {
+        return `<div class="ex-col-head"><b>${title}</b><span class="hint" data-ex-count="${kind}"></span>
+            <label class="ex-all" title="全选 / 取消全选这一栏"><input type="checkbox" data-ex-col="${kind}">全选</label></div>`;
     }
+    const masterHtml = () => '<label class="ex-all ex-master"><input type="checkbox" data-ex-master>全选全部内容（作业和背诵任务）</label>';
 
-    function readSaved(classId) {
-        try { return JSON.parse(Utils.lsGet(LS_PREFIX + classId, 'null')) || {}; } catch (e) { return {}; }
+    // 汇总复选框（分组夹 / 一栏 / 全部）按里面条目的勾选情况显示：全勾 = 勾，部分 = 半选，没有 = 不勾
+    function setTri(box, items) {
+        if (!box) return;
+        const on = items.filter((b) => b.checked).length;
+        box.checked = on > 0 && on === items.length;
+        box.indeterminate = on > 0 && on < items.length;
+        box.disabled = !items.length;
+    }
+    function syncGroups(body) {
+        body.querySelectorAll('.ex-group').forEach((g) => setTri(g.querySelector('[data-ex-group]'), Array.from(g.querySelectorAll('[data-ex-item]'))));
+        body.querySelectorAll('[data-ex-col]').forEach((c) => setTri(c, Array.from(body.querySelectorAll(`[data-ex-item="${c.dataset.exCol}"]`))));
+        setTri(body.querySelector('[data-ex-master]'), Array.from(body.querySelectorAll('[data-ex-item]')));
+    }
+    // 点汇总复选框：把它管的条目全勾 / 全不勾（半选时点 = 全勾）
+    function applyBulk(body, target) {
+        let scope = null;
+        if (target.closest('[data-ex-group]')) scope = target.closest('.ex-group').querySelectorAll('[data-ex-item]');
+        else if (target.dataset.exCol) scope = body.querySelectorAll(`[data-ex-item="${target.dataset.exCol}"]`);
+        else if (target.hasAttribute('data-ex-master')) scope = body.querySelectorAll('[data-ex-item]');
+        if (scope) scope.forEach((b) => { b.checked = target.checked; });
+    }
+    // 以前版本记住的勾选（1.42.0 起不再使用）：打开导出窗口时删掉
+    function dropSaved(classId) {
+        [LS_PREFIX + classId, LS_PREFIX + 'personal.' + classId].forEach((k) => { try { localStorage.removeItem(k); } catch (e) { /* 忽略 */ } });
     }
 
     function openDialog() {
@@ -81,9 +101,7 @@
         if (!AppState.getStudents().length) { Toast.error('当前班级还没有学生'); return; }
         const hwLayout = HomeworkModel.sideLayout();
         const rdLayout = RecitationModel.roundLayout();
-        const saved = readSaved(classId);
-        const hwChecked = new Set(saved.hw || []);
-        const rdChecked = new Set(saved.rec || []);
+        dropSaved(classId);
         let titleEdited = false;
 
         Modal.open({
@@ -92,24 +110,22 @@
             dirtyKey: () => '',   // 只是选择内容，没有要保存的东西，关闭时不询问
             html: `
                 <div class="ex-dialog">
+                    ${masterHtml()}
                     <div class="ex-cols">
                         <div class="ex-col">
-                            <div class="ex-col-head"><b>📝 作业</b><span class="hint" data-ex-count="hw"></span>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-all="hw">全选</button>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-none="hw">清空</button></div>
-                            <div class="ex-tree">${treeHtml(hwLayout, 'hw', (h) => `${esc(h.title)}<small>${esc(Utils.formatDate(h.date))}</small>`, hwChecked)}</div>
+                            ${colHeadHtml('hw', '📝 作业')}
+                            <div class="ex-tree">${treeHtml(hwLayout, 'hw', (h) => `${esc(h.title)}<small>${esc(Utils.formatDate(h.date))}</small>`)}</div>
                         </div>
                         <div class="ex-col">
-                            <div class="ex-col-head"><b>📖 背诵任务</b><span class="hint" data-ex-count="rec"></span>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-none="rec">清空</button></div>
-                            <div class="ex-tree">${treeHtml(rdLayout, 'rec', (r) => esc(r.title), rdChecked)}</div>
+                            ${colHeadHtml('rec', '📖 背诵任务')}
+                            <div class="ex-tree">${treeHtml(rdLayout, 'rec', (r) => esc(r.title))}</div>
                         </div>
                     </div>
                     <div class="ex-opts">
                         <label class="ex-title">标题<input type="text" data-ex-title autocomplete="off"></label>
                         <label>排序<select data-ex-sort>
                             <option value="no">按学号</option>
-                            <option value="score" ${saved.sort === 'score' ? 'selected' : ''}>按最终得分（高→低）</option>
+                            <option value="score">按最终得分（高→低）</option>
                         </select></label>
                     </div>
                     <div class="ex-actions">
@@ -148,7 +164,6 @@
                     const sel = current();
                     q('[data-ex-count="hw"]').textContent = `已选 ${sel.hwIds.length} 项`;
                     q('[data-ex-count="rec"]').textContent = `已选 ${sel.roundIds.length} 项`;
-                    Utils.lsSet(LS_PREFIX + classId, JSON.stringify({ hw: sel.hwIds, rec: sel.roundIds, sort: sel.sort }));
                     const empty = !sel.hwIds.length && !sel.roundIds.length;
                     body.querySelectorAll('[data-ex-out]').forEach((b) => { b.disabled = empty; });
                     q('[data-ex-preview]').innerHTML = empty
@@ -157,18 +172,12 @@
                 }
 
                 body.addEventListener('change', (e) => {
-                    const g = e.target.closest('[data-ex-group]');
-                    if (g) g.closest('.ex-group').querySelectorAll('[data-ex-item]').forEach((b) => { b.checked = g.checked; });
                     if (e.target.closest('[data-ex-title]')) return;
+                    applyBulk(body, e.target);
                     refresh();
                 });
                 q('[data-ex-title]').addEventListener('input', (e) => { titleEdited = e.target.value.trim() !== ''; });
                 q('[data-ex-title]').addEventListener('change', refresh);
-                body.querySelectorAll('[data-ex-all], [data-ex-none]').forEach((btn) => btn.addEventListener('click', () => {
-                    const kind = btn.dataset.exAll || btn.dataset.exNone;
-                    body.querySelectorAll(`[data-ex-item="${kind}"]`).forEach((b) => { b.checked = !!btn.dataset.exAll; });
-                    refresh();
-                }));
 
                 body.querySelectorAll('[data-ex-out]').forEach((btn) => btn.addEventListener('click', async () => {
                     const rp = ScoreReport.build(current());
@@ -201,11 +210,7 @@
         const classId = AppState.getActiveClassId();
         const students = AppState.getStudents().slice().sort(Utils.compareStudentNo);
         if (!students.length) { Toast.error('当前班级还没有学生'); return; }
-        const key = LS_PREFIX + 'personal.' + classId;
-        let saved = {};
-        try { saved = JSON.parse(Utils.lsGet(key, 'null')) || {}; } catch (e) { saved = {}; }
-        const hwChecked = new Set(saved.hw || []);
-        const rdChecked = new Set(saved.rec || []);
+        dropSaved(classId);
         let titleEdited = false;
 
         Modal.open({
@@ -218,18 +223,15 @@
                         <label>学生<select data-ex-student>${students.map((s) => `<option value="${s.id}">${esc(s.studentNo ? s.studentNo + ' ' : '')}${esc(s.name)}</option>`).join('')}</select></label>
                         <label class="ex-title">标题<input type="text" data-ex-title autocomplete="off"></label>
                     </div>
+                    ${masterHtml()}
                     <div class="ex-cols">
                         <div class="ex-col">
-                            <div class="ex-col-head"><b>📝 作业</b><span class="hint" data-ex-count="hw"></span>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-all="hw">全选</button>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-none="hw">清空</button></div>
-                            <div class="ex-tree">${treeHtml(HomeworkModel.sideLayout(), 'hw', (h) => `${esc(h.title)}<small>${esc(Utils.formatDate(h.date))}</small>`, hwChecked)}</div>
+                            ${colHeadHtml('hw', '📝 作业')}
+                            <div class="ex-tree">${treeHtml(HomeworkModel.sideLayout(), 'hw', (h) => `${esc(h.title)}<small>${esc(Utils.formatDate(h.date))}</small>`)}</div>
                         </div>
                         <div class="ex-col">
-                            <div class="ex-col-head"><b>📖 背诵任务</b><span class="hint" data-ex-count="rec"></span>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-all="rec">全选</button>
-                                <button type="button" class="btn-secondary btn-sm" data-ex-none="rec">清空</button></div>
-                            <div class="ex-tree">${treeHtml(RecitationModel.roundLayout(), 'rec', (r) => esc(r.title), rdChecked)}</div>
+                            ${colHeadHtml('rec', '📖 背诵任务')}
+                            <div class="ex-tree">${treeHtml(RecitationModel.roundLayout(), 'rec', (r) => esc(r.title))}</div>
                         </div>
                     </div>
                     <div class="ex-actions">
@@ -256,7 +258,6 @@
                     const sel = current();
                     q('[data-ex-count="hw"]').textContent = `已选 ${sel.hwIds.length} 项`;
                     q('[data-ex-count="rec"]').textContent = `已选 ${sel.roundIds.length} 项`;
-                    Utils.lsSet(key, JSON.stringify({ hw: sel.hwIds, rec: sel.roundIds }));
                     const empty = !sel.hwIds.length && !sel.roundIds.length;
                     body.querySelectorAll('[data-ex-out]').forEach((b) => { b.disabled = empty; });
                     q('[data-ex-preview]').innerHTML = empty
@@ -265,18 +266,12 @@
                 }
 
                 body.addEventListener('change', (e) => {
-                    const g = e.target.closest('[data-ex-group]');
-                    if (g) g.closest('.ex-group').querySelectorAll('[data-ex-item]').forEach((b) => { b.checked = g.checked; });
                     if (e.target.closest('[data-ex-title]')) return;
+                    applyBulk(body, e.target);
                     refresh();
                 });
                 q('[data-ex-title]').addEventListener('input', (e) => { titleEdited = e.target.value.trim() !== ''; });
                 q('[data-ex-title]').addEventListener('change', refresh);
-                body.querySelectorAll('[data-ex-all], [data-ex-none]').forEach((btn) => btn.addEventListener('click', () => {
-                    const kind = btn.dataset.exAll || btn.dataset.exNone;
-                    body.querySelectorAll(`[data-ex-item="${kind}"]`).forEach((b) => { b.checked = !!btn.dataset.exAll; });
-                    refresh();
-                }));
 
                 body.querySelectorAll('[data-ex-out]').forEach((btn) => btn.addEventListener('click', async () => {
                     const P = ReportOutput.personal;

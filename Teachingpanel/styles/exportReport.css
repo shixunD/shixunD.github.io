@@ -140,3 +140,8 @@
     .rp-two { flex-direction: column; }
     .rp-cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
+
+/* 1.42.0：「全选」复选框（每栏一个 + 最上面全选全部内容） */
+.ex-all { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+.ex-all input { width: 1rem; height: 1rem; margin: 0; }
+.ex-master { font-weight: 700; margin-bottom: 0.5rem; }
