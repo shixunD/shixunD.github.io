@@ -70,7 +70,7 @@
         const hidden = hiddenSet();
         const shown = hist.filter((h) => !hidden.has(h.exam.id));
         const hiddenHere = hist.length - shown.length;   // 这个学生的考试里被隐藏了几场
-        const line = shown.slice().reverse();   // 折线图新 → 旧（最新的在左边，和下面的表格一致；1.44.0）
+        const line = shown;   // 折线图旧 → 新（最新的在右边；1.44.0 曾倒过来，1.44.1 按 Auson 要求改回）
 
         return `
             <div class="stat-row">

@@ -49,15 +49,15 @@
             <div class="count-chips">
                 ${HomeworkModel.STATUSES.map((s) => `<span class="status-pill" style="background:${s.color};color:${s.text}">${esc(s.label)} ${st.counts[s.key]}</span>`).join('')}
             </div>
-            <h3 class="section-title">时间轴（新 → 旧）</h3>
+            <h3 class="section-title">时间轴（旧 → 新）</h3>
             <div class="strip">
-                ${st.timeline.slice().reverse().map(({ hw, rec }) => {
+                ${st.timeline.map(({ hw, rec }) => {
                     const s = S[rec.status];
                     return `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-locate-hw="${hw.id}" title="${Utils.formatDate(hw.date)} ${esc(hw.title)} · ${esc(s.label)}${rec.comment ? '：' + esc(rec.comment) : ''}（点击定位到问题记录）"></button>`;
                 }).join('')}
             </div>
-            ${weekly.length > 1 ? `<h3 class="section-title">每周按时完成率（新 → 旧）</h3>
-                ${SvgChart.line({ labels: weekly.slice().reverse().map((w) => w.label), series: [{ name: '按时完成率', color: S.done.color, values: weekly.slice().reverse().map((w) => w.rate * 100) }], yMin: 0, yMax: 100, height: 200, yFormat: (v) => `${Math.round(v)}%` })}` : ''}
+            ${weekly.length > 1 ? `<h3 class="section-title">每周按时完成率</h3>
+                ${SvgChart.line({ labels: weekly.map((w) => w.label), series: [{ name: '按时完成率', color: S.done.color, values: weekly.map((w) => w.rate * 100) }], yMin: 0, yMax: 100, height: 200, yFormat: (v) => `${Math.round(v)}%` })}` : ''}
             <h3 class="section-title">问题记录与 comment</h3>
             ${comments.length ? `<ul class="record-list">${comments.map(({ hw, rec }) => {
                 const s = S[rec.status];
