@@ -92,8 +92,9 @@
         const students = AppState.getStudents();
         const rounds = RecitationModel.rounds().slice().reverse();
         const R = RecitationModel.RESULT_MAP;
-        // 列顺序和分组跟背诵页侧栏一致（侧栏靠前 = 总览靠左），分组夹可折叠
-        const segs = SideGroups.columns(RecitationModel.roundLayout());
+        // 列顺序和分组跟背诵页侧栏联动，但倒过来（1.45.2，Auson 要求）：侧栏最上面的在总览最右边，分组之间、分组里的轮次都倒序；
+        // 检查页侧栏的顺序不变。分组夹可折叠
+        const segs = SideGroups.columns(RecitationModel.roundLayout(), { reverse: true });
         const folded = (seg) => seg.group && seg.group.collapsed;
 
         let body;
@@ -131,11 +132,12 @@
                                     const checks = RecitationModel.checksFor(r.id, stu.id);
                                     const key = RecitationModel.statusOf(r.id, stu.id);
                                     if (RecitationModel.isPassed(key)) passed++;
-                                    // 色块按该生在这一轮所有检查记录的结果数量分段：提前完成(深绿) / 过关(绿) / 重新过关(黄) / 未过关(红)，从左到右按数量比例占宽度
+                                    // 色块 = 该生在这一轮的每一次检查，按时间从旧到新、从左到右排（第一次在最左），每次等宽，颜色是那次的结果。
+                                    // 1.45.2 前是按结果种类固定顺序（提前完成→过关→条件过关→重新过关→未过关）合并分段，先重背后过关会显示成绿在左、黄在右，看着像反了
                                     const n = { excel: 0, pass: 0, cond: 0, retry: 0, fail: 0 };
                                     checks.forEach((c) => { if (n[c.result] != null) n[c.result]++; });
-                                    const segs = ['excel', 'pass', 'cond', 'retry', 'fail'].filter((k) => n[k])
-                                        .map((k) => `<span style="flex:${n[k]};background:${R[k].color}"></span>`).join('');
+                                    const segs = checks.filter((c) => R[c.result])
+                                        .map((c) => `<span style="flex:1;background:${R[c.result].color}"></span>`).join('');
                                     const tip = checks.length
                                         ? `${n.excel ? `提前完成 ${n.excel} · ` : ''}完成过关 ${n.pass} · ${n.cond ? `条件过关 ${n.cond} · ` : ''}重新过关 ${n.retry} · 未过关 ${n.fail}（当前：${R[key].label}）`
                                         : '未检查';
@@ -154,7 +156,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="hint">每个色块按这个学生在该轮所有检查的结果数量分段：深绿 = 提前完成、绿 = 完成过关、浅绿 = 条件过关、黄 = 重新过关、红 = 未过关（数字是检查次数，灰色 = 未检查）；点击格子登记检查；点击列头进入该轮次；点上方的分组名折叠 / 展开该分组（折叠后每人显示该分组里过关几轮）；最右列按当前状态统计。</div>`;
+                <div class="hint">每个色块按这个学生在该轮的每次检查分段，从左到右是第一次、第二次……（旧 → 新）：深绿 = 提前完成、绿 = 完成过关、浅绿 = 条件过关、黄 = 重新过关、红 = 未过关（数字是检查次数，灰色 = 未检查）；点击格子登记检查；点击列头进入该轮次；点上方的分组名折叠 / 展开该分组（折叠后每人显示该分组里过关几轮）；最右列按当前状态统计。</div>`;
         }
 
         view.innerHTML = `
@@ -164,7 +166,8 @@
             <div class="card">${body}</div>
         `;
         UI.bindMatrixGroups(view);
-        UI.bindMatrixColDrag(view, (drag, drop) => RecitationModel.moveSide({ type: 'item', id: drag }, drop));
+        // 总览是侧栏的倒序：拖到某列「右边」= 侧栏里放在它「上面」
+        UI.bindMatrixColDrag(view, (drag, drop) => RecitationModel.moveSide({ type: 'item', id: drag }, { ...drop, after: !drop.after }));
         view.querySelectorAll('.cell').forEach((cell) => {
             cell.addEventListener('click', () => RecitationDialogs.openCheck(cell.dataset.round, cell.dataset.sid));
         });

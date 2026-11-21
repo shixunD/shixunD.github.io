@@ -7,21 +7,38 @@
 //   多音字每个读音都试（曾 = zeng / ceng）；ü 当 u，所以 lv、lu 都能对上 吕。
 //   每加一个或删一个字就重新匹配；匹配上的闪 5 下（和跳转定位学生同一个效果），之后留一个静止的框，直到输入变了或清空。
 //   页面重绘（改状态、换作业等）后保留输入，框照样标出来；Enter 依次跳到下一个匹配的学生。
-//   Esc 在任何地方按（不用先点输入框）都清空所有找人框：在 window 捕获阶段监听、不拦截，弹窗等原有的 Esc 行为照常生效。
+//   Esc 在任何地方按（不用先点输入框）都清空当前页面的找人框（其他页面的保留；输入只存在内存里，刷新 / 关闭网页才全部清空）：在 window 捕获阶段监听、不拦截，弹窗等原有的 Esc 行为照常生效；
+//   清空后光标回到当前页面的找人框（有弹窗等浮层开着、或正在别的输入框里打字时不抢焦点）。
 
 (function () {
     'use strict';
 
     let table = null;          // 字 -> [无调读音]，第一次用时从 PinyinData 建
-    const queries = {};        // 每个位置（key）各自记住输入，页面重绘后恢复
+    const queries = {};        // 每个位置（key）各自记住输入，页面重绘、切换页面后恢复；只在内存里，刷新 / 关闭网页就没了
     const MAX_NAME_FORMS = 64; // 一个名字最多展开这么多种读音组合（多音字很多时截断）
     const live = new Set();    // 已绑定的输入框的清空函数（输入框不在页面上了就移除）
     const pending = {};        // onPick 引起重绘时，交给新输入框接着用：{ flash, cursor, caret }
 
+    // 弹窗、照片放大、录音、手机拍等浮层（它们自己也处理 Esc）
+    const OVERLAYS = '.modal-overlay, .dialog-overlay, .photo-choose-overlay, .photo-lightbox, .camera-overlay, .phonelink-overlay, .audio-rec-overlay, .audio-choose-overlay';
+    const isField = (el) => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+
     window.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape' || e.isComposing) return;
-        Object.keys(queries).forEach((k) => { queries[k] = ''; });
-        live.forEach((entry) => { if (entry.alive()) entry.clear(); else live.delete(entry); });
+        // 先在这里判断（弹窗自己的 Esc 处理还没跑）：有浮层开着、或正在别的输入框里打字时，只清空不抢焦点
+        const a = document.activeElement;
+        const refocus = !document.querySelector(OVERLAYS) && !(isField(a) && !a.classList.contains('name-search-input'));
+        // 只清当前页面（作业 / 背诵 / 考试 / 学生趋势里正在看的那页）的找人框，其他页面的保留
+        let target = null;
+        live.forEach((entry) => {
+            if (!entry.alive()) { live.delete(entry); return; }
+            if (!entry.input.closest('.page.active')) return;
+            queries[entry.key] = '';
+            entry.clear();
+            if (!target) target = entry.input;
+        });
+        // 清空后光标回到当前页面的找人框，可以马上找下一个人
+        if (refocus && target) target.focus({ preventScroll: true });
     }, true);
 
     function charTable() {
@@ -163,6 +180,8 @@
         });
 
         live.add({
+            input,
+            key,
             alive: () => input.isConnected,
             clear: () => { if (input.value || hits.length) { input.value = ''; apply(false, false); } }
         });

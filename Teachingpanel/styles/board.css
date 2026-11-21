@@ -105,7 +105,7 @@
     border-style: solid; border-width: 0 8px 8px 0; border-color: transparent #fff transparent transparent;
 }
 .cell-text { width: 40px; }
-/* 背诵总览：按检查结果数量分段的色块（绿/黄/红从左到右），数字 = 检查次数 */
+/* 背诵总览：每次检查一段等宽色块，从左到右按时间旧 → 新（第一次在最左），数字 = 检查次数 */
 .cell-bar { width: 56px; height: 24px; display: flex; overflow: hidden; padding: 0; background: #e5e7eb; position: relative; }
 .cell-bar > span { display: block; height: 100%; }
 .cell-bar .cell-count {
