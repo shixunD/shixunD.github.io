@@ -78,9 +78,17 @@
             Utils.lsSet(LS_KIND, b.dataset.trendKind);
             onKind(b.dataset.trendKind);
         }));
-        // 名字拼音定位：在学生小块里标出读音对得上的学生（选择器自己会滚动，所以只滚到看得见）
+        // 名字拼音定位：在学生小块里标出读音对得上的学生（选择器自己会滚动，所以只滚到看得见）；
+        // 找到就直接切换到第一个匹配的学生（Enter 切到下一个），Auson 的要求（1.45.1）
         NameSearch.bind(view, 'trend', {
             block: 'nearest',
+            onPick: (el) => {
+                const id = el.dataset.trendStu;
+                if (!id || id === studentId) return false;
+                studentId = id;
+                onPick();
+                return true;
+            },
             targets: () => Array.from(view.querySelectorAll('.trend-chip[data-trend-stu]')).map((el) => {
                 const s = AppState.getStudent(el.dataset.trendStu);
                 return { el, name: s ? s.name : '' };
