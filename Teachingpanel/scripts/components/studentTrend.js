@@ -60,7 +60,10 @@
         const inactive = selStu && selStu.status ? selStu : null;   // 正在看的是已转出 / 休学的学生：单独补一块
         return `
             <div class="card trend-picker">
-                <div class="trend-kinds">${KINDS.map((k) => `<button type="button" class="trend-kind ${k.key === active ? 'active' : ''}" data-trend-kind="${k.key}">${k.label}</button>`).join('')}</div>
+                <div class="trend-picker-top">
+                    <div class="trend-kinds">${KINDS.map((k) => `<button type="button" class="trend-kind ${k.key === active ? 'active' : ''}" data-trend-kind="${k.key}">${k.label}</button>`).join('')}</div>
+                    ${NameSearch.html('trend')}
+                </div>
                 <div class="trend-chips">${students.map((s) => `<button type="button" class="trend-chip ${s.id === sel ? 'active' : ''}" data-trend-stu="${s.id}">${esc(s.studentNo ? s.studentNo + ' ' : '')}${esc(s.name)}</button>`).join('')}${inactive ? `<button type="button" class="trend-chip active" data-trend-stu="${inactive.id}">${esc(inactive.name)}（已${esc(AppState.STUDENT_STATUS[inactive.status])}）</button>` : ''}</div>
             </div>`;
     }
@@ -75,6 +78,14 @@
             Utils.lsSet(LS_KIND, b.dataset.trendKind);
             onKind(b.dataset.trendKind);
         }));
+        // 名字拼音定位：在学生小块里标出读音对得上的学生（选择器自己会滚动，所以只滚到看得见）
+        NameSearch.bind(view, 'trend', {
+            block: 'nearest',
+            targets: () => Array.from(view.querySelectorAll('.trend-chip[data-trend-stu]')).map((el) => {
+                const s = AppState.getStudent(el.dataset.trendStu);
+                return { el, name: s ? s.name : '' };
+            })
+        });
     }
 
     // 弹窗标题「姓名 · 后缀」里的姓名变成可点链接：关掉弹窗，跳到该生趋势。在 Modal.open 的 onMount 里调用

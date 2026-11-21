@@ -7,7 +7,9 @@
 }
 .trend-sec { scroll-margin-top: calc(var(--picker-h, 120px) + 12px); margin-top: 1rem; }
 .trend-sec-title { font-size: 1.15rem; margin: 0 0 0.6rem; }
+.trend-picker-top { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .trend-kinds { display: flex; gap: 0.3rem; background: #f1e9e1; padding: 3px; border-radius: 9px; align-self: flex-start; }
+.trend-chip.name-hit { position: relative; z-index: 1; }
 .trend-kind {
     border: none; background: transparent; padding: 0.3rem 0.8rem; border-radius: 7px; cursor: pointer;
     font-family: inherit; font-size: 0.85rem; color: var(--text-secondary);

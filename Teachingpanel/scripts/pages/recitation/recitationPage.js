@@ -179,7 +179,7 @@
                         ${round.content ? `<div class="detail-meta">${esc(round.content)}</div>` : ''}
                     </div>
                     <div class="detail-actions">
-                        <button type="button" class="btn-primary btn-sm" data-plan>🗓️ 计划背诵</button>
+                        ${NameSearch.html('recitation')}
                         <button type="button" class="btn-secondary btn-sm" data-edit>编辑</button>
                         <button type="button" class="btn-secondary btn-sm btn-danger-text" data-delete>删除</button>
                     </div>
@@ -219,7 +219,6 @@
         const planIsLast = lastPlanDate && (!pg.check || lastPlanDate > pg.check.date);
         const look = planIsLast ? RecitationModel.PLAN : st;
         const due = RecitationModel.dueToday(round.id, stu.id);
-        const attempts = checks.length;
 
         // 同一天既有检查又有计划时，检查在前
         const rows = checks.map((c) => ({ date: c.date, order: 0, c }))
@@ -232,15 +231,20 @@
         return `
             <div class="stu-card ${due ? 'due-today' : ''}" data-sid="${stu.id}" style="--st-color:${look.color};--st-text:${look.text}"
                 title="${esc(st.label)}${plans.length ? ` · 计划：${plans.map((p) => Utils.formatDate(p.date)).join('、')}` : ''}${due ? ' · 今天需要检查' : ''}">
-                <div class="stu-card-no">${esc(stu.studentNo)}${attempts > 1 ? ` · 第${attempts}次` : ''}</div>
+                <div class="stu-card-no">${esc(stu.studentNo)}</div>
                 <div class="stu-card-name">${esc(stu.name)}<span class="stu-card-tally" title="所有背诵任务里提前完成 + 完成过关 + 条件过关的总次数">(${(totals && totals.get(stu.id)) || 0}次)</span></div>
                 ${dateLines}
             </div>`;
     }
 
     function bindDetail(view, round) {
-        view.querySelector('[data-plan]').addEventListener('click', () => openTab('plan', { roundId: round.id }));
         view.querySelector('[data-edit]').addEventListener('click', () => RecitationDialogs.openRoundForm(round));
+        NameSearch.bind(view, 'recitation', {
+            targets: () => Array.from(view.querySelectorAll('.stu-card[data-sid]')).map((el) => {
+                const s = AppState.getStudent(el.dataset.sid);
+                return { el, name: s ? s.name : '' };
+            })
+        });
         view.querySelector('[data-delete]').addEventListener('click', async () => {
             const ok = await Modal.confirm({
                 title: '删除背诵轮次',

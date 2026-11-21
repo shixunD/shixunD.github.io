@@ -149,6 +149,7 @@
                         <div class="detail-meta">${Utils.formatDate(hw.date)}${hw.note ? ` · ${esc(hw.note)}` : ''}</div>
                     </div>
                     <div class="detail-actions">
+                        ${NameSearch.html('homework')}
                         <button type="button" class="btn-secondary btn-sm" data-edit>编辑</button>
                         <button type="button" class="btn-secondary btn-sm btn-danger-text" data-delete>删除</button>
                     </div>
@@ -181,6 +182,12 @@
 
     function bindDetail(view, hw) {
         view.querySelector('[data-edit]').addEventListener('click', () => HomeworkDialogs.openForm(hw));
+        NameSearch.bind(view, 'homework', {
+            targets: () => Array.from(view.querySelectorAll('.stu-card[data-sid]')).map((el) => {
+                const s = AppState.getStudent(el.dataset.sid);
+                return { el, name: s ? s.name : '' };
+            })
+        });
         view.querySelector('[data-delete]').addEventListener('click', async () => {
             const ok = await Modal.confirm({
                 title: '删除作业',

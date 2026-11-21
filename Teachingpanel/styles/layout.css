@@ -108,6 +108,18 @@
 /* 从学生趋势跳过来后，学生卡片闪烁三秒（0.6s × 5） */
 .flash-student { animation: student-flash 0.6s ease-in-out 5; }
 .stu-card.flash-student { position: relative; z-index: 1; }
+/* 名字拼音定位（NameSearch）：匹配上的学生先闪 5 下（同上），之后留一个静止的框，直到输入变了或清空 */
+.name-hit { outline: 3px solid var(--primary-color); outline-offset: 2px; }
+.stu-card.name-hit { position: relative; z-index: 1; }
+.name-search { display: inline-flex; align-items: center; gap: 0.25rem; }
+.name-search-input {
+    width: 7.5rem; box-sizing: border-box; padding: 0.28rem 0.5rem; border: 1px solid var(--border-color); border-radius: 7px;
+    font-family: inherit; font-size: 0.82rem; background: #fff; color: var(--text-primary);
+}
+.name-search-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(255, 138, 61, 0.2); }
+.name-search.no-hit .name-search-input { border-color: #d93025; }
+.name-search-count { font-size: 0.75rem; color: var(--text-secondary); min-width: 1.8em; white-space: nowrap; }
+.name-search.no-hit .name-search-count { color: #d93025; }
 /* 返回学生趋势原位置的小按钮（固定在导航栏下方左上角） */
 .back-jump-btn { position: fixed; left: 10px; top: 64px; z-index: 900; width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); border-radius: 50%; background: #fff; color: var(--text-secondary); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14); cursor: pointer; transition: color 0.12s, border-color 0.12s, transform 0.12s; }
 .back-jump-btn:hover { color: var(--primary-dark, #e06a1f); border-color: var(--primary-color); transform: translateX(-1px); }

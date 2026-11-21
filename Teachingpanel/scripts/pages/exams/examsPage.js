@@ -104,6 +104,7 @@
                         <div class="detail-meta">${Utils.formatDate(exam.date)} · 满分 ${exam.fullScore}</div>
                     </div>
                     <div class="detail-actions">
+                        ${NameSearch.html('exams')}
                         <button type="button" class="btn-secondary btn-sm" data-edit>编辑</button>
                         <button type="button" class="btn-secondary btn-sm btn-danger-text" data-delete>删除</button>
                     </div>
@@ -138,6 +139,12 @@
 
     function bindDetail(view, exam) {
         view.querySelector('[data-edit]').addEventListener('click', () => ExamDialogs.openForm(exam));
+        NameSearch.bind(view, 'exams', {
+            targets: () => Array.from(view.querySelectorAll('.rank-table tr[data-sid]')).map((el) => {
+                const s = AppState.getStudent(el.dataset.sid);
+                return { el, name: s ? s.name : '' };
+            })
+        });
         view.querySelector('[data-delete]').addEventListener('click', async () => {
             const ok = await Modal.confirm({ title: '删除考试', text: `确定删除「${exam.name}」及全部成绩吗？此操作不可撤销。`, confirmText: '删除', danger: true });
             if (ok) await ExamModel.remove(exam.id);
