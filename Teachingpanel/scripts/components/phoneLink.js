@@ -190,6 +190,7 @@
             let received = 0;
             let state = 'starting';   // starting | waiting | pairing | connected | quiet | p2pfail | error
             const lastSeen = new WeakMap();   // 连接 -> 最近一次收到它消息的时间
+            const deviceOf = new WeakMap();   // 连接 -> 手机标识（1.45.3：同一台手机重新连上时，旧连接马上作废）
             const expectUntil = new WeakMap();   // 连接 -> 正在传的照片最晚什么时候该到（传大照片时心跳排在后面，不能当成没回应）
             let quietTimer = null;
             let errorText = '';
@@ -294,6 +295,19 @@
                         lastSeen.set(conn, Date.now());
                         if (state === 'quiet' && conns.has(conn)) setState('connected');
                         if (msg.type === 'ping') { conn.send({ type: 'pong', t: msg.t }); return; }   // 手机的心跳：手机靠它发现连接已失效
+                        // 手机报上自己的标识：同一台手机误关网页后重新打开、旧连接还没超时断开时，用新连接顶替旧的，
+                        // 不用等 1 分钟心跳超时，电脑这边也不会把一台手机算成两台
+                        if (msg.type === 'device') {
+                            if (typeof msg.id !== 'string' || !/^d-[a-z0-9]{6,40}$/.test(msg.id)) return;
+                            deviceOf.set(conn, msg.id);
+                            Array.from(conns).forEach((c) => {
+                                if (c === conn || deviceOf.get(c) !== msg.id) return;
+                                conns.delete(c);
+                                try { c.close(); } catch (e) { /* 忽略 */ }
+                            });
+                            if (conns.has(conn)) setState('connected');
+                            return;
+                        }
                         if (msg.type === 'bye') {   // 手机离开拍照页（刷新、关掉）：马上断开，不再显示「已连接」
                             try { conn.close(); } catch (e) { /* 忽略 */ }
                             gone();

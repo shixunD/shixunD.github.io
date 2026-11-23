@@ -40,6 +40,9 @@
     const SS_CAMERA = 'teachingPanel.phone.cameraAt';
     const LS_ORIENT = 'teachingPanel.phone.orient';   // 网页相机的拍摄方向：v 竖拍（默认）/ h 横拍
     const OUTBOX_DB = 'teaching-panel-phone-outbox';   // 手机上暂存还没送到电脑的照片（库名带本应用前缀）
+    const LS_DEVICE = 'teachingPanel.phone.deviceId';  // 这台手机（这个浏览器）的固定标识：电脑据此用新连接顶替同一台手机的旧连接（1.45.3）
+    const TAB_CHANNEL = 'teaching-panel-phone-tabs';   // 同一浏览器里几个拍照页互相通知：新打开的接管，旧的让出摄像头和连接（1.45.3）
+    const CAM_BUSY_RETRIES = 8;                        // 摄像头「被占用」时重试几次（每次隔 700 ms，约 6 秒）
     const DEPLOY_TAG_URL = '/deploy-tag.json';         // 部署指纹，和 updateChecker.js 一样用绝对路径
     const UPDATE_EVERY = 10 * 60 * 1000;               // 开着的拍照页隔多久看一次有没有新版本
     const ackTimeout = (bytes) => 20000 + Math.ceil(bytes / 102400) * 1000;   // 20 秒 + 每 100 KB 1 秒（很慢的网络也够）
@@ -134,6 +137,14 @@
     let peer = null;
     let conn = null;
     let connected = false;
+    let yielded = false;   // 同一浏览器里又打开了一个拍照页：这个页面已让出摄像头和连接，不再重连
+
+    // 这台手机的固定标识（存在 localStorage，刷新、关掉重开都不变）
+    let deviceId = lsGet(LS_DEVICE);
+    if (!/^d-[a-z0-9]{6,}$/.test(deviceId)) {
+        deviceId = 'd-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        lsSet(LS_DEVICE, deviceId);
+    }
     let retryTimer = null;
     let heartbeat = null;
     let lastPong = 0;                // 最近一次收到电脑任何消息的时间
@@ -167,6 +178,7 @@
     }
 
     function scheduleRetry(text, cls, showTips) {
+        if (yielded) return;
         connected = false;
         clearInterval(heartbeat);
         setStatus(text, cls, showTips);
@@ -176,6 +188,7 @@
 
     // 连接已失效（心跳超时、回到页面时检查不通过、照片回执超时）：作废当前连接，立刻重连；没收到回执的照片回到队列
     function reconnectNow(text) {
+        if (yielded) return;
         logEv('立即重连：' + (text || '连接已失效'));
         const old = conn;
         conn = null;
@@ -226,7 +239,7 @@
 
     function connect() {
         clearTimeout(retryTimer);
-        if (connected) return;
+        if (connected || yielded) return;
         if (!peer || peer.destroyed) {
             setStatus('正在连接牵线服务器…', 'wait');
             peer = new window.Peer(undefined, cfg.PEER_OPTIONS);
@@ -338,6 +351,8 @@
             diag.pc = '在线';
             renderDiag();
             setStatus('✅ 已连接电脑，可以拍照了', 'ok');
+            // 告诉电脑「我是哪台手机」：误关网页后重新打开时，电脑马上用这条新连接顶替旧的（旧版电脑不认识这条消息，会忽略）
+            try { c.send({ type: 'device', id: deviceId }); } catch (e) { /* 忽略 */ }
             startHeartbeat(c);
             flush();
         });
@@ -374,7 +389,7 @@
     let lastCheck = 0;
     document.addEventListener('visibilitychange', () => logEv(document.visibilityState === 'visible' ? '回到页面' : '页面进入后台'));
     function onBack() {
-        if (document.visibilityState !== 'visible' || Date.now() - lastCheck < 1000) return;
+        if (yielded || document.visibilityState !== 'visible' || Date.now() - lastCheck < 1000) return;
         lastCheck = Date.now();
         if (connected) ensureAlive().then((ok) => { if (ok) flush(); });
         else if (!conn) connect();
@@ -388,6 +403,8 @@
 
     // 离开页面（刷新、关掉、跳走）：先告诉电脑「我走了」，电脑窗口马上改回「等待手机连接」，不会一直以为手机还连着
     window.addEventListener('pagehide', () => {
+        // 马上放开摄像头：不然误关网页后马上重新扫码打开，新页面可能拿不到摄像头（显示「被占用」）
+        if (camStream) stopCam();
         if (!connected || !conn) return;
         logEv('离开页面，通知电脑');
         try { conn.send({ type: 'bye' }); } catch (e) { /* 忽略 */ }
@@ -690,11 +707,29 @@
 
     const applyCam = (c) => (camTrack ? camTrack.applyConstraints({ advanced: [c] }).catch(() => {}) : Promise.resolve());
 
+    // 摄像头「被占用」（NotReadableError 等）多半是刚扫码用的相机 App、或刚关掉的拍照页还没放开：先请同一浏览器里的旧拍照页让出，再隔一会儿重试
+    const camBusy = (err) => !!err && ['NotReadableError', 'TrackStartError', 'AbortError'].includes(err.name);
+    async function getCamStream() {
+        for (let i = 0; ; i++) {
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: false });
+                if (i) { logEv(`摄像头第 ${i + 1} 次才打开`); showNote(''); }
+                return s;
+            } catch (err) {
+                if (!camBusy(err) || i >= CAM_BUSY_RETRIES) throw err;
+                if (i === 0) {
+                    logEv('摄像头被占用（' + err.name + '），等它放开后重试');
+                    showNote('摄像头还被占着（可能是刚才扫码的相机，或之前打开的拍照页还没放开），正在等它放开…');
+                    tabs.claim();
+                }
+                await new Promise((r) => setTimeout(r, 700));
+            }
+        }
+    }
+
     async function startCam() {
         stopCam();
-        camStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facing } }, audio: false
-        });
+        camStream = await getCamStream();
         camTrack = camStream.getVideoTracks()[0];
         // 不写死期望值：先打开，再按摄像头自己报告的最大宽、高（getCapabilities）重新要求，要的就是它实际能给的
         const cp = (camTrack.getCapabilities && camTrack.getCapabilities()) || {};
@@ -891,6 +926,35 @@
         catch (e) { prompt('长按全选后复制：', text); }
         setTimeout(() => { $('copylog').textContent = '复制日志'; }, 2000);
     });
+
+    // ---------- 同一浏览器里只留一个拍照页在用（1.45.3） ----------
+    // 误关网页后重新扫码，有时旧页面其实还在后台（或刚关掉还没完全退出），还占着摄像头和连接，新页面就打不开摄像头（「被占用」）。
+    // 新打开的拍照页一启动就广播「我来接管」，旧页面收到后关摄像头、告诉电脑「我走了」、断开连接并停止重连。
+    const tabs = (() => {
+        const me = Math.random().toString(36).slice(2);
+        let ch = null;
+        try { if ('BroadcastChannel' in window) ch = new BroadcastChannel(TAB_CHANNEL); } catch (e) { ch = null; }
+        function yieldHere() {
+            if (yielded) return;
+            logEv('手机上又打开了一个拍照页，这里让出摄像头和连接');
+            if (camOpen) closeCam(); else if (camStream) stopCam();
+            if (connected && conn) { try { conn.send({ type: 'bye' }); } catch (e) { /* 忽略 */ } }
+            yielded = true;
+            connected = false;
+            clearTimeout(retryTimer);
+            clearInterval(heartbeat);
+            pendingAcks.forEach((p) => p.reject(new Error('已在另一个拍照页继续')));
+            pendingAcks.clear();
+            const old = conn;
+            conn = null;
+            if (old) { try { old.close(); } catch (e) { /* 忽略 */ } }
+            if (peer) { try { peer.destroy(); } catch (e) { /* 忽略 */ } peer = null; }
+            setStatus('这个拍照页已停用：手机上又打开了一个拍照页，请在那边继续拍（没发出去的照片那边会接着发）。要在这里用，请刷新本页', 'bad');
+        }
+        if (ch) ch.onmessage = (e) => { const m = e.data; if (m && m.type === 'claim' && m.from !== me) yieldHere(); };
+        return { claim() { if (ch) { try { ch.postMessage({ type: 'claim', from: me }); } catch (e) { /* 忽略 */ } } } };
+    })();
+    tabs.claim();
 
     connect();
 })();
