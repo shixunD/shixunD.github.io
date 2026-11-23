@@ -4,7 +4,7 @@
 (function () {
     'use strict';
 
-    const PAGES = ['home', 'homework', 'recitation', 'exams', 'trend', 'notes'];
+    const PAGES = ['home', 'homework', 'recitation', 'exams', 'trend', 'other', 'notes'];
     const LS_KEY = 'teachingPanel.ui.page';
     const listeners = [];
     let current = 'home';

@@ -95,6 +95,7 @@ const URLS_TO_CACHE = [
     './scripts/pages/exams/examStudent.js',
     './scripts/pages/exams/examsPage.js',
     './scripts/pages/trend/otherRecords.js',
+    './scripts/pages/other/otherPage.js',
     './scripts/pages/trend/trendPage.js',
     './scripts/pages/homework/homeworkPage.js',
     './scripts/pages/homework/matrix.js',

@@ -50,4 +50,13 @@
     .other-split { grid-template-columns: 1fr; }
     .other-right { position: static; max-height: none; }
 }
+/* 导航页「🗂️ 其他」：每个学生一张卡片，自动横向排开 */
+.other-all-head { margin-bottom: 0.8rem; }
+.other-all-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.5rem; }
+.other-all-check { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.88rem; cursor: pointer; }
+.other-all-q { padding: 0.25rem 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; font-family: inherit; min-width: 12rem; }
+.other-all-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.8rem; align-items: start; }
+.other-all-card { max-height: 70vh; overflow-y: auto; }
+.other-all-name { display: flex; align-items: center; gap: 0.4rem; font-weight: 700; margin-bottom: 0.5rem; }
+.other-all-card[hidden], .other-all-card .remark-item[hidden] { display: none; }
 .other-left .remark-form { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }

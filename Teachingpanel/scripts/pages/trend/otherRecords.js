@@ -67,10 +67,12 @@
             }
         });
         view.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', () => openEdit(btn.dataset.edit)));
-        view.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', async () => {
-            const ok = await Modal.confirm({ title: '删除记录', text: '确定删除这条记录吗？此操作不可撤销。', confirmText: '删除', danger: true });
-            if (ok) await RemarkModel.remove(btn.dataset.delete);
-        }));
+        view.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', () => confirmRemove(btn.dataset.delete)));
+    }
+
+    async function confirmRemove(id) {
+        const ok = await Modal.confirm({ title: '删除记录', text: '确定删除这条记录吗？此操作不可撤销。', confirmText: '删除', danger: true });
+        if (ok) await RemarkModel.remove(id);
     }
 
     // 编辑块里当前有没有（已保留的或新选的）照片或录音
@@ -117,5 +119,5 @@
         });
     }
 
-    window.OtherRecords = { render };
+    window.OtherRecords = { render, openEdit, confirmRemove };
 })();

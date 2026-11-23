@@ -22,6 +22,7 @@
         else if (pageName === 'recitation') RecitationPage.render();
         else if (pageName === 'exams') ExamsPage.render();
         else if (pageName === 'trend') TrendPage.render();
+        else if (pageName === 'other') OtherPage.render();
         else if (pageName === 'notes') NotesPage.render();
     }
 
