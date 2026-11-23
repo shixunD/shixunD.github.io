@@ -24,7 +24,7 @@
         let locked = RecitationModel.isLocked(roundId, studentId);
         const lockLabel = () => (RecitationModel.RESULT_MAP[RecitationModel.lockedResult(roundId, studentId)] || {}).label || '';
         // 「未过关」不选检查日期：登记成今天（只用来排序），界面上不显示日期
-        const isUndated = (r) => RecitationModel.isUndated(r);
+        const isUndated = (r) => RecitationModel.isUndated(r) || r === 'note';   // 笔记和未过关一样不选检查日期（存成今天）
         const saveDate = () => (isUndated(result) && !locked ? Utils.today() : checkDate);
         const lockedCheck = () => RecitationModel.checksFor(roundId, studentId).slice().pop();
         let checkDate = locked ? lockedCheck().date : Utils.today();
@@ -51,6 +51,9 @@
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option" data-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}
+                </div>
+                <div class="status-options status-options-1" data-note-only-row>
+                    <button type="button" class="status-option" data-result="note" style="--st-color:${RecitationModel.NOTE.color};--st-text:${RecitationModel.NOTE.text}" title="还没检查：只记一条笔记（文字 / 照片 / 语音），状态保持「未检查」">📝 仅添加笔记（状态不变）</button>
                 </div>
                 <div class="hint" data-mode-hint></div>
                 <div data-date-row>
@@ -99,6 +102,10 @@
                         b.disabled = locked ? k !== lockedKey : (k === 'excel' && !canEx);
                         b.title = b.disabled ? (locked ? `已${lockLabel()}（已归档），不能再登记其他状态` : '已有重新过关 / 未过关记录，不能再选提前完成') : '';
                     });
+                    // 笔记：只有一条检查记录都没有（未检查）时才能加
+                    const noChecks = !locked && RecitationModel.checksFor(roundId, studentId).length === 0;
+                    if (result === 'note' && !noChecks) setResult(null);
+                    show('[data-note-only-row]', noChecks);
                     // 选了会归档的结果 = 不能再计划新的日期（已有的计划保留）
                     const archiving = RecitationModel.isArchiveResult(result);
                     if (!locked && archiving && addedDates().length) { planDates = existingDates.slice(); planPicker.set(planDates); }
@@ -126,6 +133,8 @@
                         ? `已${lockLabel()}（已归档）：只能修改这条记录的备注 / 照片，不能再登记其他状态或计划；要改状态请在下面删除这条记录`
                         : archiving
                             ? `「${R[result].label}」保存后这一轮归档：不能再登记其他状态，也不能再加计划${isUndated(result) ? '（未过关不选检查日期）' : ''}`
+                        : result === 'note'
+                            ? '只记笔记：这一轮的状态仍是「未检查」，不用选检查日期；之后登记检查结果时不会受影响'
                         : result && !checkDate
                             ? '还没选检查日期：不选的话这次不会登记检查结果（只处理计划）'
                             : '';
@@ -171,7 +180,14 @@
                 loadCheckFor(checkDate);   // 今天已有记录就直接载入
                 saveBtn.addEventListener('click', async () => {
                     try {
-                        if (result && saveDate()) {
+                        if (result === 'note') {
+                            await RecitationModel.addNote({
+                                roundId, studentId, date: Utils.today(),
+                                note: noteEl.value.trim(),
+                                photoIds: await photoEditor.finalize(),
+                                audioIds: await audioEditor.finalize()
+                            });
+                        } else if (result && saveDate()) {
                             await RecitationModel.addCheck({
                                 roundId, studentId, result,
                                 date: saveDate(),
@@ -253,8 +269,8 @@
             title: `编辑检查记录 · ${stu.name} · ${round.title}`,
             wide: true,
             html: `
-                <div class="dialog-meta">原记录：${statusPill(check.result)} ${RecitationModel.isUndated(check.result) ? '' : Utils.formatDate(check.date)}</div>
-                <div class="status-options status-options-4">
+                <div class="dialog-meta">原记录：${statusPill(check.result)} ${RecitationModel.isUndated(check.result) && check.result !== 'note' ? '' : Utils.formatDate(check.date)}</div>
+                <div class="status-options status-options-4" ${check.result === 'note' ? 'hidden' : ''}>
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option ${r.key === result ? 'selected' : ''}" data-edit-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}
@@ -290,7 +306,7 @@
                         b.disabled = k !== check.result && (selfArchives || lockedByOthers || (k === 'excel' && !canEx));
                         b.title = b.disabled ? (selfArchives ? '这条记录已归档，只能改备注和照片；要改状态请删除这条记录' : '这一轮已归档或有重新过关 / 未过关记录：不能选这个状态') : '';
                     });
-                    body.querySelector('[data-edit-date-row]').hidden = RecitationModel.isUndated(result);
+                    body.querySelector('[data-edit-date-row]').hidden = RecitationModel.isUndated(result) || result === 'note';
                     body.querySelectorAll('[data-edit-result]').forEach((b) => b.classList.toggle('selected', b.dataset.editResult === result));
                     // 检查日期块的颜色跟所选结果的颜色一致
                     const rs = RecitationModel.RESULT_MAP[result];
@@ -357,7 +373,7 @@
                     return `<li class="check-item" style="--dot-color:${(R[c.result] || {}).color || '#9aa0a6'}">
                         <div class="check-item-head">
                             ${statusPill(c.result)}
-                            <span class="check-item-meta">${RecitationModel.isUndated(c.result) ? '' : `<span class="record-date">${Utils.formatDate(c.date)}</span>`}
+                            <span class="check-item-meta">${RecitationModel.isUndated(c.result) && c.result !== 'note' ? '' : `<span class="record-date">${Utils.formatDate(c.date)}</span>`}
                             <button type="button" class="link-btn" data-edit-check="${c.id}">编辑</button>
                             <button type="button" class="link-btn danger" data-rm-check="${c.id}">删除</button></span>
                         </div>

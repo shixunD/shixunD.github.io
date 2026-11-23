@@ -39,6 +39,7 @@
 /* 今天需要检查的学生（今天有计划，或复查日期是今天）：粉色边框 */
 .stu-card.due-today { outline: 3px solid #ff4f9a; outline-offset: 2px; }
 .due-legend { background: #fff !important; outline: 2px solid #ff4f9a; }
+.status-options-1 { grid-template-columns: 1fr; margin-top: 0.4rem; }
 .status-options-4 { grid-template-columns: repeat(4, 1fr); margin-top: 0.8rem; }
 .status-options-5 { grid-template-columns: repeat(5, 1fr); margin-top: 0.8rem; }
 [data-plan-wrap][hidden], [data-date-row][hidden], [data-note-wrap][hidden] { display: none; }

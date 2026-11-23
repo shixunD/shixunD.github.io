@@ -25,10 +25,15 @@
     const NONE = { key: 'none', label: '未检查', color: '#e5e7eb', text: '#6b7280' };
     // "计划背诵"的标识色（浅天蓝；不是检查结果，不进 RESULT_MAP）。有计划的学生卡片整体显示为这个颜色
     const PLAN = { key: 'plan', label: '计划背诵', color: '#bfe3f7', text: '#0d4a6b', accent: '#5bb8ec' };   // accent：窄色条用的天蓝（浅色在白底上太淡）
-    const RESULT_MAP = { none: NONE };
+    // 笔记（1.46.0）：「未检查」状态下只记文字 / 照片 / 语音，不改状态。存在 recChecks 里（result: 'note'），
+    // 但 checksFor / 状态 / 计划完成 / 归档 / 统计都看不见它；只有 notesFor 读它
+    const NOTE = { key: 'note', label: '笔记', color: '#e5e7eb', text: '#374151' };
+    const RESULT_MAP = { none: NONE, note: NOTE };
     RESULTS.forEach((r) => { RESULT_MAP[r.key] = r; });
 
     function state() { return AppState.getState(); }
+    const isNote = (c) => c.result === 'note';
+    const real = (list) => list.filter((c) => !isNote(c));
 
     // 提前完成、条件过关（勉强过）也算过关
     function isPassed(key) { return key === 'pass' || key === 'excel' || key === 'cond'; }
@@ -93,9 +98,32 @@
 
     // 某生某轮次的全部检查记录，按时间正序（日期相同按录入先后）
     function checksFor(roundId, studentId) {
-        return state().recChecks
+        return real(state().recChecks)
             .filter((c) => c.roundId === roundId && c.studentId === studentId)
             .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    }
+
+    // 某生某轮次的笔记（未检查状态下加的），按日期正序
+    function notesFor(roundId, studentId) {
+        return state().recChecks
+            .filter((c) => isNote(c) && c.roundId === roundId && c.studentId === studentId)
+            .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+    }
+
+    // 添加笔记：只有「未检查」（没有任何检查记录）时才能加；文字 / 照片 / 语音至少要有一样
+    function addNote(data) {
+        return AppState._commit((s) => {
+            if (real(s.recChecks).some((c) => c.roundId === data.roundId && c.studentId === data.studentId)) {
+                throw new Error('已经有检查状态了，不能再单独添加笔记；请在登记检查时写备注');
+            }
+            const hasPhoto = data.photoIds && data.photoIds.length, hasAudio = data.audioIds && data.audioIds.length;
+            if (!(data.note || '').trim() && !hasPhoto && !hasAudio) throw new Error('笔记内容不能为空（文字、照片或语音至少要有一样）');
+            const n = { id: Utils.uid('chk'), roundId: data.roundId, studentId: data.studentId, date: data.date || Utils.today(), result: 'note', note: (data.note || '').trim(), createdAt: Date.now() };
+            if (hasPhoto) n.photoIds = data.photoIds.slice();
+            if (hasAudio) n.audioIds = data.audioIds.slice();
+            s.recChecks.push(n);
+            return n;
+        });
     }
 
     function latestCheck(roundId, studentId) {
@@ -161,8 +189,8 @@
     function addCheck(data) {
         return AppState._commit((s) => {
             const date = data.date || Utils.today();
-            guardCheck(s.recChecks.filter((c) => c.roundId === data.roundId && c.studentId === data.studentId), data.result, date, null);
-            const same = s.recChecks.find((c) => c.roundId === data.roundId && c.studentId === data.studentId && c.date === date);
+            guardCheck(real(s.recChecks).filter((c) => c.roundId === data.roundId && c.studentId === data.studentId), data.result, date, null);
+            const same = real(s.recChecks).find((c) => c.roundId === data.roundId && c.studentId === data.studentId && c.date === date);
             if (same) {
                 same.result = data.result;
                 same.note = data.note || '';
@@ -193,12 +221,18 @@
             const c = s.recChecks.find((x) => x.id === id);
             if (!c) return;
             // 结果和日期都没变（只改备注 / 照片）不受限制
-            const mine = s.recChecks.filter((x) => x.roundId === c.roundId && x.studentId === c.studentId);
+            if (isNote(c)) {   // 笔记：只改文字 / 照片 / 语音
+                c.note = patch.note || '';
+                if (patch.photoIds) { if (patch.photoIds.length) c.photoIds = patch.photoIds.slice(); else delete c.photoIds; }
+                if (patch.audioIds) { if (patch.audioIds.length) c.audioIds = patch.audioIds.slice(); else delete c.audioIds; }
+                return;
+            }
+            const mine = real(s.recChecks).filter((x) => x.roundId === c.roundId && x.studentId === c.studentId);
             if (patch.result !== c.result && lastIn(mine) === c && isArchiveResult(c.result)) {
                 throw new Error(`这条「${RESULT_MAP[c.result].label}」已归档，只能修改备注和照片；要改状态请删除这条记录`);
             }
             if (!(patch.result === c.result && (patch.date || c.date) === c.date)) {
-                guardCheck(s.recChecks.filter((x) => x.roundId === c.roundId && x.studentId === c.studentId), patch.result, patch.date || c.date, c.id);
+                guardCheck(mine, patch.result, patch.date || c.date, c.id);
             }
             c.result = patch.result;
             c.date = patch.date || c.date;
@@ -206,7 +240,7 @@
             if (patch.photoIds) c.photoIds = patch.photoIds.slice();
             if (patch.audioIds) { if (patch.audioIds.length) c.audioIds = patch.audioIds.slice(); else delete c.audioIds; }
             // 改到的那天如果已有另一条记录，按「同一天只有一个状态」用这条替换掉它
-            s.recChecks = s.recChecks.filter((x) => x.id === c.id
+            s.recChecks = s.recChecks.filter((x) => x.id === c.id || isNote(x)
                 || !(x.roundId === c.roundId && x.studentId === c.studentId && x.date === c.date));
         });
     }
@@ -226,7 +260,7 @@
     // 每个学生全部轮次里「提前完成 + 完成过关 + 条件过关」的检查记录条数（含已归档的）：studentId -> 次数（1.44.0，背诵页名字旁显示）
     function passedTotals() {
         const map = new Map();
-        state().recChecks.forEach((c) => { if (isPassed(c.result)) map.set(c.studentId, (map.get(c.studentId) || 0) + 1); });
+        real(state().recChecks).forEach((c) => { if (isPassed(c.result)) map.set(c.studentId, (map.get(c.studentId) || 0) + 1); });
         return map;
     }
 
@@ -246,7 +280,7 @@
     //   只有计划当天的 重新过关 / 未过关：计划日期已过去 → 完成；是今天 → 这条检查是加计划之后登记的才算完成
     //     （今天已经判了重新过关、又给今天加计划 = 今天还要再背一次，之前那次不算）
     function isPlanDone(plan) {
-        const checks = state().recChecks.filter((c) => c.roundId === plan.roundId && c.studentId === plan.studentId && c.date >= plan.date);
+        const checks = real(state().recChecks).filter((c) => c.roundId === plan.roundId && c.studentId === plan.studentId && c.date >= plan.date);
         if (!checks.length) return false;
         if (checks.some((c) => c.date > plan.date || isPassed(c.result))) return true;
         if (plan.date < Utils.today()) return true;
@@ -266,7 +300,7 @@
             let added = 0;
             studentIds.forEach((studentId) => {
                 // 已归档（提前完成 / 完成过关 / 条件过关 / 未过关）的学生不能再加计划
-                if (lockedIn(s.recChecks.filter((c) => c.roundId === roundId && c.studentId === studentId))) return;
+                if (lockedIn(real(s.recChecks).filter((c) => c.roundId === roundId && c.studentId === studentId))) return;
                 list.forEach((date) => {
                     if (s.recPlans.some((p) => p.roundId === roundId && p.studentId === studentId && p.date === date)) return;
                     const plan = { id: Utils.uid('plan'), roundId, studentId, date, createdAt: Date.now() };
@@ -375,6 +409,7 @@
             return {
                 round,
                 checks,
+                notes: notesFor(round.id, studentId),
                 progress: pg,
                 status: pg.status,
                 attempts: checks.length,
@@ -387,9 +422,9 @@
     }
 
     window.RecitationModel = {
-        RESULTS, RESULT_MAP, NONE, PLAN, isPassed, isArchiveResult, isUndated, moveSide, removeGroup,
+        RESULTS, RESULT_MAP, NONE, NOTE, PLAN, isPassed, isArchiveResult, isUndated, moveSide, removeGroup,
         rounds, roundLayout, getRound, createRound, updateRound, removeRound,
-        checksFor, latestCheck, isLocked, lockedResult, canExcel, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary, passedTotals,
+        checksFor, notesFor, addNote, latestCheck, isLocked, lockedResult, canExcel, progressOf, statusOf, addCheck, updateCheck, removeCheck, roundSummary, passedTotals,
         plansFor, pendingPlans, isPlanDone, addPlans, setPlanNote, removePlan,
         schedule, nextArrangement, dueToday, reminderCounts, remainingCounts, weekStartOf, roundWeek, roundDay, studentOverview
     };

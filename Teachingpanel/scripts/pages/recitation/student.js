@@ -67,7 +67,7 @@
             ? passedRows.reduce((n, r) => n + r.attemptsToPass, 0) / passedRows.length : null;
         const R = RecitationModel.RESULT_MAP;
         const allChecks = [];
-        rows.forEach((r) => r.checks.forEach((c) => allChecks.push({ round: r.round, check: c })));
+        rows.forEach((r) => r.checks.concat(r.notes || []).forEach((c) => allChecks.push({ round: r.round, check: c })));
         // 计划背诵也放进检查历史（时间轴上不画）
         rows.forEach((r) => RecitationModel.plansFor(r.round.id, studentId).forEach((p) => allChecks.push({ round: r.round, plan: p, check: p })));
         // 按背诵任务设定的日期新→旧；同一天的任务按创建先后；同一任务内按检查日期新→旧（计划排在同日检查之后）
