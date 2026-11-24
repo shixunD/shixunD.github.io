@@ -25,7 +25,7 @@
     const NONE = { key: 'none', label: '未检查', color: '#e5e7eb', text: '#6b7280' };
     // "计划背诵"的标识色（浅天蓝；不是检查结果，不进 RESULT_MAP）。有计划的学生卡片整体显示为这个颜色
     const PLAN = { key: 'plan', label: '计划背诵', color: '#bfe3f7', text: '#0d4a6b', accent: '#5bb8ec' };   // accent：窄色条用的天蓝（浅色在白底上太淡）
-    // 笔记（1.46.0）：「未检查」状态下只记文字 / 照片 / 语音，不改状态。存在 recChecks 里（result: 'note'），
+    // 笔记（1.46.0；1.48.0 起任何状态都能加、日期自己选）：只记文字 / 照片 / 语音，不改状态。存在 recChecks 里（result: 'note'），
     // 但 checksFor / 状态 / 计划完成 / 归档 / 统计都看不见它；只有 notesFor 读它
     const NOTE = { key: 'note', label: '笔记', color: '#e5e7eb', text: '#374151' };
     const RESULT_MAP = { none: NONE, note: NOTE };
@@ -103,19 +103,17 @@
             .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     }
 
-    // 某生某轮次的笔记（未检查状态下加的），按日期正序
+    // 某生某轮次的笔记，按日期正序（同一天按添加先后）
     function notesFor(roundId, studentId) {
         return state().recChecks
             .filter((c) => isNote(c) && c.roundId === roundId && c.studentId === studentId)
             .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
     }
 
-    // 添加笔记：只有「未检查」（没有任何检查记录）时才能加；文字 / 照片 / 语音至少要有一样
+    // 添加笔记（1.48.0 起任何状态都能加，归档了也行；data.date = 笔记的日期，不传为今天）：文字 / 照片 / 语音至少要有一样。
+    // 同一天可以有多条笔记，也可以和同一天的检查 / 计划并存
     function addNote(data) {
         return AppState._commit((s) => {
-            if (real(s.recChecks).some((c) => c.roundId === data.roundId && c.studentId === data.studentId)) {
-                throw new Error('已经有检查状态了，不能再单独添加笔记；请在登记检查时写备注');
-            }
             const hasPhoto = data.photoIds && data.photoIds.length, hasAudio = data.audioIds && data.audioIds.length;
             if (!(data.note || '').trim() && !hasPhoto && !hasAudio) throw new Error('笔记内容不能为空（文字、照片或语音至少要有一样）');
             const n = { id: Utils.uid('chk'), roundId: data.roundId, studentId: data.studentId, date: data.date || Utils.today(), result: 'note', note: (data.note || '').trim(), createdAt: Date.now() };
@@ -221,7 +219,8 @@
             const c = s.recChecks.find((x) => x.id === id);
             if (!c) return;
             // 结果和日期都没变（只改备注 / 照片）不受限制
-            if (isNote(c)) {   // 笔记：只改文字 / 照片 / 语音
+            if (isNote(c)) {   // 笔记：只改日期 / 文字 / 照片 / 语音（状态不受影响）
+                c.date = patch.date || c.date;
                 c.note = patch.note || '';
                 if (patch.photoIds) { if (patch.photoIds.length) c.photoIds = patch.photoIds.slice(); else delete c.photoIds; }
                 if (patch.audioIds) { if (patch.audioIds.length) c.audioIds = patch.audioIds.slice(); else delete c.audioIds; }

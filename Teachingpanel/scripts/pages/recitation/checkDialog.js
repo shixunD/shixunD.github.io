@@ -24,8 +24,10 @@
         let locked = RecitationModel.isLocked(roundId, studentId);
         const lockLabel = () => (RecitationModel.RESULT_MAP[RecitationModel.lockedResult(roundId, studentId)] || {}).label || '';
         // 「未过关」不选检查日期：登记成今天（只用来排序），界面上不显示日期
-        const isUndated = (r) => RecitationModel.isUndated(r) || r === 'note';   // 笔记和未过关一样不选检查日期（存成今天）
+        const isUndated = (r) => RecitationModel.isUndated(r);
         const saveDate = () => (isUndated(result) && !locked ? Utils.today() : checkDate);
+        // 笔记（1.48.0 起任何状态都能加，归档了也行）：日期单独选（默认今天），不碰检查日期和状态
+        let noteDate = Utils.today();
         const lockedCheck = () => RecitationModel.checksFor(roundId, studentId).slice().pop();
         let checkDate = locked ? lockedCheck().date : Utils.today();
         // 该生本轮已有的（未完成）计划日期：直接显示为选中，再点一次 = 取消那天的计划
@@ -42,7 +44,7 @@
             wide: true,
             // 是否有未保存改动：只看「是否选了结果（及其日期/备注/照片）」和「计划日期是否变了」，选了又取消 = 没改动
             dirtyKey: () => JSON.stringify([
-                result ? [result, checkDate, noteVal(), photoFp()] : null,
+                result ? [result, result === 'note' ? noteDate : checkDate, noteVal(), photoFp()] : null,
                 planDates.slice().sort()
             ]),
             html: `
@@ -53,13 +55,17 @@
                     `).join('')}
                 </div>
                 <div class="status-options status-options-1" data-note-only-row>
-                    <button type="button" class="status-option" data-result="note" style="--st-color:${RecitationModel.NOTE.color};--st-text:${RecitationModel.NOTE.text}" title="还没检查：只记一条笔记（文字 / 照片 / 语音），状态保持「未检查」">📝 仅添加笔记（状态不变）</button>
+                    <button type="button" class="status-option" data-result="note" style="--st-color:${RecitationModel.NOTE.color};--st-text:${RecitationModel.NOTE.text}" title="只记一条笔记（文字 / 照片 / 语音），状态不变；日期可以自己选">📝 添加笔记（状态不变）</button>
                 </div>
                 <div class="hint" data-mode-hint></div>
                 <div data-date-row>
                     <label class="field-label">检查日期（请手动选；不选 = 这次不登记检查结果，再点一次已选的日期可取消；点到已有记录的日期会自动载入当天的结果和备注）</label>
                     ${DayPicker.html('check', { count: 7, dimFuture: true })}
                     <div class="hint text-danger" data-replace-hint></div>
+                </div>
+                <div data-note-date-row hidden>
+                    <label class="field-label">笔记日期（默认今天；本轮记录按这个日期排，同一天按添加先后）</label>
+                    ${DayPicker.html('noteDay', { count: 7, dimFuture: true })}
                 </div>
                 <div data-note-wrap>
                     <label class="field-label">备注（comment）</label>
@@ -99,17 +105,16 @@
                     if (!locked && result === 'excel' && !canEx) setResult(null);
                     body.querySelectorAll('[data-result]').forEach((b) => {
                         const k = b.dataset.result;
+                        if (k === 'note') return;   // 添加笔记任何状态都能点（归档了也行）
                         b.disabled = locked ? k !== lockedKey : (k === 'excel' && !canEx);
                         b.title = b.disabled ? (locked ? `已${lockLabel()}（已归档），不能再登记其他状态` : '已有重新过关 / 未过关记录，不能再选提前完成') : '';
                     });
-                    // 笔记：只有一条检查记录都没有（未检查）时才能加
-                    const noChecks = !locked && RecitationModel.checksFor(roundId, studentId).length === 0;
-                    if (result === 'note' && !noChecks) setResult(null);
-                    show('[data-note-only-row]', noChecks);
+                    const noting = result === 'note';
                     // 选了会归档的结果 = 不能再计划新的日期（已有的计划保留）
                     const archiving = RecitationModel.isArchiveResult(result);
                     if (!locked && archiving && addedDates().length) { planDates = existingDates.slice(); planPicker.set(planDates); }
-                    show('[data-date-row]', !locked && !isUndated(result));
+                    show('[data-date-row]', !locked && !noting && !isUndated(result));
+                    show('[data-note-date-row]', noting);
                     show('[data-plan-wrap]', !locked && !archiving);
                     // 检查日期始终显示（锁定时隐藏）；备注只在选了检查结果后才出现
                     show('[data-note-wrap]', !!result);
@@ -117,24 +122,25 @@
                     // 同一天只能有一个检查状态：这天已有记录时提醒，保存会改成新的结果
                     const sameDay = saveDate() && RecitationModel.checksFor(roundId, studentId).find((c) => c.date === saveDate());
                     const R = RecitationModel.RESULT_MAP;
-                    body.querySelector('[data-replace-hint]').textContent = result && sameDay
+                    body.querySelector('[data-replace-hint]').textContent = result && !noting && sameDay
                         ? `${isUndated(result) ? '今天' : Utils.formatDate(sameDay.date)} 已有检查记录「${(R[sameDay.result] || R.none).label}」，保存后会改成「${R[result].label}」（同一天只保留一个状态）`
                         : '';
 
                     // 只改计划时必须有改动（新选了日期、取消了已有的日期）；登记了结果时计划可以不动
                     const withPlan = planChanged();
-                    const recordCheck = !!(result && saveDate());
+                    const recordCheck = noting ? !!noteDate : !!(result && saveDate());
                     let problem = '';
                     if (!recordCheck && !withPlan) problem = result ? '请选择检查日期（或改计划日期 / 备注）' : '请选择检查结果，或选计划日期、改计划备注';
                     saveBtn.disabled = !!problem;
                     saveBtn.title = problem;
                     saveBtn.textContent = recordCheck && withPlan ? '保存并更新计划' : (!recordCheck && withPlan) ? '保存计划' : '保存';
-                    body.querySelector('[data-mode-hint]').textContent = locked
-                        ? `已${lockLabel()}（已归档）：只能修改这条记录的备注 / 照片，不能再登记其他状态或计划；要改状态请在下面删除这条记录`
+                    const curLabel = R[RecitationModel.progressOf(roundId, studentId).status].label;
+                    body.querySelector('[data-mode-hint]').textContent = noting
+                        ? `只记笔记：状态不变（仍是「${curLabel}」），文字、照片、语音至少要有一样；之后登记检查结果也不受影响`
+                        : locked
+                        ? `已${lockLabel()}（已归档）：只能修改这条记录的备注 / 照片，或添加笔记，不能再登记其他状态或计划；要改状态请在下面删除这条记录`
                         : archiving
                             ? `「${R[result].label}」保存后这一轮归档：不能再登记其他状态，也不能再加计划${isUndated(result) ? '（未过关不选检查日期）' : ''}`
-                        : result === 'note'
-                            ? '只记笔记：这一轮的状态仍是「未检查」，不用选检查日期；之后登记检查结果时不会受影响'
                         : result && !checkDate
                             ? '还没选检查日期：不选的话这次不会登记检查结果（只处理计划）'
                             : '';
@@ -148,10 +154,11 @@
                     const rs = RecitationModel.RESULT_MAP[result];
                     checkPicker.setColor(rs && rs.color, rs && rs.text);
                 }
-                function loadCheckFor(d) {
+                // keepResult：只载入备注 / 照片 / 语音，不改选中的结果（从「添加笔记」切回检查结果时用）
+                function loadCheckFor(d, keepResult) {
                     const ex = d && RecitationModel.checksFor(roundId, studentId).find((c) => c.date === d);
                     if (ex) {
-                        setResult(ex.result);
+                        if (!keepResult) setResult(ex.result);
                         noteEl.value = ex.note || '';
                         photoEditor.setKept(ex.photoIds || []);
                         audioEditor.setKept(ex.audioIds || []);
@@ -164,15 +171,31 @@
                     }
                 }
 
+                // 「添加笔记」和登记检查共用下面的备注框：切到笔记时清掉从已有检查记录载入、没改过的内容；切回检查结果时备注框是空的就重新载入
+                function clearLoaded() {
+                    if (!loaded) return;
+                    if (noteEl.value === loaded.note) noteEl.value = '';
+                    photoEditor.setKept([]);
+                    audioEditor.setKept([]);
+                    loaded = null;
+                }
+
                 const checkPicker = DayPicker.bind(body, 'check', { value: checkDate, allowClear: true, onChange: (d) => { checkDate = d; loadCheckFor(d); render(); } });
+                DayPicker.bind(body, 'noteDay', { value: noteDate, onChange: (d) => { noteDate = d; render(); } });
                 const planPicker = DayPicker.bind(body, 'plan', {
                     multi: true, value: planDates,
                     onChange: (v) => { planDates = v; render(); }
                 });
 
                 body.querySelectorAll('[data-result]').forEach((btn) => btn.addEventListener('click', () => {
-                    if (btn.disabled || locked) return;
-                    setResult(result === btn.dataset.result ? null : btn.dataset.result);
+                    const k = btn.dataset.result;
+                    if (btn.disabled || (locked && k !== 'note')) return;
+                    const wasNote = result === 'note';
+                    // 归档时取消「添加笔记」= 回到那条归档记录（可改它的备注 / 照片）
+                    const next = result === k ? (locked ? RecitationModel.lockedResult(roundId, studentId) : null) : k;
+                    if (next === 'note') clearLoaded();
+                    setResult(next);
+                    if (wasNote && next && next !== 'note' && !noteEl.value.trim()) loadCheckFor(locked ? lockedCheck().date : checkDate, true);
                     render();
                 }));
                 // 默认选中的结果：按钮高亮 + 检查日期块用该结果的颜色
@@ -182,7 +205,7 @@
                     try {
                         if (result === 'note') {
                             await RecitationModel.addNote({
-                                roundId, studentId, date: Utils.today(),
+                                roundId, studentId, date: noteDate,
                                 note: noteEl.value.trim(),
                                 photoIds: await photoEditor.finalize(),
                                 audioIds: await audioEditor.finalize()
@@ -214,7 +237,7 @@
                 // 删除计划 / 检查记录：不关弹窗，原地刷新「当前状态」和下面的记录时间线；没保存的选择、备注、照片都保留
                 function refreshLists() {
                     // 删掉提前完成的记录后解除锁定
-                    if (locked && !RecitationModel.isLocked(roundId, studentId)) { locked = false; setResult(null); loaded = null; }
+                    if (locked && !RecitationModel.isLocked(roundId, studentId)) { locked = false; if (result !== 'note') setResult(null); loaded = null; }
                     body.querySelector('[data-cur-status]').innerHTML = `当前：${statusPill(RecitationModel.progressOf(roundId, studentId).status)}`;
                     body.querySelector('[data-lists]').innerHTML = recordsHtml(roundId, studentId);
                     bindLists();
@@ -240,7 +263,10 @@
                     });
                     body.querySelectorAll('[data-rm-check]').forEach((btn) => {
                         btn.addEventListener('click', async () => {
-                            const ok = await Modal.confirm({ title: '删除检查记录', text: '确定删除这条检查记录吗？', confirmText: '删除', danger: true });
+                            const isNoteRec = btn.hasAttribute('data-rm-note');
+                            const ok = await Modal.confirm(isNoteRec
+                                ? { title: '删除笔记', text: '确定删除这条笔记吗？', confirmText: '删除', danger: true }
+                                : { title: '删除检查记录', text: '确定删除这条检查记录吗？', confirmText: '删除', danger: true });
                             if (!ok) return;
                             await RecitationModel.removeCheck(btn.dataset.rmCheck);
                             refreshLists();
@@ -265,8 +291,9 @@
         let date = check.date;
         const back = () => openCheck(check.roundId, check.studentId);
 
+        const isNoteRec = check.result === 'note';
         Modal.open({
-            title: `编辑检查记录 · ${stu.name} · ${round.title}`,
+            title: `${isNoteRec ? '编辑笔记' : '编辑检查记录'} · ${stu.name} · ${round.title}`,
             wide: true,
             html: `
                 <div class="dialog-meta">原记录：${statusPill(check.result)} ${RecitationModel.isUndated(check.result) && check.result !== 'note' ? '' : Utils.formatDate(check.date)}</div>
@@ -276,7 +303,7 @@
                     `).join('')}
                 </div>
                 <div data-edit-date-row>
-                    <label class="field-label">检查日期</label>
+                    <label class="field-label">${isNoteRec ? '笔记日期（状态不变）' : '检查日期'}</label>
                     ${DayPicker.html('editCheck', { count: 7, dimFuture: true })}
                 </div>
                 <label class="field-label">备注（comment）</label>
@@ -306,7 +333,7 @@
                         b.disabled = k !== check.result && (selfArchives || lockedByOthers || (k === 'excel' && !canEx));
                         b.title = b.disabled ? (selfArchives ? '这条记录已归档，只能改备注和照片；要改状态请删除这条记录' : '这一轮已归档或有重新过关 / 未过关记录：不能选这个状态') : '';
                     });
-                    body.querySelector('[data-edit-date-row]').hidden = RecitationModel.isUndated(result) || result === 'note';
+                    body.querySelector('[data-edit-date-row]').hidden = RecitationModel.isUndated(result);
                     body.querySelectorAll('[data-edit-result]').forEach((b) => b.classList.toggle('selected', b.dataset.editResult === result));
                     // 检查日期块的颜色跟所选结果的颜色一致
                     const rs = RecitationModel.RESULT_MAP[result];
@@ -323,7 +350,7 @@
                             photoIds: await photoEditor.finalize(),
                             audioIds: await audioEditor.finalize()
                         });
-                        Toast.success('检查记录已修改');
+                        Toast.success(isNoteRec ? '笔记已修改' : '检查记录已修改');
                         back();
                     } catch (err) {
                         Toast.error(err.message);
@@ -344,14 +371,15 @@
         return `<span class="status-pill" style="background:${P.color};color:${P.text}">${esc(P.label)}</span>`;
     }
 
-    // 本轮记录（1.33.0 起计划和检查合在一条时间线里，样式同学生趋势的检查历史）：按日期新→旧；
-    // 同一天检查排在计划上面（先排计划、后来检查，越晚发生越靠上），再按录入先后新→旧。
-    // 计划：未完成的可"取消计划"，已完成的（之后有检查记录，见 RecitationModel.isPlanDone）变淡、可删除；检查：可编辑 / 删除
+    // 本轮记录（1.33.0 起计划和检查合在一条时间线里，样式同学生趋势的检查历史；1.48.0 起笔记也在里面）：
+    // 按记录的日期新→旧（笔记是添加时选的日期，未过关是登记那天），同一天按添加先后新→旧（后加的在上面）。
+    // 计划：未完成的可"取消计划"，已完成的（之后有检查记录，见 RecitationModel.isPlanDone）变淡、可删除；检查 / 笔记：可编辑 / 删除
     function recordsHtml(roundId, studentId) {
-        const items = RecitationModel.checksFor(roundId, studentId).map((c) => ({ check: c, at: c }))
+        const items = RecitationModel.checksFor(roundId, studentId)
+            .concat(RecitationModel.notesFor(roundId, studentId)).map((c) => ({ check: c, at: c }))
             .concat(RecitationModel.plansFor(roundId, studentId).map((p) => ({ plan: p, at: p })));
         if (!items.length) return '';
-        items.sort((a, b) => b.at.date.localeCompare(a.at.date) || (!!a.plan - !!b.plan) || (b.at.createdAt || 0) - (a.at.createdAt || 0));
+        items.sort((a, b) => b.at.date.localeCompare(a.at.date) || (b.at.createdAt || 0) - (a.at.createdAt || 0));
         const R = RecitationModel.RESULT_MAP;
         const today = Utils.today();
         return `
@@ -375,7 +403,7 @@
                             ${statusPill(c.result)}
                             <span class="check-item-meta">${RecitationModel.isUndated(c.result) && c.result !== 'note' ? '' : `<span class="record-date">${Utils.formatDate(c.date)}</span>`}
                             <button type="button" class="link-btn" data-edit-check="${c.id}">编辑</button>
-                            <button type="button" class="link-btn danger" data-rm-check="${c.id}">删除</button></span>
+                            <button type="button" class="link-btn danger" data-rm-check="${c.id}"${c.result === 'note' ? ' data-rm-note' : ''}>删除</button></span>
                         </div>
                         ${c.note ? `<div class="check-comment"><span class="check-comment-icon">💬</span>${esc(c.note)}</div>` : ''}
                         ${Photos.viewHtml(c.photoIds)}${AudioRec.viewHtml(c.audioIds)}
