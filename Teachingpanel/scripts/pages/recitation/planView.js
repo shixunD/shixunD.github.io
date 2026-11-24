@@ -37,6 +37,9 @@
         const byStudent = {};
         dayPlans.forEach((p) => { byStudent[p.studentId] = p; });
         const R = RecitationModel.RESULT_MAP;
+        // 名字旁的「(x次)」（1.49.0，同检查页学生卡片）：这个学生所有背诵任务里提前完成 + 完成过关 + 条件过关的总次数（含已归档）
+        const totals = RecitationModel.passedTotals();
+        const tally = (sid) => `<span class="stu-card-tally" title="所有背诵任务里提前完成 + 完成过关 + 条件过关的总次数">(${totals.get(sid) || 0}次)</span>`;
 
         view.innerHTML = `
             <div class="toolbar card">
@@ -74,7 +77,7 @@
                         const stripColor = planned ? RecitationModel.PLAN.accent : st.color;
                         const stripTitle = planned ? `${st.label}（已计划）` : st.label;
                         return `<button type="button" class="plan-stu ${plan ? 'selected' : ''} ${done ? 'done' : ''} ${archived ? 'archived' : ''}" data-plan-sid="${stu.id}" ${!plan && archived ? `disabled title="已${esc(st.label)}（已归档），不能再加计划"` : ''} ${done ? 'title="这天的计划已检查完成；点击会取消这条历史计划"' : ''}>
-                            <i style="background:${stripColor}" title="${esc(stripTitle)}"></i><span class="row-no">${esc(stu.studentNo)}</span>${esc(stu.name)}
+                            <i style="background:${stripColor}" title="${esc(stripTitle)}"></i><span class="row-no">${esc(stu.studentNo)}</span>${esc(stu.name)}${tally(stu.id)}
                             <small>${plan ? (done ? '✓ 这天已检查' : '✓ 这天已计划') : archived ? `${esc(st.label)} · 已归档` : esc(st.label)}</small>
                             <small class="plan-stu-dates">${mine.length ? `🗓️ ${dateList}` : '暂无计划'}</small>
                         </button>`;
@@ -83,7 +86,7 @@
             </div>
             <div class="card">
                 <h3 class="section-title" style="margin-top:0">本轮全部计划</h3>
-                ${planListHtml(allPlans)}
+                ${planListHtml(allPlans, tally)}
             </div>
         `;
 
@@ -114,7 +117,7 @@
     }
 
     // 按日期分组的全部计划（未完成的在前面的日期里按学号；已完成的灰显）
-    function planListHtml(plans) {
+    function planListHtml(plans, tally) {
         if (!plans.length) return '<div class="hint">这一轮还没有计划</div>';
         const today = Utils.today();
         const byDate = {};
@@ -129,7 +132,7 @@
                     <button type="button" class="plan-date-btn" data-go-day="${d}">${Utils.formatDate(d)} · ${Utils.relativeDay(d)}</button>
                     ${open && d < today ? '<span class="hint text-danger">已逾期</span>' : ''}
                     <div class="plan-date-people">
-                        ${list.map((x) => `<span class="plan-person ${x.done ? 'done' : ''}">${esc(x.stu.name)}${x.done ? ' ✓' : ''}<button type="button" data-rm-plan-id="${x.p.id}" title="取消计划">✕</button></span>`).join('')}
+                        ${list.map((x) => `<span class="plan-person ${x.done ? 'done' : ''}">${esc(x.stu.name)}${tally(x.stu.id)}${x.done ? ' ✓' : ''}<button type="button" data-rm-plan-id="${x.p.id}" title="取消计划">✕</button></span>`).join('')}
                     </div>
                 </div>`;
         }).join('');
