@@ -297,13 +297,17 @@
             wide: true,
             html: `
                 <div class="dialog-meta">原记录：${statusPill(check.result)} ${RecitationModel.isUndated(check.result) && check.result !== 'note' ? '' : Utils.formatDate(check.date)}</div>
-                <div class="status-options status-options-4" ${check.result === 'note' ? 'hidden' : ''}>
+                <div class="status-options status-options-4">
                     ${RecitationModel.RESULTS.map((r) => `
                         <button type="button" class="status-option ${r.key === result ? 'selected' : ''}" data-edit-result="${r.key}" style="--st-color:${r.color};--st-text:${r.text}">${esc(r.label)}</button>
                     `).join('')}
                 </div>
+                ${isNoteRec ? `<div class="status-options status-options-1">
+                    <button type="button" class="status-option selected" data-edit-result="note" style="--st-color:${RecitationModel.NOTE.color};--st-text:${RecitationModel.NOTE.text}">📝 仍是笔记（状态不变）</button>
+                </div>` : ''}
+                <div class="hint" data-edit-hint></div>
                 <div data-edit-date-row>
-                    <label class="field-label">${isNoteRec ? '笔记日期（状态不变）' : '检查日期'}</label>
+                    <label class="field-label" data-edit-date-label></label>
                     ${DayPicker.html('editCheck', { count: 7, dimFuture: true })}
                 </div>
                 <label class="field-label">备注（comment）</label>
@@ -319,7 +323,7 @@
                 const photoEditor = Photos.bindEditor(body, check.photoIds || []);
                 const audioEditor = AudioRec.bindEditor(body, check.audioIds || []);
                 const saveBtn = body.querySelector('[data-edit-save]');
-                const datePicker = DayPicker.bind(body, 'editCheck', { value: date, onChange: (d) => { date = d; } });
+                const datePicker = DayPicker.bind(body, 'editCheck', { value: date, onChange: (d) => { date = d; render(); } });
 
                 // 归档的限制：别的记录已归档 → 只能保持这条原来的结果；这条自己就是归档的那条 → 只能改备注 / 照片；
                 //   有重新过关 / 未过关（别的记录）→ 不能改成提前完成
@@ -330,10 +334,20 @@
                     const canEx = RecitationModel.canExcel(check.roundId, check.studentId, date);
                     body.querySelectorAll('[data-edit-result]').forEach((b) => {
                         const k = b.dataset.editResult;
+                        if (k === 'note') return;   // 「仍是笔记」随时可点
                         b.disabled = k !== check.result && (selfArchives || lockedByOthers || (k === 'excel' && !canEx));
                         b.title = b.disabled ? (selfArchives ? '这条记录已归档，只能改备注和照片；要改状态请删除这条记录' : '这一轮已归档或有重新过关 / 未过关记录：不能选这个状态') : '';
                     });
                     body.querySelector('[data-edit-date-row]').hidden = RecitationModel.isUndated(result);
+                    body.querySelector('[data-edit-date-label]').textContent = result === 'note' ? '笔记日期（状态不变）' : '检查日期';
+                    // 笔记改成检查状态 / 改到别的日期时：说明保存后会怎样（同一天只保留一个状态）
+                    const R = RecitationModel.RESULT_MAP;
+                    const sameDay = result !== 'note' && RecitationModel.checksFor(check.roundId, check.studentId).find((c) => c.id !== check.id && c.date === date);
+                    body.querySelector('[data-edit-hint]').textContent = [
+                        isNoteRec && result !== 'note' ? `保存后这条笔记会变成「${R[result].label}」检查记录，计入状态（备注、照片、语音保留）` : '',
+                        sameDay ? `${Utils.formatDate(date)} 已有检查记录「${R[sameDay.result].label}」，保存后会被替换（同一天只保留一个状态）` : '',
+                        isNoteRec && RecitationModel.isArchiveResult(result) ? '这一轮会归档' : ''
+                    ].filter(Boolean).join('；');
                     body.querySelectorAll('[data-edit-result]').forEach((b) => b.classList.toggle('selected', b.dataset.editResult === result));
                     // 检查日期块的颜色跟所选结果的颜色一致
                     const rs = RecitationModel.RESULT_MAP[result];
@@ -350,7 +364,7 @@
                             photoIds: await photoEditor.finalize(),
                             audioIds: await audioEditor.finalize()
                         });
-                        Toast.success(isNoteRec ? '笔记已修改' : '检查记录已修改');
+                        Toast.success(isNoteRec ? (result === 'note' ? '笔记已修改' : `已改成「${RecitationModel.RESULT_MAP[result].label}」`) : '检查记录已修改');
                         back();
                     } catch (err) {
                         Toast.error(err.message);

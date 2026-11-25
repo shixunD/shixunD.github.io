@@ -213,13 +213,14 @@
         });
     }
 
-    // 编辑一条检查记录（结果 / 日期 / 备注）
+    // 编辑一条检查记录（结果 / 日期 / 备注）。笔记（1.50.0）：patch.result 不传或是 'note' 就仍是笔记；
+    //   传了检查结果就把这条笔记改成检查记录，和新登记一样受归档 / 提前完成 / 同一天只留一个状态的限制
     function updateCheck(id, patch) {
         return AppState._commit((s) => {
             const c = s.recChecks.find((x) => x.id === id);
             if (!c) return;
             // 结果和日期都没变（只改备注 / 照片）不受限制
-            if (isNote(c)) {   // 笔记：只改日期 / 文字 / 照片 / 语音（状态不受影响）
+            if (isNote(c) && (!patch.result || patch.result === 'note')) {   // 仍是笔记：只改日期 / 文字 / 照片 / 语音（状态不受影响）
                 c.date = patch.date || c.date;
                 c.note = patch.note || '';
                 if (patch.photoIds) { if (patch.photoIds.length) c.photoIds = patch.photoIds.slice(); else delete c.photoIds; }
