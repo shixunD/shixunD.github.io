@@ -119,7 +119,7 @@
 
     function suggestNextNo() {
         const max = AppState.getStudents({ all: true }).reduce((m, x) => (/^\d+$/.test(x.studentNo) ? Math.max(m, Number(x.studentNo)) : m), 0);
-        return String(max + 1);
+        return Utils.normalizeStudentNo(String(max + 1));
     }
 
     function openBulkAdd() {

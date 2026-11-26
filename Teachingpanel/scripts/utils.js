@@ -102,6 +102,13 @@
             `--${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
     }
 
+    // 学号统一写法（1.51.0，Auson 要求）：去掉首尾空格，单个数字 1-9 补成两位 01-09（输入 / 导入时 1 和 01 都行，存和显示都是 01）；
+    // 其他（10 以上、带字母、已经是两位的）原样
+    function normalizeStudentNo(no) {
+        const s = no == null ? '' : String(no).trim();
+        return /^[1-9]$/.test(s) ? '0' + s : s;
+    }
+
     // 学号排序：纯数字按数值比较，混合字符串用 numeric collation；没填学号的排最后
     function compareStudentNo(a, b) {
         const na = (a.studentNo || '').trim();
@@ -155,7 +162,7 @@
 
     window.Utils = {
         escapeHtml, balancedTitleHtml, uid, toDateStr, parseDate, today, addDays, diffDays,
-        formatDate, weekdayName, weekdaysOf, relativeDay, timestampName, compareStudentNo, formatNumber, percent,
+        formatDate, weekdayName, weekdaysOf, relativeDay, timestampName, normalizeStudentNo, compareStudentNo, formatNumber, percent,
         downloadText, lsGet, lsSet, scrollBox
     };
 })();

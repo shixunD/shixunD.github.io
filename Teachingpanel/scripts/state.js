@@ -227,7 +227,7 @@
 
         out.students.forEach((s) => {
             s.name = String(s.name || '').trim();
-            s.studentNo = s.studentNo == null ? '' : String(s.studentNo).trim();
+            s.studentNo = Utils.normalizeStudentNo(s.studentNo);   // 1.51.0：旧数据 / 导入的 1-9 补成 01-09
             s.note = s.note || '';
             if (!isDateStr(s.joinedOn)) delete s.joinedOn;
             if (!STUDENT_STATUS[s.status]) { delete s.status; delete s.statusOn; }
@@ -446,7 +446,7 @@
                 id: Utils.uid('stu'),
                 classId: getActiveClassId(),
                 name,
-                studentNo: String(data.studentNo || '').trim(),
+                studentNo: Utils.normalizeStudentNo(data.studentNo),
                 note: data.note || ''
             };
             if (joinedOn) stu.joinedOn = joinedOn;
@@ -461,7 +461,7 @@
             patch.name = String(patch.name).trim();
             assertUniqueName(patch.name, id);
         }
-        if (patch.studentNo != null) patch.studentNo = String(patch.studentNo).trim();
+        if (patch.studentNo != null) patch.studentNo = Utils.normalizeStudentNo(patch.studentNo);
         const hasJoined = Object.prototype.hasOwnProperty.call(patch, 'joinedOn');
         const joinedOn = hasJoined ? cleanJoinedOn(patch.joinedOn) : '';
         delete patch.joinedOn;
@@ -511,7 +511,7 @@
         parsed.forEach((p) => {
             if (existing.has(p.name)) { skipped.push({ line: p.line, reason: '姓名已存在' }); return; }
             existing.add(p.name);
-            toAdd.push({ name: p.name, studentNo: p.no || String(nextNo++) });
+            toAdd.push({ name: p.name, studentNo: Utils.normalizeStudentNo(p.no || String(nextNo++)) });
         });
 
         return commit((s) => {
