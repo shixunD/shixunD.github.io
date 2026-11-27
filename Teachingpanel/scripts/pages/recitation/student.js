@@ -87,13 +87,15 @@
             </div>
             <h3 class="section-title">时间轴（旧 → 新）</h3>
             <div class="strip">
-                ${rows.map((r) => {
+                ${rows.map((r, i) => {
                     const s = R[r.status] || RecitationModel.NONE;
+                    // 按背诵任务所属周（周一到周日）分段：和上一块不在同一周时，前面加一条灰色竖线
+                    const sep = i > 0 && RecitationModel.roundWeek(r.round) !== RecitationModel.roundWeek(rows[i - 1].round) ? '<span class="strip-week-sep" aria-hidden="true"></span>' : '';
                     const next = RecitationModel.nextArrangement(r.round.id, studentId);
                     const tip = `${r.round.title} · ${s.label} · 检查 ${r.attempts || 0} 次` + (r.firstPassDate ? ` · 首次过关 ${Utils.formatDate(r.firstPassDate)}` : '') + (r.daysToPass == null ? '' : r.daysToPass === 0 ? ' · 当天过关' : ` · 用时 ${r.daysToPass} 天`) + (next ? ` · 下一次 ${Utils.formatDate(next.date)}${next.overdue ? '（已逾期）' : ''}` : '');
-                    return full
+                    return sep + (full
                         ? `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-jump-round="${r.round.id}" title="${esc(tip)}（点击跳到检查历史）"></button>`
-                        : `<span class="strip-cell" style="background:${s.color}" title="${esc(tip)}"></span>`;
+                        : `<span class="strip-cell" style="background:${s.color}" title="${esc(tip)}"></span>`);
                 }).join('')}
             </div>
             <h3 class="section-title">检查历史</h3>

@@ -51,9 +51,11 @@
             </div>
             <h3 class="section-title">时间轴（旧 → 新）</h3>
             <div class="strip">
-                ${st.timeline.map(({ hw, rec }) => {
+                ${st.timeline.map(({ hw, rec }, i) => {
                     const s = S[rec.status];
-                    return `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-locate-hw="${hw.id}" title="${Utils.formatDate(hw.date)} ${esc(hw.title)} · ${esc(s.label)}${rec.comment ? '：' + esc(rec.comment) : ''}（点击定位到问题记录）"></button>`;
+                    // 按作业日期所在周（周一到周日）分段：和上一块不在同一周时，前面加一条灰色竖线
+                    const sep = i > 0 && RecitationModel.weekStartOf(hw.date) !== RecitationModel.weekStartOf(st.timeline[i - 1].hw.date) ? '<span class="strip-week-sep" aria-hidden="true"></span>' : '';
+                    return sep + `<button type="button" class="strip-cell strip-btn" style="background:${s.color}" data-locate-hw="${hw.id}" title="${Utils.formatDate(hw.date)} ${esc(hw.title)} · ${esc(s.label)}${rec.comment ? '：' + esc(rec.comment) : ''}（点击定位到问题记录）"></button>`;
                 }).join('')}
             </div>
             ${weekly.length > 1 ? `<h3 class="section-title">每周按时完成率</h3>

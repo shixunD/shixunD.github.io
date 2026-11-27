@@ -134,6 +134,8 @@
 .strip-cell { width: 16px; height: 22px; border-radius: 3px; display: inline-block; }
 .strip-btn { border: none; padding: 0; cursor: pointer; }
 .strip-btn:hover { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+/* 时间轴按周分段：两周之间一条细灰竖线（左右各留一点空），换行时不占额外高度 */
+.strip-week-sep { flex: none; align-self: center; width: 2px; height: 16px; margin: 0 4px; border-radius: 1px; background: #c4c9d0; }
 .count-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
 
 /* 考试 */
