@@ -94,7 +94,7 @@
     // ---------- 检查视图 ----------
 
     function renderCheck(view) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'rec' });
         const rounds = RecitationModel.rounds();
         if (!rounds.some((r) => r.id === ui.selectedId)) ui.selectedId = rounds.length ? rounds[0].id : null;
         const round = ui.selectedId ? RecitationModel.getRound(ui.selectedId) : null;

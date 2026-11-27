@@ -10,6 +10,13 @@
         return s.joinedOn ? `<span class="roster-tag" title="这天之前布置的作业不算该生">${esc(Utils.formatDate(s.joinedOn))} 入班</span>` : '';
     }
 
+    // 只转出了某几类（1.54.0）：橙色小标签「作业已转出 · 日期」
+    function outCatsHtml(s) {
+        if (!s.outOf) return '';
+        return Object.keys(AppState.OUT_CATS).filter((k) => s.outOf[k])
+            .map((k) => `<span class="roster-tag roster-tag-out" title="${esc(AppState.OUT_CATS[k])}不再计入该生，其他照常；点「转出」可修改">${esc(AppState.OUT_CATS[k])}已转出 · ${esc(Utils.formatDate(s.outOf[k]))}</span>`).join('');
+    }
+
     // 已转出 / 休学的学生：折叠区，记录都在，可恢复在读或彻底删除
     function inactiveHtml() {
         const list = AppState.getInactiveStudents();
@@ -54,10 +61,10 @@
                                 <tr>
                                     <td>${esc(s.studentNo) || '<span class="hint">-</span>'}</td>
                                     <td>${UI.studentLink(s)}</td>
-                                    <td class="roster-note">${joinedHtml(s)}${esc(s.note)}</td>
+                                    <td class="roster-note">${joinedHtml(s)}${outCatsHtml(s)}${esc(s.note)}</td>
                                     <td class="row-actions">
                                         <button type="button" class="link-btn" data-edit-student="${s.id}">编辑</button>
-                                        <button type="button" class="link-btn" data-leave-student="${s.id}" title="不再出现在登记和统计里，记录全部保留，可随时恢复">转出</button>
+                                        <button type="button" class="link-btn" data-leave-student="${s.id}" title="可只转出作业 / 背诵 / 考试中的某几类；转出的那类不再计入，记录全部保留，可随时恢复">转出</button>
                                         <button type="button" class="link-btn danger" data-del-student="${s.id}">删除</button>
                                     </td>
                                 </tr>`).join('')}
@@ -170,21 +177,45 @@
     }
 
     // 转出：记录全部保留（1.33.2 起界面上只有「转出」一种，不再单独选休学；以前设为休学的学生数据不变，名单里仍显示「休学」）
+    // 1.54.0 起可只转出作业 / 背诵 / 考试中的某几类：默认三类全勾 = 整体转出（同以前）；只勾一部分 = 按类别转出，
+    // 该生仍在名单里，转出的那类不再计入，其他照常。已按类别转出的再点「转出」：勾选框显示当前状态，全部取消 = 恢复各类都计入
     function openLeave(stu) {
+        const cats = AppState.OUT_CATS;
+        const keys = Object.keys(cats);
+        const cur = stu.outOf ? keys.filter((k) => stu.outOf[k]) : keys;
         Modal.open({
             title: `${stu.name} · 转出`,
             html: `
-                <p>转出后，该生不再出现在作业、背诵、考试的登记和统计里，也不计入导出统计；以前的所有记录都保留，在学生名单底部「已转出」里可以随时恢复在读。</p>
+                <p>勾选要转出的类别。转出的那类不再出现在该类的登记和统计里，也不计入导出统计；其他类照常计入。以前的所有记录都保留。</p>
+                <div class="roster-out-cats">${keys.map((k) => `<label class="ex-item"><input type="checkbox" data-out-cat="${k}"${cur.includes(k) ? ' checked' : ''}><span>${esc(cats[k])}</span></label>`).join('')}</div>
+                <p class="hint" data-out-hint></p>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" data-dialog-close>取消</button>
-                    <button type="button" class="btn-primary" data-set="out">转出</button>
+                    <button type="button" class="btn-primary" data-out-save>转出</button>
                 </div>`,
             onMount(body, close) {
-                body.querySelectorAll('[data-set]').forEach((btn) => btn.addEventListener('click', async () => {
-                    await AppState.setStudentStatus(stu.id, btn.dataset.set);
+                const boxes = Array.from(body.querySelectorAll('[data-out-cat]'));
+                const picked = () => boxes.filter((b) => b.checked).map((b) => b.dataset.outCat);
+                const hint = body.querySelector('[data-out-hint]');
+                const save = body.querySelector('[data-out-save]');
+                const sync = () => {
+                    const p = picked();
+                    if (p.length === keys.length) { hint.textContent = '三类全选 = 整体转出：该生移到学生名单底部「已转出」，可随时恢复在读。'; save.textContent = '转出'; }
+                    else if (p.length) { hint.textContent = `只转出${p.map((k) => cats[k]).join('、')}：该生仍在名单里，${keys.filter((k) => !p.includes(k)).map((k) => cats[k]).join('、')}照常计入。`; save.textContent = '转出'; }
+                    else { hint.textContent = stu.outOf ? '全部不勾 = 恢复，作业、背诵、考试都照常计入。' : '至少勾选一类。'; save.textContent = stu.outOf ? '恢复' : '转出'; }
+                    save.disabled = !p.length && !stu.outOf;
+                };
+                boxes.forEach((b) => b.addEventListener('change', sync));
+                sync();
+                save.addEventListener('click', async () => {
+                    const p = picked();
+                    if (!p.length && !stu.outOf) return;
+                    await AppState.setStudentOutCats(stu.id, p);
                     close();
-                    Toast.success(`${stu.name} 已设为${AppState.STUDENT_STATUS[btn.dataset.set]}`);
-                }));
+                    if (p.length === keys.length) Toast.success(`${stu.name} 已转出`);
+                    else if (p.length) Toast.success(`${stu.name} 已转出${p.map((k) => cats[k]).join('、')}`);
+                    else Toast.success(`${stu.name} 已恢复，各类都照常计入`);
+                });
             }
         });
     }

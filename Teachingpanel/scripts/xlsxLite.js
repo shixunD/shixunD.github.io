@@ -6,7 +6,8 @@
 //   print:  { landscape: true|false, titleRows: [起, 止]（每页重复的行，从 1 数）, footer: 页脚左侧文字 }
 //           有 print 时：A4、缩放到一页宽（高度不限）、页脚右侧「第 X 页 / 共 Y 页」
 //   cell:   null | 字符串 | 数字 | { v: 字符串或数字, runs: [{ t, color, bold }], s: 样式 }
-//   样式 s: { bold, color: 'RRGGBB', fill: 'RRGGBB', align: 'left'|'center'|'right', size, border: true, signed: true（数字显示为 +2 / -0.5 / 0）, wrap }
+//   样式 s: { bold, color: 'RRGGBB', fill: 'RRGGBB', align: 'left'|'center'|'right', size, border: true, signed: true（数字显示为 +2 / -0.5 / 0）, wrap,
+//                slash: true（红色斜线，左下到右上；1.54.0 导出里「已转出该类」的格子用，自带细边框） }
 // 为什么不用 SheetJS：整个库约 900 KB，而这里只需要「写几张带颜色的表」。
 // .xlsx = ZIP 包里的几份 XML；ZIP 用「仅存储、不压缩」方式手写（文件很小，不值得带压缩库）。
 
@@ -92,7 +93,7 @@
             const font = intern(fonts, `<font>${s.bold ? '<b/>' : ''}<sz val="${s.size || 11}"/>${s.color ? `<color rgb="FF${s.color}"/>` : ''}<name val="微软雅黑"/></font>`);
             const fill = s.fill ? intern(fills, `<fill><patternFill patternType="solid"><fgColor rgb="FF${s.fill}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
             const align = (s.align || s.wrap) ? `<alignment${s.align ? ` horizontal="${s.align}"` : ''} vertical="center"${s.wrap ? ' wrapText="1"' : ''}/>` : '<alignment vertical="center"/>';
-            xfs.push(`<xf numFmtId="${s.signed ? 164 : 0}" fontId="${font}" fillId="${fill}" borderId="${s.border ? 1 : 0}" xfId="0" applyFont="1"${fill ? ' applyFill="1"' : ''}${s.border ? ' applyBorder="1"' : ''}${s.signed ? ' applyNumberFormat="1"' : ''} applyAlignment="1">${align}</xf>`);
+            xfs.push(`<xf numFmtId="${s.signed ? 164 : 0}" fontId="${font}" fillId="${fill}" borderId="${s.slash ? 2 : s.border ? 1 : 0}" xfId="0" applyFont="1"${fill ? ' applyFill="1"' : ''}${s.border || s.slash ? ' applyBorder="1"' : ''}${s.signed ? ' applyNumberFormat="1"' : ''} applyAlignment="1">${align}</xf>`);
             index.set(key, xfs.length - 1);
             return xfs.length - 1;
         }
@@ -103,7 +104,8 @@
                 '<numFmts count="1"><numFmt numFmtId="164" formatCode="+General;-General;0"/></numFmts>' +
                 `<fonts count="${fonts.length}">${fonts.join('')}</fonts>` +
                 `<fills count="${fills.length}">${fills.join('')}</fills>` +
-                `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border>${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal/></border></borders>` +
+                `<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border>${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal/></border>` +
+                `<border diagonalUp="1">${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal style="thin"><color rgb="FFD9534F"/></diagonal></border></borders>` +
                 '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
                 `<cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs>` +
                 '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +

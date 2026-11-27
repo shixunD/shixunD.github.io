@@ -161,7 +161,7 @@
     // 所有仍未补上的记录（欠交清单），按作业分组：[{ hw, items: [{student, rec}] }]
     // 作业顺序同 list()（日期倒序），组内学生按学号
     function outstanding(filter) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'hw' });
         const groups = [];
         list(filter).forEach((hw) => {
             const items = [];

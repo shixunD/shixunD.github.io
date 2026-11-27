@@ -6,8 +6,9 @@
 //
 // 数据结构（详见 PROJECT.md「数据模型」）：
 //   classes[]   { id, name }
-//   students[]  { id, classId, name, studentNo, note, joinedOn?, status?, statusOn? }     姓名在同一班级内唯一（含已转出/休学的）
+//   students[]  { id, classId, name, studentNo, note, joinedOn?, status?, statusOn?, outOf? }     姓名在同一班级内唯一（含已转出/休学的）
 //               joinedOn = 入班日期（中途转入；这天之前的作业不算他的）；status = 'out' 转出 | 'leave' 休学（没有 = 在读），statusOn = 设为该状态的日期
+//               outOf? = { hw?, rec?, exam?: 日期 } 只转出某几类（1.54.0；三类全转 = status 'out'）
 //               三个都是可选字段（1.33.0），不升 schema：.db 里落在 students.extra，旧版本读到也不会丢
 //   homework[]  { id, classId, date, title, note, createdAt, records: { [studentId]: {status, comment, madeUpAt} } }
 //   recRounds[] { id, classId, title, content, createdAt, archived, order? }   order：手动拖动排序后才有（可选，无需迁移）
@@ -214,6 +215,25 @@
     const isDateStr = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
     // 学生的非在读状态（转出 / 休学）：不出现在登记、统计、导出里，但所有历史记录保留，可随时恢复在读
     const STUDENT_STATUS = { out: '转出', leave: '休学' };
+    // 按类别转出（1.54.0）：student.outOf = { hw?: 日期, rec?: 日期, exam?: 日期 }，只转出其中某几类。
+    // 转出的那类不再出现在该类的登记、统计、导出里，其他类照常；三类全选 = 原来的整体转出（status 'out'，删掉 outOf）。
+    // 可选字段，旧数据没有 = 没有按类别转出，不升 schema（同 joinedOn / status）
+    const OUT_CATS = { hw: '作业', rec: '背诵', exam: '考试' };
+    const OUT_CAT_KEYS = Object.keys(OUT_CATS);
+
+    // outOf 只留合法的类别和日期；为空、或整体已转出 / 休学时删掉
+    function cleanOutOf(stu) {
+        const src = stu.outOf;
+        const out = {};
+        if (src && typeof src === 'object' && !stu.status) {
+            OUT_CAT_KEYS.forEach((k) => { if (src[k]) out[k] = isDateStr(src[k]) ? src[k] : Utils.today(); });
+        }
+        if (Object.keys(out).length && Object.keys(out).length < OUT_CAT_KEYS.length) stu.outOf = out;
+        else {
+            delete stu.outOf;
+            if (Object.keys(out).length === OUT_CAT_KEYS.length) { stu.status = 'out'; stu.statusOn = Object.values(out).sort().pop(); }
+        }
+    }
 
     function normalize(raw) {
         const data = migrate(raw || {});
@@ -231,6 +251,7 @@
             s.note = s.note || '';
             if (!isDateStr(s.joinedOn)) delete s.joinedOn;
             if (!STUDENT_STATUS[s.status]) { delete s.status; delete s.statusOn; }
+            cleanOutOf(s);
         });
         out.homework.forEach((h) => { if (!h.records || typeof h.records !== 'object') h.records = {}; });
         out.sideGroups = out.sideGroups.filter((g) => g.kind === 'hw' || g.kind === 'rec' || g.kind === 'note');
@@ -393,10 +414,36 @@
     // ---------- 学生（均指当前激活班级） ----------
 
     // 当前班级的在读学生（登记、统计、导出都用它）。opts.all = true 时连已转出 / 休学的也返回（名单页、查重、编学号用）
+    // opts.cat = 'hw' | 'rec' | 'exam'：再去掉只转出了这一类的学生（1.54.0，作业 / 背诵 / 考试各自的页面和统计用）
     function getStudents(opts) {
         const classId = getActiveClassId();
         const all = !!(opts && opts.all);
-        return state.students.filter((x) => x.classId === classId && (all || !x.status)).sort(Utils.compareStudentNo);
+        const cat = opts && opts.cat;
+        return state.students.filter((x) => x.classId === classId && (all || !x.status) && !(cat && isOutOf(x, cat))).sort(Utils.compareStudentNo);
+    }
+
+    // 该生是否已转出 cat 这一类（整体转出 / 休学的算全部转出）
+    function isOutOf(stu, cat) {
+        if (!stu) return false;
+        if (stu.status) return true;
+        return !!(stu.outOf && stu.outOf[cat]);
+    }
+
+    // 按类别转出：cats = 要转出的类别 key 数组。三类全选 = 整体转出；空数组 = 恢复在读（各类都计入）。
+    // 已经转出的类别保留原来的日期，新转出的记今天。只改状态，不删任何记录
+    function setStudentOutCats(id, cats) {
+        const want = OUT_CAT_KEYS.filter((k) => (cats || []).includes(k));
+        return commit(() => {
+            const stu = getStudent(id);
+            if (!stu) return;
+            const prev = stu.outOf || {};
+            if (want.length === OUT_CAT_KEYS.length) { stu.status = 'out'; stu.statusOn = Utils.today(); delete stu.outOf; return; }
+            delete stu.status; delete stu.statusOn;
+            if (!want.length) { delete stu.outOf; return; }
+            const next = {};
+            want.forEach((k) => { next[k] = prev[k] || Utils.today(); });
+            stu.outOf = next;
+        });
     }
 
     // 当前班级已转出 / 休学的学生
@@ -413,6 +460,7 @@
             if (!stu) return;
             if (status) { stu.status = status; stu.statusOn = Utils.today(); }
             else { delete stu.status; delete stu.statusOn; }
+            delete stu.outOf;   // 整体转出 / 恢复在读都清掉按类别转出
         });
     }
 
@@ -467,6 +515,7 @@
         delete patch.joinedOn;
         delete patch.status;      // 状态只能走 setStudentStatus
         delete patch.statusOn;
+        delete patch.outOf;       // 按类别转出只能走 setStudentOutCats
         return commit(() => {
             const stu = getStudent(id);
             if (!stu) return;
@@ -569,8 +618,9 @@
         photoPut, photoGet, photoList, gcPhotos,
         audioPut: photoPut, audioGet: photoGet,   // 录音和照片同一个存储
         getClasses, getActiveClass, getActiveClassId, addClass, renameClass, removeClass, switchClass,
-        STUDENT_STATUS,
+        STUDENT_STATUS, OUT_CATS,
         getStudents, getInactiveStudents, getStudent, findStudentByName, addStudent, updateStudent, setStudentStatus, removeStudent, bulkAddStudents,
+        isOutOf, setStudentOutCats,
         updateSettings, getQuickPhrases, addQuickPhrase, updateQuickPhrase, removeQuickPhrase, moveQuickPhrase
     };
 })();

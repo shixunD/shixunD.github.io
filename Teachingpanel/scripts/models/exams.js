@@ -118,7 +118,7 @@
                 if (grade === undefined) { result.invalid.push(line); return; }
             }
             if (cls === undefined) { result.invalid.push(line); return; }
-            const stu = AppState.getStudents().find((x) => x.name === name) || null;   // 只匹配在读学生（转出 / 休学的不导入）
+            const stu = AppState.getStudents({ cat: 'exam' }).find((x) => x.name === name) || null;   // 只匹配在读学生（转出 / 休学的不导入）
             if (!stu) { result.unknown.push({ name, line }); return; }
             const item = { student: stu, score, cls, grade, line };
             if (seen[stu.id] != null) {
@@ -143,7 +143,7 @@
         const exam = get(examId);
         if (!exam) return '';
         const st = stats(exam);
-        return '姓名 得分 班级排名 年级排名\n' + AppState.getStudents()
+        return '姓名 得分 班级排名 年级排名\n' + AppState.getStudents({ cat: 'exam' })
             .filter((stu) => exam.scores[stu.id] != null)
             .map((stu) => `${stu.name} ${formatScore(exam.scores[stu.id])} ${st.ranks[stu.id]} ${st.gradeRanks[stu.id] || 'NA'}`)
             .join('\n') + '\n';
@@ -151,7 +151,7 @@
 
     // 单场统计：只统计当前班级在册学生的成绩
     function stats(exam) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'exam' });
         const entries = students
             .filter((stu) => exam.scores[stu.id] != null)
             .map((stu) => ({ student: stu, score: exam.scores[stu.id] }))
@@ -174,7 +174,7 @@
         });
         // 班级百分位 = 本次分数严格低于他的同学 ÷（参考人数 − 1）× 100，即「超过了班里百分之几的同学」：
         //   第一名 100%，最后一名 0%；同分不算超过（同分的人百分位相同）；只算这次有成绩的在班学生
-        //   （缺考的不进分母，转出的学生 getStudents 本来就不含）；只有 1 人参考时没有百分位
+        //   （缺考的不进分母，转出考试的学生 getStudents({ cat: 'exam' }) 不含）；只有 1 人参考时没有百分位
         const percentiles = {};
         if (n >= 2) {
             entries.forEach((x) => {

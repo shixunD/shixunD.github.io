@@ -252,7 +252,7 @@
     // 单轮次的状态统计；passed = 提前完成 + 过关 + 条件过关
     function roundSummary(roundId, students) {
         const counts = { excel: 0, pass: 0, cond: 0, retry: 0, fail: 0, none: 0 };
-        (students || AppState.getStudents()).forEach((stu) => { counts[statusOf(roundId, stu.id)]++; });
+        (students || AppState.getStudents({ cat: 'rec' })).forEach((stu) => { counts[statusOf(roundId, stu.id)]++; });
         counts.passed = counts.excel + counts.pass + counts.cond;
         return counts;
     }
@@ -331,7 +331,7 @@
     //   { type:'plan', round, student, plan, check(最新检查或 null), dates:[date], nextDate:date, overdue: date < 今天 }
     function schedule() {
         const today = Utils.today();
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'rec' });
         const items = [];
         rounds().forEach((round) => {
             students.forEach((stu) => {
@@ -385,7 +385,7 @@
         const thisWeek = weekStartOf(today);
         const todayIds = new Set(schedule().filter((x) => !x.overdue && x.nextDate === today).map((x) => x.student.id));
         let week = 0;
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'rec' });
         rounds().filter((r) => roundWeek(r) === thisWeek).forEach((r) => {
             students.forEach((s) => { if (!isPassed(statusOf(r.id, s.id))) week++; });
         });

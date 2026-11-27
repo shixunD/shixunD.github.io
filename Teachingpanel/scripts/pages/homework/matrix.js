@@ -34,7 +34,7 @@
     // ---------- 总览矩阵 ----------
 
     function renderMatrix(view) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'hw' });
         const hws = HomeworkModel.list(filter());
         // 列顺序和分组跟作业页侧栏一致（分组夹可折叠）
         const inRange = new Set(hws.map((h) => h.id));

@@ -48,7 +48,7 @@
     // 逐人录入：在弹窗里一次填完再统一保存（避免每输入一格就触发整页重绘、丢失输入焦点）
     function openScoreEntry(examId) {
         const exam = ExamModel.get(examId);
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'exam' });
         if (!exam) return;
         if (!students.length) { Toast.warning('当前班级还没有学生'); return; }
 
@@ -123,7 +123,7 @@
                 function preview() {
                     parsed = ExamModel.parseTxt(textarea.value);
                     const overwrite = parsed.matched.filter((m) => exam.scores[m.student.id] != null && exam.scores[m.student.id] !== m.score).length;
-                    const missing = AppState.getStudents().filter((s) => !parsed.matched.some((m) => m.student.id === s.id));
+                    const missing = AppState.getStudents({ cat: 'exam' }).filter((s) => !parsed.matched.some((m) => m.student.id === s.id));
                     body.querySelector('[data-preview]').innerHTML = textarea.value.trim() ? `
                         <div class="import-preview">
                             <div class="ok">✔ 匹配成功 <b>${parsed.matched.length}</b> 人${overwrite ? `（其中 ${overwrite} 人会覆盖已有成绩）` : ''}</div>

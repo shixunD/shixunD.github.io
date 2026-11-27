@@ -132,7 +132,7 @@
                             <td><b>${ExamModel.formatScore(x.score)}</b></td><td>${Utils.percent(x.score, exam.fullScore)}</td><td class="rank-no">${esc(x.student.studentNo)}</td></tr>`).join('')}
                         </tbody>
                     </table>
-                    ${st.total > st.count ? `<div class="hint">未录入：${AppState.getStudents().filter((s) => exam.scores[s.id] == null).map((s) => esc(s.name)).join('、')}</div>` : ''}
+                    ${st.total > st.count ? `<div class="hint">未录入：${AppState.getStudents({ cat: 'exam' }).filter((s) => exam.scores[s.id] == null).map((s) => esc(s.name)).join('、')}</div>` : ''}
                 ` : '<div class="empty-message">还没有成绩，点击「录入成绩」或「导入 TXT」</div>'}
             </div>`;
     }

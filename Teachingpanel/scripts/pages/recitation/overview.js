@@ -89,7 +89,7 @@
     // ---------- 总览（所有轮次） ----------
 
     function renderOverview(view) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'rec' });
         const rounds = RecitationModel.rounds().slice().reverse();
         const R = RecitationModel.RESULT_MAP;
         // 列顺序和分组跟背诵页侧栏联动，但倒过来（1.45.2，Auson 要求）：侧栏最上面的在总览最右边，分组之间、分组里的轮次都倒序；

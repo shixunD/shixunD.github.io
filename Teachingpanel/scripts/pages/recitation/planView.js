@@ -20,7 +20,7 @@
     function setRound(roundId) { ui.roundId = roundId; }
 
     function render(view) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'rec' });
         const rounds = RecitationModel.rounds();
         if (!students.length) { view.innerHTML = `<div class="card">${UI.emptyStudentsHint()}</div>`; return; }
         if (!rounds.length) { view.innerHTML = '<div class="card empty-message">还没有背诵轮次，请先在「检查」里新建轮次</div>'; return; }

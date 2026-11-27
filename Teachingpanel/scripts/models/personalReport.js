@@ -15,6 +15,9 @@
         const S = HomeworkModel.STATUS_MAP;
 
         // 作业按日期从早到晚编号
+        // 已转出作业 / 背诵的（1.54.0）：那一类不出现在个人学情里
+        if (AppState.isOutOf(stu, 'hw')) hwSet.clear();
+        if (AppState.isOutOf(stu, 'rec')) rdSet.clear();
         const hws = HomeworkModel.list().filter((h) => hwSet.has(h.id) && (!stu || HomeworkModel.appliesTo(h, stu))).reverse().map((hw, i) => {
             const rec = HomeworkModel.getRecord(hw, o.studentId);
             return { no: i + 1, hw, status: rec.status, label: S[rec.status].label, comment: rec.comment };

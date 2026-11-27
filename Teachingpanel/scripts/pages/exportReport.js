@@ -253,7 +253,8 @@
 
     function openPersonalDialog() {
         const classId = AppState.getActiveClassId();
-        const students = AppState.getStudents().slice().sort(Utils.compareStudentNo);
+        // 作业和背诵都转出了的学生没有可导出的内容，不列（1.54.0）
+        const students = AppState.getStudents().filter((s) => !(AppState.isOutOf(s, 'hw') && AppState.isOutOf(s, 'rec'))).sort(Utils.compareStudentNo);
         if (!students.length) { Toast.error('当前班级还没有学生'); return; }
         dropSaved(classId);
         let titleEdited = false;

@@ -6,7 +6,7 @@
 
     const esc = (s) => Utils.escapeHtml(s);
     function render(view) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents();   // 学生趋势里的一块：和趋势页一样用全班在读名单（按类别转出的也能看以前的记录）
         if (!students.length) { view.innerHTML = `<div class="card">${UI.emptyStudentsHint()}</div>`; return; }
         const id = StudentTrend.currentId();
 

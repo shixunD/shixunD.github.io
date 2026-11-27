@@ -126,6 +126,11 @@
 .rp-table thead th.rp-wk-start { border-left-color: rgba(255, 255, 255, 0.45); }
 .rp-multi-sum thead tr + tr th { padding-top: 3px; padding-bottom: 3px; font-size: var(--rp-fs-xs); }
 .rp-table td.rp-dash { color: var(--rp-muted); }
+/* 已转出该类（1.54.0）：灰底 + 左下到右上的红色斜线（to bottom right 的 50% 等值线正好连左下角和右上角） */
+.rp-table td.rp-out, .rp-sq.rp-out {
+    background: linear-gradient(to bottom right, #e4dfda calc(50% - 0.75px), #d9534f calc(50% - 0.75px), #d9534f calc(50% + 0.75px), #e4dfda calc(50% + 0.75px));
+}
+.rp-sq.rp-out { vertical-align: -1px; margin-right: 4px; }
 .rp-note { margin: 4px 0 0; font-size: var(--rp-fs-xs); color: var(--rp-muted); }
 .rp-weeks .rp-name { text-align: center; }
 .rp-week { margin-top: 26px; padding-top: 18px; border-top: 3px dashed #cfdad5; }

@@ -77,7 +77,7 @@
     // ---------- 登记视图 ----------
 
     function renderRegister(view) {
-        const students = AppState.getStudents();
+        const students = AppState.getStudents({ cat: 'hw' });
         const list = HomeworkModel.sideList();
         if (!list.some((h) => h.id === ui.selectedId)) ui.selectedId = list.length ? list[0].id : null;
         const hw = ui.selectedId ? HomeworkModel.get(ui.selectedId) : null;

@@ -14,6 +14,9 @@
 //   卡片底色 = 最新检查结果的颜色；但「最后一天只有未完成的计划」时卡片是天蓝（与 recitationPage.studentCard 同一规则）
 //   （1.32.0 起另有背诵加减分，见 recScore；✓/✗ 仍用于「过关人数」统计）
 //   ✓ = 最新结果是 提前完成 / 完成过关 /（condPass 开时）条件过关，且（planBlocks 开时）卡片不是天蓝
+// 按类别转出（1.54.0）：只转出作业的学生 row.hwOut = true（作业格 'out'，bonus / penalty / final = null，不进作业汇总），
+//   只转出背诵的 row.recOut = true（rec[i] = { out: true, score: null }，不进过关人数和背诵汇总）；报表里有的类别都转出了的不出现在报表里（activeFor）。
+//   导出文件里这些格子画成灰底 + 左下到右上的红斜线（reportOutput 的 rp-out）
 // 多周（1.52.0，buildMulti）：勾选的条目按自然周（周一到周日）分开，每周单独跑一次 build，再把各周得分相加
 
 (function () {
@@ -65,6 +68,7 @@
 
     // 带正负号的分数：+2 / -0.5 / 0（负号用普通连字符，方便复制到表格里）
     function signed(n) {
+        if (n == null) return '—';   // 已转出该类（1.54.0）
         const v = round2(n);
         if (v > 0) return '+' + v;
         if (v < 0) return '-' + Math.abs(v);
@@ -106,23 +110,31 @@
         return rules.recLate;
     }
 
+    // 报表里出现的学生：在读的，去掉「报表里有的类别全都转出了」的（只有作业的报表不列只转出作业的；两类都没选时按两类算）
+    function activeFor(hasHw, hasRec) {
+        const cats = (hasHw || hasRec) ? [hasHw && 'hw', hasRec && 'rec'].filter(Boolean) : ['hw', 'rec'];
+        return AppState.getStudents().filter((stu) => !cats.every((c) => AppState.isOutOf(stu, c)));
+    }
+
     // opts: { hwIds[], roundIds[], sort: 'no' | 'score', title }
     function build(opts) {
         const o = opts || {};
         const rules = getRules();
-        const students = AppState.getStudents();
         const hwSet = new Set(o.hwIds || []);
         const rdSet = new Set(o.roundIds || []);
         // 作业按日期从早到晚编号（第 1 项 = 最早），背诵任务按侧栏顺序
         const hws = HomeworkModel.list().filter((h) => hwSet.has(h.id)).reverse();
         const rounds = RecitationModel.rounds().filter((r) => rdSet.has(r.id));
         const n = hws.length;
+        const students = activeFor(n > 0, rounds.length > 0);
 
         const rows = students.map((stu) => {
+            const hwOut = AppState.isOutOf(stu, 'hw'), recOut = AppState.isOutOf(stu, 'rec');
             const counts = {};
             STATUS_ORDER.forEach((k) => { counts[k] = 0; });
             let rowN = 0;
             const statuses = hws.map((hw) => {
+                if (hwOut) return 'out';
                 if (!HomeworkModel.appliesTo(hw, stu)) return 'na';
                 rowN++;
                 const st = HomeworkModel.getRecord(hw, stu.id).status;
@@ -131,31 +143,37 @@
             });
             const bonus = bonusOf(counts.done, rowN, rules);
             const penalty = round2(PENALTY_KEYS.reduce((sum, k) => sum + counts[k] * rules.penalty[k], 0));
-            const rec = rounds.map((r) => recOf(r, stu.id, rules));
-            const recScoreSum = round2(rec.reduce((sum, x) => sum + x.score, 0));
-            const final = round2(bonus - penalty);
+            const rec = recOut ? rounds.map(() => ({ out: true, pass: false, look: 'out', status: 'out', score: null })) : rounds.map((r) => recOf(r, stu.id, rules));
+            const recScoreSum = recOut ? null : round2(rec.reduce((sum, x) => sum + x.score, 0));
+            const final = hwOut ? null : round2(bonus - penalty);
             return {
-                student: stu, n: rowN, counts, statuses, bonus, penalty, final,
-                rec, recScore: recScoreSum, total: round2(final + recScoreSum)
+                student: stu, n: rowN, counts, statuses,
+                bonus: hwOut ? null : bonus, penalty: hwOut ? null : penalty, final,
+                rec, recScore: recScoreSum, total: round2((final || 0) + (recScoreSum || 0)),
+                hwOut, recOut
             };
         });
-        if (o.sort === 'score' && n) rows.sort((a, b) => b.final - a.final);   // sort 稳定：同分保持学号顺序
+        // sort 稳定：同分保持学号顺序；已转出作业的排在最后
+        if (o.sort === 'score' && n) rows.sort((a, b) => (a.hwOut - b.hwOut) || ((b.final || 0) - (a.final || 0)));
 
-        const total = round2(rows.reduce((s, r) => s + r.final, 0));
+        const hwRows = rows.filter((r) => !r.hwOut), recRows = rows.filter((r) => !r.recOut);
+        const total = round2(hwRows.reduce((s, r) => s + r.final, 0));
         const summary = {
             students: rows.length,
+            hwStudents: hwRows.length, recStudents: recRows.length,    // 作业 / 背诵各自计入的人数（去掉只转出该类的）
+            hwOut: rows.length - hwRows.length, recOut: rows.length - recRows.length,
             total,
-            avg: rows.length ? round2(total / rows.length) : 0,
-            recTotal: round2(rows.reduce((sum, r) => sum + r.recScore, 0)),
-            full: rows.filter((r) => r.n && r.counts.done === r.n).length,           // 全部按时完成（中途入班的按入班后的作业数算）
-            oneOff: rows.filter((r) => r.n >= 2 && r.counts.done === r.n - 1).length,   // 只差一项（N ≥ 2 才有这一档）
-            lateJoin: rows.filter((r) => r.n < n).length,                           // 有入班前作业（不计入）的学生数
-            pos: rows.filter((r) => r.final > 0).length,
-            zero: rows.filter((r) => r.final === 0).length,
-            neg: rows.filter((r) => r.final < 0).length,
+            avg: hwRows.length ? round2(total / hwRows.length) : 0,
+            recTotal: round2(recRows.reduce((sum, r) => sum + r.recScore, 0)),
+            full: hwRows.filter((r) => r.n && r.counts.done === r.n).length,           // 全部按时完成（中途入班的按入班后的作业数算）
+            oneOff: hwRows.filter((r) => r.n >= 2 && r.counts.done === r.n - 1).length,   // 只差一项（N ≥ 2 才有这一档）
+            lateJoin: hwRows.filter((r) => r.n < n).length,                           // 有入班前作业（不计入）的学生数
+            pos: hwRows.filter((r) => r.final > 0).length,
+            zero: hwRows.filter((r) => r.final === 0).length,
+            neg: hwRows.filter((r) => r.final < 0).length,
             rec: rounds.map((r, i) => {
-                const pass = rows.filter((x) => x.rec[i].pass).length;
-                return { round: r, pass, fail: rows.length - pass };
+                const pass = recRows.filter((x) => x.rec[i].pass).length;
+                return { round: r, pass, fail: recRows.length - pass };
             })
         };
 
@@ -167,7 +185,7 @@
 
         const recFails = rounds.map((r, i) => ({
             round: r,
-            students: rows.filter((x) => !x.rec[i].pass).map((x) => x.student).sort(Utils.compareStudentNo)
+            students: rows.filter((x) => !x.recOut && !x.rec[i].pass).map((x) => x.student).sort(Utils.compareStudentNo)
         }));
 
         const cls = AppState.getActiveClass();
@@ -205,28 +223,33 @@
             no: i + 1, monday: g.monday, sunday: Utils.addDays(g.monday, 6),
             rp: build({ hwIds: g.hwIds, roundIds: g.roundIds, sort: o.sort, title: `第 ${i + 1} 周` })
         }));
-        const students = AppState.getStudents();
+        // 报表里有的类别都转出了的不出现；只转出一类的：该类各周和合计都是 null，hwOut / recOut 标出来（导出里画灰底红斜线）
+        const students = activeFor(weeks.some((w) => w.rp.n), weeks.some((w) => w.rp.rounds.length));
         const rows = students.map((stu) => {
+            const hwOut = AppState.isOutOf(stu, 'hw'), recOut = AppState.isOutOf(stu, 'rec');
             const ws = weeks.map((w) => {
                 const r = w.rp.rows.find((x) => x.student.id === stu.id);
-                const hw = w.rp.n && r && r.n ? r.final : null;
-                const rec = w.rp.rounds.length && r ? r.recScore : null;
+                const hw = !hwOut && w.rp.n && r && r.n ? r.final : null;
+                const rec = !recOut && w.rp.rounds.length && r ? r.recScore : null;
                 return { hw, rec, total: round2((hw || 0) + (rec || 0)) };
             });
-            const hwTotal = round2(ws.reduce((s, x) => s + (x.hw || 0), 0));
-            const recTotal = round2(ws.reduce((s, x) => s + (x.rec || 0), 0));
-            return { student: stu, weeks: ws, hwTotal, recTotal, total: round2(hwTotal + recTotal) };
+            const hwTotal = hwOut ? null : round2(ws.reduce((s, x) => s + (x.hw || 0), 0));
+            const recTotal = recOut ? null : round2(ws.reduce((s, x) => s + (x.rec || 0), 0));
+            return { student: stu, weeks: ws, hwTotal, recTotal, total: round2((hwTotal || 0) + (recTotal || 0)), hwOut, recOut };
         });
         if (o.sort === 'score') rows.sort((a, b) => b.total - a.total);
 
-        const sum = (f) => round2(rows.reduce((s, r) => s + f(r), 0));
-        const avg = (v) => (rows.length ? round2(v / rows.length) : 0);
-        const total = sum((r) => r.total), hwTotal = sum((r) => r.hwTotal), recTotal = sum((r) => r.recTotal);
+        const sum = (f, list) => round2((list || rows).reduce((s, r) => s + (f(r) || 0), 0));
+        const avgOf = (v, list) => (list.length ? round2(v / list.length) : 0);
+        const avg = (v) => avgOf(v, rows);
+        const hwRows = rows.filter((r) => !r.hwOut), recRows = rows.filter((r) => !r.recOut);
+        const total = sum((r) => r.total), hwTotal = sum((r) => r.hwTotal, hwRows), recTotal = sum((r) => r.recTotal, recRows);
         const hasHw = weeks.some((w) => w.rp.n), hasRec = weeks.some((w) => w.rp.rounds.length);
         const summary = {
             weeks: weeks.length, students: rows.length,
             hwCount: weeks.reduce((s, w) => s + w.rp.n, 0), recCount: weeks.reduce((s, w) => s + w.rp.rounds.length, 0),
-            hasHw, hasRec, total, avg: avg(total), hwTotal, hwAvg: avg(hwTotal), recTotal, recAvg: avg(recTotal),
+            hasHw, hasRec, total, avg: avg(total), hwTotal, hwAvg: avgOf(hwTotal, hwRows), recTotal, recAvg: avgOf(recTotal, recRows),
+            hwOut: rows.length - hwRows.length, recOut: rows.length - recRows.length,
             pos: rows.filter((r) => r.total > 0).length,
             zero: rows.filter((r) => r.total === 0).length,
             neg: rows.filter((r) => r.total < 0).length
