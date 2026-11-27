@@ -14,6 +14,7 @@
 //   卡片底色 = 最新检查结果的颜色；但「最后一天只有未完成的计划」时卡片是天蓝（与 recitationPage.studentCard 同一规则）
 //   （1.32.0 起另有背诵加减分，见 recScore；✓/✗ 仍用于「过关人数」统计）
 //   ✓ = 最新结果是 提前完成 / 完成过关 /（condPass 开时）条件过关，且（planBlocks 开时）卡片不是天蓝
+// 多周（1.52.0，buildMulti）：勾选的条目按自然周（周一到周日）分开，每周单独跑一次 build，再把各周得分相加
 
 (function () {
     'use strict';
@@ -180,8 +181,72 @@
         };
     }
 
+    // ---------- 多周（1.52.0） ----------
+    // 作业 / 背诵任务归到哪一周：自然周（周一到周日）。作业看作业日期，背诵看任务设定的日期（RecitationModel.roundWeek）
+    const hwWeek = (hw) => RecitationModel.weekStartOf(hw.date);
+
+    // 把勾选的条目按周分好：[{ monday, hwIds, roundIds }]，周一从早到晚
+    function splitWeeks(hwIds, roundIds) {
+        const map = new Map();
+        const at = (monday) => { if (!map.has(monday)) map.set(monday, { monday, hwIds: [], roundIds: [] }); return map.get(monday); };
+        (hwIds || []).forEach((id) => { const h = HomeworkModel.get(id); if (h) at(hwWeek(h)).hwIds.push(id); });
+        (roundIds || []).forEach((id) => { const r = RecitationModel.getRound(id); if (r) at(RecitationModel.roundWeek(r)).roundIds.push(id); });
+        return Array.from(map.values()).sort((a, b) => (a.monday < b.monday ? -1 : 1));
+    }
+
+    // opts 同 build：{ hwIds[], roundIds[], sort, title }。每一周单独跑一次 build（作业加分档、扣分、背诵加减分都按那一周算），
+    // 再把各周得分加起来。返回 { title, className, exportedAt, rules, weeks: [{ no, monday, sunday, rp }], rows, summary }
+    //   rows[i].weeks[k] = { hw: 该周作业得分 | null（该周没作业，或该生入班前）, rec: 该周背诵得分 | null（该周没背诵）, total }
+    function buildMulti(opts) {
+        const o = opts || {};
+        const rules = getRules();
+        const groups = splitWeeks(o.hwIds, o.roundIds);
+        const weeks = groups.map((g, i) => ({
+            no: i + 1, monday: g.monday, sunday: Utils.addDays(g.monday, 6),
+            rp: build({ hwIds: g.hwIds, roundIds: g.roundIds, sort: o.sort, title: `第 ${i + 1} 周` })
+        }));
+        const students = AppState.getStudents();
+        const rows = students.map((stu) => {
+            const ws = weeks.map((w) => {
+                const r = w.rp.rows.find((x) => x.student.id === stu.id);
+                const hw = w.rp.n && r && r.n ? r.final : null;
+                const rec = w.rp.rounds.length && r ? r.recScore : null;
+                return { hw, rec, total: round2((hw || 0) + (rec || 0)) };
+            });
+            const hwTotal = round2(ws.reduce((s, x) => s + (x.hw || 0), 0));
+            const recTotal = round2(ws.reduce((s, x) => s + (x.rec || 0), 0));
+            return { student: stu, weeks: ws, hwTotal, recTotal, total: round2(hwTotal + recTotal) };
+        });
+        if (o.sort === 'score') rows.sort((a, b) => b.total - a.total);
+
+        const sum = (f) => round2(rows.reduce((s, r) => s + f(r), 0));
+        const avg = (v) => (rows.length ? round2(v / rows.length) : 0);
+        const total = sum((r) => r.total), hwTotal = sum((r) => r.hwTotal), recTotal = sum((r) => r.recTotal);
+        const hasHw = weeks.some((w) => w.rp.n), hasRec = weeks.some((w) => w.rp.rounds.length);
+        const summary = {
+            weeks: weeks.length, students: rows.length,
+            hwCount: weeks.reduce((s, w) => s + w.rp.n, 0), recCount: weeks.reduce((s, w) => s + w.rp.rounds.length, 0),
+            hasHw, hasRec, total, avg: avg(total), hwTotal, hwAvg: avg(hwTotal), recTotal, recAvg: avg(recTotal),
+            pos: rows.filter((r) => r.total > 0).length,
+            zero: rows.filter((r) => r.total === 0).length,
+            neg: rows.filter((r) => r.total < 0).length
+        };
+
+        const cls = AppState.getActiveClass();
+        const now = new Date();
+        const pad = (x) => String(x).padStart(2, '0');
+        return {
+            multi: true,
+            title: (o.title || '').trim() || '多周学情统计',
+            className: cls ? cls.name : '',
+            exportedAt: `${Utils.toDateStr(now)} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+            rules, weeks, rows, summary
+        };
+    }
+
     window.ScoreReport = {
         DEFAULT_RULES, PENALTY_KEYS, STATUS_ORDER,
-        getRules, saveRules, defaultRules, normalizeRules, signed, bonusOf, recOf, build
+        getRules, saveRules, defaultRules, normalizeRules, signed, bonusOf, recOf, build,
+        hwWeek, splitWeeks, buildMulti
     };
 })();

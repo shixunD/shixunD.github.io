@@ -1,6 +1,6 @@
 // models/personalReport.js —— 「导出个人学情」：某个学生在所选作业 / 背诵任务上的完成情况（只读，不计加减分）
 // 全局命名空间：window.PersonalReport
-// 背诵过关判定沿用班级学情的 ScoreReport.recOf（同一套规则）。
+// 背诵过关判定沿用单周学情的 ScoreReport.recOf（同一套规则）。
 
 (function () {
     'use strict';

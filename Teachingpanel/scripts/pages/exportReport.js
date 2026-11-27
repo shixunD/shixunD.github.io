@@ -1,4 +1,4 @@
-// exportReport.js —— 主页「📤 导出统计」卡片 + 选择作业 / 背诵任务的导出弹窗 + 「加减分规则」设置弹窗
+// exportReport.js —— 主页「📤 导出统计」卡片 + 选择作业 / 背诵任务的导出弹窗（单周 / 多周 / 个人）+ 「加减分规则」设置弹窗
 // 全局命名空间：window.ExportReport
 // 计分在 models/scoreReport.js，三种输出在 reportOutput.js；这里只管界面。
 // 1.42.0 起每次打开都一项不勾、不记上次的选择（以前记在 localStorage teachingPanel.export.*，打开时顺手删掉）。
@@ -16,9 +16,10 @@
         return `
             <div class="card">
                 <h2>📤 导出统计</h2>
-                <p class="hint">勾选作业（可整个分组夹）和背诵任务：「班级学情」生成每位学生的作业加减分与背诵过关表；「个人学情」选一位学生，写清每项的完成情况（不计分）。可导出为 PDF、Excel 或 Markdown。当前班级有 ${hwCount} 项作业、${rdCount} 项背诵任务。</p>
+                <p class="hint">勾选作业（可整个分组夹）和背诵任务：「单周学情」把勾选的内容当作一个统计周期，生成每位学生的作业加减分与背诵过关表；「多周学情」按周勾选，每周的作业、背诵分开计分再算总分；「个人学情」选一位学生，写清每项的完成情况（不计分）。可导出为 PDF、Excel 或 Markdown。当前班级有 ${hwCount} 项作业、${rdCount} 项背诵任务。</p>
                 <div class="btn-col">
-                    <button type="button" class="btn-primary" data-export-report>📤 导出班级学情</button>
+                    <button type="button" class="btn-primary" data-export-report>📤 导出单周学情</button>
+                    <button type="button" class="btn-primary" data-export-multi>🗓️ 导出多周学情</button>
                     <button type="button" class="btn-primary" data-export-personal>👤 导出个人学情</button>
                 </div>
             </div>`;
@@ -26,7 +27,9 @@
 
     function bindCard(root) {
         const btn = root.querySelector('[data-export-report]');
-        if (btn) btn.addEventListener('click', openDialog);
+        if (btn) btn.addEventListener('click', () => openDialog());
+        const mbtn = root.querySelector('[data-export-multi]');
+        if (mbtn) mbtn.addEventListener('click', openMultiDialog);
         const pbtn = root.querySelector('[data-export-personal]');
         if (pbtn) pbtn.addEventListener('click', openPersonalDialog);
         const rules = root.querySelector('[data-score-rules]');
@@ -48,15 +51,16 @@
     // ---------- 选择树 ----------
 
     // layout: SideGroups 布局；返回带复选框的树（默认都不勾）。分组夹的复选框 = 全选 / 取消全选里面的条目
-    function treeHtml(layout, kind, labelOf) {
+    // weekOf（多周导出）：条目所在周的周一，写在 data-ex-wk 上，给最上面「按周勾选」用；分组的 icon 默认 📁
+    function treeHtml(layout, kind, labelOf, weekOf, icon) {
         const item = (it) => `
-            <label class="ex-item"><input type="checkbox" data-ex-item="${kind}" value="${it.id}"><span>${labelOf(it)}</span></label>`;
+            <label class="ex-item"><input type="checkbox" data-ex-item="${kind}" value="${it.id}"${weekOf ? ` data-ex-wk="${weekOf(it)}"` : ''}><span>${labelOf(it)}</span></label>`;
         const html = layout.map((e) => {
             if (e.type === 'item') return item(e.obj);
             if (!e.children.length) return '';
             return `
                 <div class="ex-group">
-                    <label class="ex-item ex-group-head" title="全选 / 取消全选这个分组夹"><input type="checkbox" data-ex-group><span>📁 ${esc(e.obj.title)}</span><em>${e.children.length}</em></label>
+                    <label class="ex-item ex-group-head" title="全选 / 取消全选这个分组夹"><input type="checkbox" data-ex-group><span>${icon || '📁'} ${esc(e.obj.title)}</span><em>${e.children.length}</em></label>
                     <div class="ex-group-body">${e.children.map((c) => item(c.obj)).join('')}</div>
                 </div>`;
         }).join('');
@@ -81,6 +85,7 @@
     function syncGroups(body) {
         body.querySelectorAll('.ex-group').forEach((g) => setTri(g.querySelector('[data-ex-group]'), Array.from(g.querySelectorAll('[data-ex-item]'))));
         body.querySelectorAll('[data-ex-col]').forEach((c) => setTri(c, Array.from(body.querySelectorAll(`[data-ex-item="${c.dataset.exCol}"]`))));
+        body.querySelectorAll('[data-ex-week]').forEach((c) => setTri(c, Array.from(body.querySelectorAll(`[data-ex-wk="${c.dataset.exWeek}"]`))));
         setTri(body.querySelector('[data-ex-master]'), Array.from(body.querySelectorAll('[data-ex-item]')));
     }
     // 点汇总复选框：把它管的条目全勾 / 全不勾（半选时点 = 全勾）
@@ -88,6 +93,7 @@
         let scope = null;
         if (target.closest('[data-ex-group]')) scope = target.closest('.ex-group').querySelectorAll('[data-ex-item]');
         else if (target.dataset.exCol) scope = body.querySelectorAll(`[data-ex-item="${target.dataset.exCol}"]`);
+        else if (target.dataset.exWeek) scope = body.querySelectorAll(`[data-ex-wk="${target.dataset.exWeek}"]`);
         else if (target.hasAttribute('data-ex-master')) scope = body.querySelectorAll('[data-ex-item]');
         if (scope) scope.forEach((b) => { b.checked = target.checked; });
     }
@@ -96,36 +102,69 @@
         [LS_PREFIX + classId, LS_PREFIX + 'personal.' + classId].forEach((k) => { try { localStorage.removeItem(k); } catch (e) { /* 忽略 */ } });
     }
 
-    function openDialog() {
+    // ---------- 多周：按自然周（周一到周日）分组 ----------
+    // 作业看作业日期，背诵看任务设定的日期；分组夹不再起作用（一周里来自不同分组夹的作业放在一起）
+    const weekRangeOf = (monday) => ReportOutput.multi.weekRange({ monday, sunday: Utils.addDays(monday, 6) });
+    function weekLayout(items, weekOf) {
+        const map = new Map();
+        items.forEach((it) => { const m = weekOf(it); if (!map.has(m)) map.set(m, []); map.get(m).push(it); });
+        return Array.from(map.keys()).sort().reverse()   // 新的一周在上，和侧栏一样
+            .map((m) => ({ type: 'group', monday: m, obj: { title: weekRangeOf(m) }, children: map.get(m).map((obj) => ({ obj })) }));
+    }
+    // 最上面「按周勾选」：一周一个复选框，管这一周的作业和背诵任务
+    function weeksStripHtml(hwLayout, rdLayout) {
+        const map = new Map();
+        const add = (lay, key) => lay.forEach((g) => { const x = map.get(g.monday) || { hw: 0, rec: 0 }; x[key] = g.children.length; map.set(g.monday, x); });
+        add(hwLayout, 'hw'); add(rdLayout, 'rec');
+        const ms = Array.from(map.keys()).sort().reverse();
+        if (!ms.length) return '';
+        return `<div class="ex-weeks"><span class="ex-weeks-label">按周勾选：</span>${ms.map((m) => {
+            const x = map.get(m);
+            const n = [x.hw ? `作业 ${x.hw}` : '', x.rec ? `背诵 ${x.rec}` : ''].filter(Boolean).join(' · ');
+            return `<label class="ex-week" title="勾选 / 取消这一周的全部作业和背诵任务"><input type="checkbox" data-ex-week="${m}">${esc(weekRangeOf(m))}<small>${esc(n)}</small></label>`;
+        }).join('')}</div>`;
+    }
+
+    // 单周学情（1.52.0 前叫「班级学情」）与多周学情共用这一个弹窗；multi = true 时按周列出、按周计分
+    function openDialog() { openClassDialog(false); }
+    function openMultiDialog() { openClassDialog(true); }
+
+    function openClassDialog(multi) {
         const classId = AppState.getActiveClassId();
         if (!AppState.getStudents().length) { Toast.error('当前班级还没有学生'); return; }
-        const hwLayout = HomeworkModel.sideLayout();
-        const rdLayout = RecitationModel.roundLayout();
+        const hwLabel = (h) => `${esc(h.title)}<small>${esc(Utils.formatDate(h.date))}</small>`;
+        const hwLayout = multi ? weekLayout(HomeworkModel.list(), ScoreReport.hwWeek) : HomeworkModel.sideLayout();
+        const rdLayout = multi ? weekLayout(RecitationModel.rounds(), RecitationModel.roundWeek) : RecitationModel.roundLayout();
+        const hwTree = multi ? treeHtml(hwLayout, 'hw', hwLabel, ScoreReport.hwWeek, '🗓️') : treeHtml(hwLayout, 'hw', hwLabel);
+        const rdTree = multi ? treeHtml(rdLayout, 'rec', (r) => esc(r.title), RecitationModel.roundWeek, '🗓️') : treeHtml(rdLayout, 'rec', (r) => esc(r.title));
+        const OUT = multi ? ReportOutput.multi : ReportOutput;
+        const buildOf = (sel) => (multi ? ScoreReport.buildMulti(sel) : ScoreReport.build(sel));
         dropSaved(classId);
         let titleEdited = false;
 
         Modal.open({
-            title: '📤 导出班级学情',
+            title: multi ? '🗓️ 导出多周学情' : '📤 导出单周学情',
             wide: true,
             dirtyKey: () => '',   // 只是选择内容，没有要保存的东西，关闭时不询问
             html: `
                 <div class="ex-dialog">
                     ${masterHtml()}
+                    ${multi ? weeksStripHtml(hwLayout, rdLayout) : ''}
                     <div class="ex-cols">
                         <div class="ex-col">
-                            ${colHeadHtml('hw', '📝 作业')}
-                            <div class="ex-tree">${treeHtml(hwLayout, 'hw', (h) => `${esc(h.title)}<small>${esc(Utils.formatDate(h.date))}</small>`)}</div>
+                            ${colHeadHtml('hw', multi ? '📝 作业（按周）' : '📝 作业')}
+                            <div class="ex-tree">${hwTree}</div>
                         </div>
                         <div class="ex-col">
-                            ${colHeadHtml('rec', '📖 背诵任务')}
-                            <div class="ex-tree">${treeHtml(rdLayout, 'rec', (r) => esc(r.title))}</div>
+                            ${colHeadHtml('rec', multi ? '📖 背诵任务（按周）' : '📖 背诵任务')}
+                            <div class="ex-tree">${rdTree}</div>
                         </div>
                     </div>
                     <div class="ex-opts">
                         <label class="ex-title">标题<input type="text" data-ex-title autocomplete="off"></label>
                         <label>排序<select data-ex-sort>
                             <option value="no">按学号</option>
-                            <option value="score">按最终得分（高→低）</option>
+                            <option value="score">${multi ? '按总分（高→低）' : '按最终得分（高→低）'}</option>
                         </select></label>
                     </div>
                     <div class="ex-actions">
@@ -134,6 +173,7 @@
                         <button type="button" class="btn-primary" data-ex-out="md">📝 Markdown</button>
                         <button type="button" class="btn-secondary" data-ex-out="copy">📋 复制 Markdown</button>
                     </div>
+                    ${multi ? '<p class="hint">按自然周（周一到周日）分：作业看作业日期，背诵看任务设定的日期。每周单独计分（作业的全部按时完成 / 差一项加分按那一周的作业数算），再把各周相加。报表前面是多周总分和各周概览，后面每周一份完整的单周学情；PDF 里每周从新的一页开始，Excel 里每周三张表。</p>' : ''}
                     <p class="hint">PDF：会打开浏览器的打印窗口，「打印机」选「另存为 PDF」即可保存；在「更多设置」里取消勾选「页眉和页脚」，否则会多印网址和时间（页码报表自带）。加减分规则在「主页 → ⚙️ 设置」里调整。</p>
                     <div class="ex-preview" data-ex-preview></div>
                 </div>`,
@@ -143,6 +183,11 @@
 
                 // 默认标题：勾的作业正好全在同一个分组夹里 → 用分组夹名；否则用班级名
                 function autoTitle(hwIds) {
+                    if (multi) {
+                        const cls = AppState.getActiveClass();
+                        const k = ScoreReport.splitWeeks(hwIds, picked('rec')).length;
+                        return `${cls ? cls.name + ' ' : ''}多周学情${k ? `（${k} 周）` : ''}`;
+                    }
                     const groups = new Set(hwIds.map((id) => { const h = HomeworkModel.get(id); return (h && h.groupId) || ''; }));
                     if (hwIds.length && groups.size === 1) {
                         const g = SideGroups.getGroup(Array.from(groups)[0]);
@@ -167,8 +212,8 @@
                     const empty = !sel.hwIds.length && !sel.roundIds.length;
                     body.querySelectorAll('[data-ex-out]').forEach((b) => { b.disabled = empty; });
                     q('[data-ex-preview]').innerHTML = empty
-                        ? '<div class="empty-message">先在上面勾选要统计的作业或背诵任务</div>'
-                        : ReportOutput.html(ScoreReport.build(sel));
+                        ? `<div class="empty-message">先在上面勾选要统计的${multi ? '几周的' : ''}作业或背诵任务</div>`
+                        : OUT.html(buildOf(sel));
                 }
 
                 body.addEventListener('change', (e) => {
@@ -180,18 +225,18 @@
                 q('[data-ex-title]').addEventListener('change', refresh);
 
                 body.querySelectorAll('[data-ex-out]').forEach((btn) => btn.addEventListener('click', async () => {
-                    const rp = ScoreReport.build(current());
+                    const rp = buildOf(current());
                     const base = ReportOutput.fileBase(rp);
                     try {
-                        if (btn.dataset.exOut === 'pdf') ReportOutput.print(rp);
+                        if (btn.dataset.exOut === 'pdf') OUT.print(rp);
                         else if (btn.dataset.exOut === 'xlsx') {
-                            Utils.downloadText(base + '.xlsx', ReportOutput.xlsx(rp), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                            Utils.downloadText(base + '.xlsx', OUT.xlsx(rp), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
                             Toast.success(`已导出 ${base}.xlsx`);
                         } else if (btn.dataset.exOut === 'md') {
-                            Utils.downloadText(base + '.md', ReportOutput.markdown(rp), 'text/markdown;charset=utf-8');
+                            Utils.downloadText(base + '.md', OUT.markdown(rp), 'text/markdown;charset=utf-8');
                             Toast.success(`已导出 ${base}.md`);
                         } else {
-                            await navigator.clipboard.writeText(ReportOutput.markdown(rp));
+                            await navigator.clipboard.writeText(OUT.markdown(rp));
                             Toast.success('Markdown 已复制到剪贴板');
                         }
                     } catch (err) {
@@ -362,5 +407,5 @@
         });
     }
 
-    window.ExportReport = { cardHtml, bindCard, settingRowHtml, openDialog, openPersonalDialog, openRules };
+    window.ExportReport = { cardHtml, bindCard, settingRowHtml, openDialog, openMultiDialog, openPersonalDialog, openRules };
 })();

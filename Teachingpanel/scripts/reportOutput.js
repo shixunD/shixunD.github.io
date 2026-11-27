@@ -413,11 +413,15 @@
 
     // ---------- Excel ----------
 
-    function xlsx(rp) {
+    function xlsx(rp) { return XlsxLite.build(xlsxSheets(rp)); }
+
+    // 单周学情的三张表；prefix（多周导出里的「第 1 周 」）加在表名前，footerTitle 换页脚上的报表名
+    function xlsxSheets(rp, prefix, footerTitle) {
+        const pre = prefix || '';
         const { REC, MUTED } = XL;
         const th = xlTh, td = xlTd, colorOf = xlColor;
         const thRec = (v) => xlTh(v, { fill: REC });
-        const footer = [rp.className, rp.title].filter(Boolean).join(' · ');
+        const footer = [rp.className, footerTitle || rp.title].filter(Boolean).join(' · ');
         const s = rp.summary;
         const width = 2 + (rp.n ? 4 : 0) + rp.rounds.length + (rp.rounds.length ? 1 : 0);
 
@@ -491,11 +495,243 @@
             unfixedByHw(rp).forEach((g) => rows3.push([hwLabel(g.hw), g.items.map((x) => `${x.student.name}（${hwStatus(x.status).label}）`).join('、')]));
         }
 
-        return XlsxLite.build([
-            { name: '汇总', cols: cols1, freeze: 5, rows: rows1, merges: width > 1 ? [`A1:${lastCol}1`, `A2:${lastCol}2`, `A3:${lastCol}3`] : [], print: xlPrint(5, footer, width > 7) },
-            { name: '逐项明细', cols: cols2, freeze: 1, rows: rows2, print: xlPrint(1, footer, cols2.length > 8) },
-            { name: '说明与名单', cols: [26, 90], rows: rows3, print: xlPrint(0, footer) }
-        ]);
+        return [
+            { name: pre + '汇总', cols: cols1, freeze: 5, rows: rows1, merges: width > 1 ? [`A1:${lastCol}1`, `A2:${lastCol}2`, `A3:${lastCol}3`] : [], print: xlPrint(5, footer, width > 7) },
+            { name: pre + '逐项明细', cols: cols2, freeze: 1, rows: rows2, print: xlPrint(1, footer, cols2.length > 8) },
+            { name: pre + '说明与名单', cols: [26, 90], rows: rows3, print: xlPrint(0, footer) }
+        ];
+    }
+
+    // ---------- 多周学情（ScoreReport.buildMulti 的结果，1.52.0） ----------
+    // 前面是多周才有的页：总分表（每周作业 / 背诵分开）、各周概览；后面每一周照抄单周学情的全部内容（html / markdown / 三张 Excel 表）
+
+    // 「11月2日–8日」「10月26日–11月1日」
+    function weekRange(w) {
+        const a = Utils.parseDate(w.monday), b = Utils.parseDate(w.sunday);
+        return `${a.getMonth() + 1}月${a.getDate()}日–${a.getMonth() === b.getMonth() ? '' : (b.getMonth() + 1) + '月'}${b.getDate()}日`;
+    }
+    const weekTitle = (w) => `第 ${w.no} 周（${weekRange(w)}）`;
+    const weekCols = (w) => (w.rp.n ? ['hw'] : []).concat(w.rp.rounds.length ? ['rec'] : []);
+    // 每周两小列（作业 / 背诵）放得下就分开写；周数多、总列数超过 10 时每周只写一列「本周得分」
+    const multiCompact = (m) => m.weeks.reduce((s, w) => s + weekCols(w).length, 0) > 10;
+    const multiDates = (m) => m.weeks.reduce((a, w) => a.concat(w.rp.hws.map((h) => h.date), w.rp.rounds.map((r) => r.day)), []);
+    const multiBadge = (m) => [`${m.summary.weeks} 周`, m.summary.hwCount ? `作业 ${m.summary.hwCount} 项` : '', m.summary.recCount ? `背诵 ${m.summary.recCount} 项` : '', `${m.summary.students} 人`].filter(Boolean).join(' · ');
+    function multiMetaBits(m) {
+        const range = rangeText(multiDates(m));
+        return [m.className, range ? `统计范围：${range}` : '', `导出于 ${cnStamp(m.exportedAt)}`];
+    }
+    const multiMeta = (m) => [m.className, multiBadge(m)].concat(multiMetaBits(m).slice(1)).filter(Boolean).join(' · ');
+    const scoreOrDash = (v) => (v == null ? '—' : signed(v));
+
+    // 计分说明：按周算的作业规则（不写具体项数，各周的项数在各周页里）
+    function multiRuleText(m) {
+        const r = m.rules, bits = ['每周单独计分，再把各周得分相加'];
+        if (m.summary.hasHw) {
+            const pen = ['poor', 'missing', 'poor_fixed', 'missing_fixed'].filter((k) => r.penalty[k] > 0).map((k) => `${hwStatus(k).label} ${signed(-r.penalty[k])}／项`);
+            bits.push(`作业：该周全部按时完成 ${signed(r.bonusAll)}，该周差一项 ${signed(r.bonusOneOff)}（该周作业不少于 2 项才有）` + (pen.length ? '，' + pen.join('，') : ''));
+        }
+        if (m.summary.hasRec) bits.push(recScoreText(m).replace(/^背诵加减分：/, '背诵：'));
+        return bits.join('；');
+    }
+
+    // 某周的统计数字（各周概览）
+    function weekStat(m, w, k) {
+        const s = w.rp.summary;
+        const recChecks = w.rp.rounds.length * s.students;
+        const recPass = s.rec.reduce((a, x) => a + x.pass, 0);
+        return {
+            hwAvg: w.rp.n ? signed(s.avg) : '—',
+            full: w.rp.n ? `${s.full} 人` : '—',
+            rec: w.rp.rounds.length ? `${recPass}/${recChecks}（${Utils.percent(recPass, recChecks)}）` : '—',
+            recAvg: w.rp.rounds.length ? signed(s.students ? s.recTotal / s.students : 0) : '—',
+            avg: signed(m.rows.length ? m.rows.reduce((a, r) => a + r.weeks[k].total, 0) / m.rows.length : 0)
+        };
+    }
+
+    function multiTotalTable(m) {
+        const S = m.summary, compact = multiCompact(m);
+        const cls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+        const both = S.hasHw && S.hasRec;
+        const tail = (both ? '<th class="rp-num" rowspan="2">作业合计</th><th class="rp-num rp-rec-th" rowspan="2">背诵合计</th>' : '') + '<th class="rp-num" rowspan="2">总分</th>';
+        const rs = compact ? '' : ' rowspan="2"';
+        const head1 = `<th class="rp-c"${rs}>学号</th><th${rs}>学生</th>` +
+            m.weeks.map((w) => `<th class="rp-c rp-wk-h${compact ? '' : ' rp-wk-start'}"${compact ? '' : ` colspan="${weekCols(w).length}"`}>第 ${w.no} 周<small>${esc(weekRange(w))}</small></th>`).join('') +
+            (compact ? tail.replace(/ rowspan="2"/g, '') : tail);
+        const head2 = compact ? '' : `<tr>${m.weeks.map((w) => weekCols(w).map((c, i) => `<th class="rp-num${c === 'rec' ? ' rp-rec-th' : ''}${i === 0 ? ' rp-wk-start' : ''}">${c === 'hw' ? '作业' : '背诵'}</th>`).join('')).join('')}</tr>`;
+        const body = m.rows.map((row) => {
+            const wk = m.weeks.map((w, k) => {
+                const x = row.weeks[k];
+                if (compact) return `<td class="rp-num rp-wk-start ${cls(x.total)}">${signed(x.total)}</td>`;
+                return weekCols(w).map((c, i) => {
+                    const v = x[c];
+                    return `<td class="rp-num${i === 0 ? ' rp-wk-start' : ''}${v == null ? ' rp-dash' : ' ' + cls(v)}">${scoreOrDash(v)}</td>`;
+                }).join('');
+            }).join('');
+            const sums = (both ? `<td class="rp-num rp-final rp-sep ${cls(row.hwTotal)}">${signed(row.hwTotal)}</td><td class="rp-num rp-final ${cls(row.recTotal)}">${signed(row.recTotal)}</td>` : '') +
+                `<td class="rp-num rp-final${both ? '' : ' rp-sep'} ${cls(row.total)}">${signed(row.total)}</td>`;
+            return `<tr><td class="rp-no">${esc(row.student.studentNo)}</td><td class="rp-name">${esc(row.student.name)}</td>${wk}${sums}</tr>`;
+        }).join('');
+        return `
+            <table class="rp-table rp-sum rp-multi-sum">
+                <thead><tr>${head1}</tr>${head2}</thead>
+                <tbody>${body}</tbody>
+            </table>
+            ${compact ? '<p class="rp-note">周数较多，每周只写一列本周得分（作业 + 背诵）；每周的作业 / 背诵得分见后面各周的页面。</p>' : ''}`;
+    }
+
+    function multiWeekTable(m) {
+        const S = m.summary;
+        const body = m.weeks.map((w, k) => {
+            const st = weekStat(m, w, k);
+            return `<tr><td class="rp-c rp-name">第 ${w.no} 周</td><td class="rp-date">${esc(weekRange(w))}</td>` +
+                (S.hasHw ? `<td class="rp-num">${w.rp.n || '—'}</td><td class="rp-num">${st.hwAvg}</td><td class="rp-num">${st.full}</td>` : '') +
+                (S.hasRec ? `<td class="rp-num rp-sep">${w.rp.rounds.length || '—'}</td><td class="rp-num">${st.rec}</td><td class="rp-num">${st.recAvg}</td>` : '') +
+                `<td class="rp-num rp-final rp-sep">${st.avg}</td></tr>`;
+        }).join('');
+        return `
+            <table class="rp-table rp-auto rp-weeks">
+                <thead><tr><th class="rp-c">周次</th><th>日期</th>
+                    ${S.hasHw ? `<th class="rp-num">作业项数</th><th class="rp-num">作业人均</th><th class="rp-num">全部按时完成 ${signed(m.rules.bonusAll)}</th>` : ''}
+                    ${S.hasRec ? '<th class="rp-num rp-rec-th">背诵项数</th><th class="rp-num rp-rec-th">背诵过关（人次）</th><th class="rp-num rp-rec-th">背诵人均</th>' : ''}
+                    <th class="rp-num">人均总分</th></tr></thead>
+                <tbody>${body}</tbody>
+            </table>`;
+    }
+
+    function multiHtml(m) {
+        const S = m.summary;
+        const cards = [
+            { tag: '多周', label: '统计周数', v: S.weeks, unit: '周' },
+            { tag: '多周', label: '全班总分', v: signed(S.total) },
+            { tag: '多周', label: '人均总分', v: signed(S.avg) }
+        ];
+        if (S.hasHw && S.hasRec) {
+            cards.push({ tag: '作业', label: '人均作业得分', v: signed(S.hwAvg) });
+            cards.push({ tag: '背诵', sub: true, label: '人均背诵得分', v: signed(S.recAvg) });
+        }
+        cards.push({ tag: '多周', label: '正分 / 0 / 负分', v: `${S.pos} / ${S.zero} / ${S.neg}` });
+        return `
+            <div class="rp rp-multi">
+                ${headHtml(m.title, multiBadge(m), multiMetaBits(m).map((b, i) => (i === 2 ? b + '（以导出时的状态为准）' : b)))}
+                <div class="rp-rules"><span class="rp-rule" style="white-space:normal">${esc(multiRuleText(m))}</span></div>
+                <div class="rp-line"></div>
+                ${cardsHtml(cards)}
+                <div class="rp-section rp-first">
+                    <h2 class="rp-h2">一、多周总分（每周作业、背诵分开计分）</h2>
+                    ${multiTotalTable(m)}
+                </div>
+                <div class="rp-section">
+                    <h2 class="rp-h2">二、各周概览</h2>
+                    ${multiWeekTable(m)}
+                </div>
+                ${m.weeks.map((w) => `<div class="rp-week">${html(Object.assign({}, w.rp, { title: `${m.title} · ${weekTitle(w)}` }))}</div>`).join('')}
+            </div>`;
+    }
+
+    function multiMarkdown(m) {
+        const S = m.summary, compact = multiCompact(m);
+        const L = [`# ${m.title}`, '', multiMeta(m), '', `**计分方式：** ${multiRuleText(m)}`, ''];
+        const both = S.hasHw && S.hasRec;
+        const head = ['学号', '学生'], align = ['---:', '---'];
+        m.weeks.forEach((w) => {
+            if (compact) { head.push(`第${w.no}周（${weekRange(w)}）`); align.push(':---:'); }
+            else weekCols(w).forEach((c) => { head.push(`第${w.no}周${c === 'hw' ? '作业' : '背诵'}`); align.push(':---:'); });
+        });
+        if (both) { head.push('作业合计', '背诵合计'); align.push(':---:', ':---:'); }
+        head.push('总分'); align.push(':---:');
+        L.push('## 多周总分', '');
+        if (!compact) L.push(m.weeks.map((w) => `第${w.no}周 = ${weekRange(w)}`).join('，'), '');
+        L.push(`| ${head.join(' | ')} |`, `|${align.join('|')}|`);
+        m.rows.forEach((row) => {
+            const c = [mdCell(row.student.studentNo), mdCell(row.student.name)];
+            m.weeks.forEach((w, k) => {
+                if (compact) c.push(signed(row.weeks[k].total));
+                else weekCols(w).forEach((col) => c.push(scoreOrDash(row.weeks[k][col])));
+            });
+            if (both) c.push(signed(row.hwTotal), signed(row.recTotal));
+            c.push(`**${signed(row.total)}**`);
+            L.push(`| ${c.join(' | ')} |`);
+        });
+        L.push('', `**汇总：** ${S.weeks} 周 ｜ 全班总分 ${signed(S.total)} ｜ 人均总分 ${signed(S.avg)}${both ? ` ｜ 人均作业 ${signed(S.hwAvg)} ｜ 人均背诵 ${signed(S.recAvg)}` : ''} ｜ 正分 / 0 / 负分：${S.pos} / ${S.zero} / ${S.neg}`, '');
+        L.push('## 各周概览', '');
+        const wh = ['周次', '日期'], wa = ['---', '---'];
+        if (S.hasHw) { wh.push('作业项数', '作业人均', `全部按时完成 ${signed(m.rules.bonusAll)}`); wa.push(':---:', ':---:', ':---:'); }
+        if (S.hasRec) { wh.push('背诵项数', '背诵过关（人次）', '背诵人均'); wa.push(':---:', ':---:', ':---:'); }
+        wh.push('人均总分'); wa.push(':---:');
+        L.push(`| ${wh.join(' | ')} |`, `|${wa.join('|')}|`);
+        m.weeks.forEach((w, k) => {
+            const st = weekStat(m, w, k);
+            const c = [`第${w.no}周`, weekRange(w)];
+            if (S.hasHw) c.push(w.rp.n || '—', st.hwAvg, st.full);
+            if (S.hasRec) c.push(w.rp.rounds.length || '—', st.rec, st.recAvg);
+            c.push(st.avg);
+            L.push(`| ${c.join(' | ')} |`);
+        });
+        L.push('');
+        // 各周：单周学情的 Markdown 原样放进来，一级标题降成二级
+        m.weeks.forEach((w) => {
+            L.push(markdown(Object.assign({}, w.rp, { title: weekTitle(w) })).replace(/^# /, '## '), '');
+        });
+        return L.join('\n').replace(/\n{3,}/g, '\n\n');
+    }
+
+    function multiXlsx(m) {
+        const S = m.summary, compact = multiCompact(m);
+        const th = xlTh, td = xlTd, colorOf = xlColor, MUTED = XL.MUTED;
+        const thRec = (v) => xlTh(v, { fill: XL.REC });
+        const footer = [m.className, m.title].filter(Boolean).join(' · ');
+        const both = S.hasHw && S.hasRec;
+        const top = [[{ v: m.title, s: { bold: true, size: 16 } }], [{ v: multiMeta(m), s: { color: MUTED } }], [{ v: multiRuleText(m), s: { wrap: true } }], []];
+
+        // 表 1：多周总分
+        const head = [th('学号'), th('学生', { align: 'left' })];
+        const cols = [7, 12];
+        m.weeks.forEach((w) => {
+            if (compact) { head.push(th(`第${w.no}周\n${weekRange(w)}`)); cols.push(12); }
+            else weekCols(w).forEach((c) => { head.push((c === 'hw' ? th : thRec)(`第${w.no}周${c === 'hw' ? '作业' : '背诵'}\n${weekRange(w)}`)); cols.push(12); });
+        });
+        if (both) { head.push(th('作业合计'), thRec('背诵合计')); cols.push(10, 10); }
+        head.push(th('总分')); cols.push(10);
+        const rows1 = top.concat([head]);
+        m.rows.forEach((row) => {
+            const no = row.student.studentNo;
+            const line = [td(/^\d+$/.test(no) ? Number(no) : no, { align: 'center', color: MUTED }), td(row.student.name, { bold: true })];
+            const num = (v, bold) => (v == null ? td('—', { align: 'center', color: MUTED }) : td(v, { align: 'center', signed: true, bold: !!bold, color: colorOf(v) }));
+            m.weeks.forEach((w, k) => {
+                if (compact) line.push(num(row.weeks[k].total));
+                else weekCols(w).forEach((c) => line.push(num(row.weeks[k][c])));
+            });
+            if (both) line.push(num(row.hwTotal, true), num(row.recTotal, true));
+            line.push(num(row.total, true));
+            rows1.push(line);
+        });
+        const last1 = colLetter(head.length);
+
+        // 表 2：各周概览
+        const wh = [th('周次'), th('日期')];
+        const wcols = [8, 16];
+        if (S.hasHw) { wh.push(th('作业项数'), th('作业人均'), th(`全部按时完成 ${signed(m.rules.bonusAll)}`)); wcols.push(10, 10, 14); }
+        if (S.hasRec) { wh.push(thRec('背诵项数'), thRec('背诵过关（人次）'), thRec('背诵人均')); wcols.push(10, 18, 10); }
+        wh.push(th('人均总分')); wcols.push(10);
+        const rows2 = [[{ v: m.title + ' · 各周概览', s: { bold: true, size: 14 } }], [{ v: multiMeta(m), s: { color: MUTED } }], [], wh];
+        m.weeks.forEach((w, k) => {
+            const st = weekStat(m, w, k);
+            const c = [td(`第${w.no}周`, { align: 'center', bold: true }), td(weekRange(w))];
+            if (S.hasHw) c.push(td(w.rp.n || '—', { align: 'center' }), td(st.hwAvg, { align: 'center' }), td(st.full, { align: 'center' }));
+            if (S.hasRec) c.push(td(w.rp.rounds.length || '—', { align: 'center' }), td(st.rec, { align: 'center' }), td(st.recAvg, { align: 'center' }));
+            c.push(td(st.avg, { align: 'center', bold: true }));
+            rows2.push(c);
+        });
+
+        const sheets = [
+            { name: '多周总分', cols, freeze: 5, rows: rows1, merges: head.length > 1 ? [`A1:${last1}1`, `A2:${last1}2`, `A3:${last1}3`] : [], print: xlPrint(5, footer, head.length > 8) },
+            { name: '各周概览', cols: wcols, freeze: 4, rows: rows2, print: xlPrint(4, footer, wh.length > 7) }
+        ];
+        // 各周：单周学情的三张表，表名前加「第 N 周 」
+        m.weeks.forEach((w) => {
+            xlsxSheets(Object.assign({}, w.rp, { title: `${m.title} · ${weekTitle(w)}` }), `第${w.no}周 `, m.title).forEach((sh) => sheets.push(sh));
+        });
+        return XlsxLite.build(sheets);
     }
 
     // 文件名（不含扩展名）：去掉文件名里不能用的字符
@@ -505,6 +741,7 @@
 
     window.ReportOutput = {
         markdown, html, print, xlsx, fileBase,
+        multi: { markdown: multiMarkdown, html: multiHtml, xlsx: multiXlsx, print: (m) => printHtml(multiHtml(m), fileBase(m), [m.className, m.title].filter(Boolean).join(' · ')), weekTitle, weekRange },
         personal: { markdown: personalMarkdown, html: personalHtml, xlsx: personalXlsx, print: (p) => printHtml(personalHtml(p), fileBase(p), [p.className, p.title].filter(Boolean).join(' · ')) }
     };
 })();
